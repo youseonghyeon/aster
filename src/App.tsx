@@ -1,50 +1,104 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
+import { memo, useDeferredValue, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import "./App.css";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+const initialMarkdown = `# 읽기 좋은 마크다운 뷰어
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+왼쪽에서 마크다운을 작성하면 오른쪽에서 **바로 확인**할 수 있습니다.
+
+## 가독성을 위한 시작점
+
+- 편안한 본문 너비와 넉넉한 줄 간격
+- 제목과 본문이 명확하게 구분되는 크기
+- 표, 체크리스트, 코드 블록을 지원하는 GitHub Flavored Markdown
+
+> 좋은 문서는 내용뿐 아니라 읽는 경험도 중요합니다.
+
+### 작업 목록
+
+- [x] 좌우 분할 화면 만들기
+- [x] 실시간 미리보기 연결하기
+- [ ] 로컬 마크다운 파일 열기
+- [ ] 글꼴과 테마 설정 추가하기
+
+| 요소 | 상태 |
+| --- | --- |
+| 실시간 미리보기 | 준비됨 |
+| 표와 체크리스트 | 준비됨 |
+
+~~~ts
+const message: string = "Aster에서 편안하게 읽기";
+console.log(message);
+~~~
+`;
+
+const markdownPlugins = [remarkGfm];
+
+const MarkdownPreview = memo(function MarkdownPreview({
+  content,
+}: {
+  content: string;
+}) {
+  return (
+    <article className="markdown-body">
+      <ReactMarkdown remarkPlugins={markdownPlugins}>{content}</ReactMarkdown>
+    </article>
+  );
+});
+
+function App() {
+  const [markdown, setMarkdown] = useState(initialMarkdown);
+  const deferredMarkdown = useDeferredValue(markdown);
+  const isPreviewUpdating = markdown !== deferredMarkdown;
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="brand" aria-label="Aster 마크다운 뷰어">
+          <span className="brand-mark" aria-hidden="true">
+            A
+          </span>
+          <span>Aster</span>
+        </div>
+        <span className="document-name">새 문서.md</span>
+        <span className="character-count">
+          {markdown.length.toLocaleString("ko-KR")}자
+        </span>
+      </header>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
+      <main className="workspace">
+        <section className="pane editor-pane" aria-labelledby="editor-title">
+          <div className="pane-header">
+            <h2 id="editor-title">마크다운</h2>
+            <span>입력</span>
+          </div>
+          <textarea
+            id="markdown-editor"
+            className="markdown-editor"
+            value={markdown}
+            onChange={(event) => setMarkdown(event.currentTarget.value)}
+            aria-label="마크다운 입력"
+            spellCheck="false"
+          />
+        </section>
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+        <section className="pane preview-pane" aria-labelledby="preview-title">
+          <div className="pane-header">
+            <h2 id="preview-title">미리보기</h2>
+            <span aria-live="polite">
+              {isPreviewUpdating ? "업데이트 중" : "실시간"}
+            </span>
+          </div>
+          <div
+            className={`preview-scroll${isPreviewUpdating ? " is-updating" : ""}`}
+            aria-busy={isPreviewUpdating}
+          >
+            <MarkdownPreview content={deferredMarkdown} />
+          </div>
+        </section>
+      </main>
+    </div>
   );
 }
 

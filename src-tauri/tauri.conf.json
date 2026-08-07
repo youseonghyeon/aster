@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "aster",
+  "productName": "Aster",
   "version": "0.1.0",
   "identifier": "com.yuseonghyeon.aster",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "aster",
+        "title": "Aster",
         "width": 800,
         "height": 600
       }
