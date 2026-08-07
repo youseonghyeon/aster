@@ -8,6 +8,15 @@ importers:
 
   .:
     dependencies:
+      '@fontsource-variable/noto-sans-kr':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource-variable/noto-serif-kr':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/pretendard':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@tauri-apps/api':
         specifier: ^2
         version: 2.11.1
@@ -286,6 +295,15 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource-variable/noto-sans-kr@5.3.0':
+    resolution: {integrity: sha512-h863ZOIVMKjX0PSr0hLMUp/SjrwOul2yp0f5P61avqXdhqDABSkakzG2Ee07d3W8gVYgS9dMmxULdCkoN09f1A==}
+
+  '@fontsource-variable/noto-serif-kr@5.3.0':
+    resolution: {integrity: sha512-sy7jHCFyLRfo86KbolWCUDuWYroUvbUZqxQikjOv1F6+rOjS5PtGPS9MLB5MBCCB1gcKfBaZKzKCu3I0OqOqnw==}
+
+  '@fontsource/pretendard@5.3.0':
+    resolution: {integrity: sha512-IDvI+QlHSFW9AkBX8cKXFi9nRJXdj7IQSGSqgemwFqII6EptpWQmWKcs3OfTZBT2yftzqt6VF6abQpUeAmHxMA==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -1215,6 +1233,12 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.1':
     optional: true
+
+  '@fontsource-variable/noto-sans-kr@5.3.0': {}
+
+  '@fontsource-variable/noto-serif-kr@5.3.0': {}
+
+  '@fontsource/pretendard@5.3.0': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
