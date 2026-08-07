@@ -1,4 +1,8 @@
 use std::{fs, path::PathBuf};
+use tauri::{
+    menu::{Menu, MenuItemBuilder, MenuItemKind, PredefinedMenuItem},
+    Emitter,
+};
 
 const MAX_MARKDOWN_FILE_SIZE: u64 = 10 * 1024 * 1024;
 
@@ -62,6 +66,29 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .menu(|app| {
+            let menu = Menu::default(app)?;
+            let open_item = MenuItemBuilder::with_id("open_markdown", "Open…")
+                .accelerator("CmdOrCtrl+O")
+                .build(app)?;
+            let separator = PredefinedMenuItem::separator(app)?;
+
+            for item in menu.items()? {
+                if let MenuItemKind::Submenu(submenu) = item {
+                    if submenu.text()? == "File" {
+                        submenu.prepend_items(&[&open_item, &separator])?;
+                        break;
+                    }
+                }
+            }
+
+            Ok(menu)
+        })
+        .on_menu_event(|app, event| {
+            if event.id() == "open_markdown" {
+                let _ = app.emit("open-markdown-requested", ());
+            }
+        })
         .invoke_handler(tauri::generate_handler![read_markdown_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

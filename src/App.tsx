@@ -10,6 +10,7 @@ import {
   type PointerEvent,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { message, open } from "@tauri-apps/plugin-dialog";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -380,6 +381,7 @@ function App() {
   const settingsRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const openFileRef = useRef<() => void>(() => undefined);
+  const isOpeningFileRef = useRef(false);
   const splitPercentRef = useRef(50);
   const deferredMarkdown = useDeferredValue(markdown);
   const isPreviewUpdating = markdown !== deferredMarkdown;
@@ -397,22 +399,23 @@ function App() {
     readingZoom === readingZoomLevels[readingZoomLevels.length - 1].value;
 
   useEffect(() => {
-    function handleOpenFileShortcut(event: globalThis.KeyboardEvent) {
-      if (
-        (!event.metaKey && !event.ctrlKey) ||
-        event.shiftKey ||
-        event.altKey ||
-        event.key.toLowerCase() !== "o"
-      ) {
-        return;
-      }
+    let isDisposed = false;
+    let stopListening: (() => void) | undefined;
 
-      event.preventDefault();
+    void listen("open-markdown-requested", () => {
       openFileRef.current();
-    }
+    }).then((unlisten) => {
+      if (isDisposed) {
+        unlisten();
+      } else {
+        stopListening = unlisten;
+      }
+    });
 
-    window.addEventListener("keydown", handleOpenFileShortcut);
-    return () => window.removeEventListener("keydown", handleOpenFileShortcut);
+    return () => {
+      isDisposed = true;
+      stopListening?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -638,10 +641,11 @@ function App() {
   }
 
   async function handleOpenFile() {
-    if (isOpeningFile) {
+    if (isOpeningFileRef.current) {
       return;
     }
 
+    isOpeningFileRef.current = true;
     setIsOpeningFile(true);
 
     try {
@@ -672,6 +676,7 @@ function App() {
         console.error("파일을 열 수 없습니다:", errorMessage);
       }
     } finally {
+      isOpeningFileRef.current = false;
       setIsOpeningFile(false);
     }
   }
