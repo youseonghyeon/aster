@@ -1157,16 +1157,23 @@ select {
   font-size: 0.9em;
   font-variant-numeric: tabular-nums;
   line-height: 1.5;
+  table-layout: auto;
 }
 
 .markdown-body th,
 .markdown-body td {
-  min-width: 7.85em;
   padding: 0.72em 1.05em;
   border: 0;
   border-bottom: 1px solid var(--border-soft);
   text-align: left;
   vertical-align: middle;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+.markdown-body :is(th, td) :is(a, code) {
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .markdown-body th {
