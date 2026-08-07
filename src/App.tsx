@@ -35,6 +35,14 @@ console.log(message);
 
 const markdownPlugins = [remarkGfm];
 
+type PaneKind = "editor" | "preview";
+type PaneSide = "left" | "right";
+
+const oppositePane: Record<PaneKind, PaneKind> = {
+  editor: "preview",
+  preview: "editor",
+};
+
 const MarkdownPreview = memo(function MarkdownPreview({
   content,
 }: {
@@ -47,10 +55,90 @@ const MarkdownPreview = memo(function MarkdownPreview({
   );
 });
 
+function Pane({
+  side,
+  activePane,
+  markdown,
+  previewMarkdown,
+  isPreviewUpdating,
+  onSelectPane,
+  onMarkdownChange,
+}: {
+  side: PaneSide;
+  activePane: PaneKind;
+  markdown: string;
+  previewMarkdown: string;
+  isPreviewUpdating: boolean;
+  onSelectPane: (pane: PaneKind) => void;
+  onMarkdownChange: (value: string) => void;
+}) {
+  const isEditor = activePane === "editor";
+  const paneLabel = side === "left" ? "왼쪽" : "오른쪽";
+
+  return (
+    <section
+      id={`${side}-pane`}
+      className={`pane ${isEditor ? "editor-pane" : "preview-pane"}`}
+      role="tabpanel"
+      aria-labelledby={`${side}-${activePane}-tab`}
+    >
+      <div className="pane-header">
+        <div className="pane-tabs" role="tablist" aria-label={`${paneLabel} 패널`}>
+          <button
+            id={`${side}-editor-tab`}
+            className={`pane-tab${isEditor ? " is-active" : ""}`}
+            type="button"
+            role="tab"
+            aria-selected={isEditor}
+            aria-controls={`${side}-pane`}
+            onClick={() => onSelectPane("editor")}
+          >
+            마크다운
+          </button>
+          <button
+            id={`${side}-preview-tab`}
+            className={`pane-tab${isEditor ? "" : " is-active"}`}
+            type="button"
+            role="tab"
+            aria-selected={!isEditor}
+            aria-controls={`${side}-pane`}
+            onClick={() => onSelectPane("preview")}
+          >
+            미리보기
+          </button>
+        </div>
+        <span aria-live={isEditor ? undefined : "polite"}>
+          {isEditor ? "입력" : isPreviewUpdating ? "업데이트 중" : "실시간"}
+        </span>
+      </div>
+
+      {isEditor ? (
+        <textarea
+          id="markdown-editor"
+          className="markdown-editor"
+          value={markdown}
+          onChange={(event) => onMarkdownChange(event.currentTarget.value)}
+          aria-label="마크다운 입력"
+          spellCheck="false"
+        />
+      ) : (
+        <div
+          className={`preview-scroll${isPreviewUpdating ? " is-updating" : ""}`}
+          aria-busy={isPreviewUpdating}
+        >
+          <MarkdownPreview content={previewMarkdown} />
+        </div>
+      )}
+    </section>
+  );
+}
+
 function App() {
   const [markdown, setMarkdown] = useState(initialMarkdown);
+  const [leftPane, setLeftPane] = useState<PaneKind>("editor");
   const deferredMarkdown = useDeferredValue(markdown);
   const isPreviewUpdating = markdown !== deferredMarkdown;
+  const rightPane = oppositePane[leftPane];
 
   return (
     <div className="app-shell">
@@ -68,35 +156,24 @@ function App() {
       </header>
 
       <main className="workspace">
-        <section className="pane editor-pane" aria-labelledby="editor-title">
-          <div className="pane-header">
-            <h2 id="editor-title">마크다운</h2>
-            <span>입력</span>
-          </div>
-          <textarea
-            id="markdown-editor"
-            className="markdown-editor"
-            value={markdown}
-            onChange={(event) => setMarkdown(event.currentTarget.value)}
-            aria-label="마크다운 입력"
-            spellCheck="false"
-          />
-        </section>
-
-        <section className="pane preview-pane" aria-labelledby="preview-title">
-          <div className="pane-header">
-            <h2 id="preview-title">미리보기</h2>
-            <span aria-live="polite">
-              {isPreviewUpdating ? "업데이트 중" : "실시간"}
-            </span>
-          </div>
-          <div
-            className={`preview-scroll${isPreviewUpdating ? " is-updating" : ""}`}
-            aria-busy={isPreviewUpdating}
-          >
-            <MarkdownPreview content={deferredMarkdown} />
-          </div>
-        </section>
+        <Pane
+          side="left"
+          activePane={leftPane}
+          markdown={markdown}
+          previewMarkdown={deferredMarkdown}
+          isPreviewUpdating={isPreviewUpdating}
+          onSelectPane={setLeftPane}
+          onMarkdownChange={setMarkdown}
+        />
+        <Pane
+          side="right"
+          activePane={rightPane}
+          markdown={markdown}
+          previewMarkdown={deferredMarkdown}
+          isPreviewUpdating={isPreviewUpdating}
+          onSelectPane={(pane) => setLeftPane(oppositePane[pane])}
+          onMarkdownChange={setMarkdown}
+        />
       </main>
     </div>
   );

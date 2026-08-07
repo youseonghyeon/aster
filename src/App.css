@@ -100,9 +100,12 @@ textarea {
   min-height: 0;
 }
 
+.pane:first-child {
+  border-right: 1px solid #d8d4ca;
+}
+
 .editor-pane {
   background: #fbfaf7;
-  border-right: 1px solid #d8d4ca;
 }
 
 .preview-pane {
@@ -122,11 +125,51 @@ textarea {
   text-transform: uppercase;
 }
 
-.pane-header h2 {
-  margin: 0;
+.pane-tabs {
+  display: flex;
+  align-self: stretch;
+  gap: 14px;
+}
+
+.pane-tab {
+  position: relative;
+  padding: 1px 0 0;
+  color: #9a958c;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pane-tab::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: transparent;
+  border-radius: 2px 2px 0 0;
+  content: "";
+}
+
+.pane-tab:hover {
   color: #514e47;
-  font-size: inherit;
-  font-weight: 700;
+}
+
+.pane-tab:focus-visible {
+  outline: 2px solid #76a392;
+  outline-offset: 3px;
+}
+
+.pane-tab.is-active {
+  color: #315b4e;
+}
+
+.pane-tab.is-active::after {
+  background: #4e7e6e;
 }
 
 .markdown-editor {
@@ -351,7 +394,7 @@ textarea {
     min-height: 520px;
   }
 
-  .editor-pane {
+  .pane:first-child {
     border-right: 0;
     border-bottom: 1px solid #d8d4ca;
   }
