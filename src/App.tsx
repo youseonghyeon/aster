@@ -1,13 +1,15 @@
 import {
   memo,
   useDeferredValue,
+  useEffect,
   useRef,
   useState,
   type ChangeEvent,
+  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
 } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./App.css";
 
@@ -42,11 +44,23 @@ console.log(message);
 `;
 
 const markdownPlugins = [remarkGfm];
+const markdownComponents = {
+  table: ({ node, ...tableProps }) => {
+    void node;
+
+    return (
+      <div className="table-scroll" role="region" aria-label="표" tabIndex={0}>
+        <table {...tableProps} />
+      </div>
+    );
+  },
+} satisfies Components;
 const minimumPaneWidth = 240;
 const dividerWidth = 9;
 const themeStorageKey = "aster:theme:v1";
 const fontStorageKey = "aster:reading-font:v1";
 const lineSpacingStorageKey = "aster:line-spacing:v1";
+const readingZoomStorageKey = "aster:reading-zoom:v1";
 
 const themes = [
   { value: "paper", label: "종이" },
@@ -69,9 +83,21 @@ const lineSpacings = [
   { value: "wide", label: "넓게 2.1" },
 ] as const;
 
+const readingZoomLevels = [
+  { value: "80" },
+  { value: "90" },
+  { value: "100" },
+  { value: "110" },
+  { value: "120" },
+  { value: "130" },
+  { value: "140" },
+  { value: "150" },
+] as const;
+
 type Theme = (typeof themes)[number]["value"];
 type ReadingFont = (typeof readingFonts)[number]["value"];
 type LineSpacing = (typeof lineSpacings)[number]["value"];
+type ReadingZoom = (typeof readingZoomLevels)[number]["value"];
 
 type PaneKind = "editor" | "preview";
 type PaneSide = "left" | "right";
@@ -81,63 +107,42 @@ const oppositePane: Record<PaneKind, PaneKind> = {
   preview: "editor",
 };
 
-function loadTheme(): Theme {
+function loadPreference<T extends string>(
+  storageKey: string,
+  options: readonly { value: T }[],
+  fallback: T,
+): T {
   try {
-    const storedTheme = localStorage.getItem(themeStorageKey);
-    const isKnownTheme = themes.some((theme) => theme.value === storedTheme);
+    const storedValue = localStorage.getItem(storageKey);
+    const isKnownValue = options.some((option) => option.value === storedValue);
 
-    return isKnownTheme ? (storedTheme as Theme) : "paper";
+    return isKnownValue ? (storedValue as T) : fallback;
   } catch {
-    return "paper";
+    return fallback;
   }
 }
 
-function saveTheme(theme: Theme) {
+function savePreference(storageKey: string, value: string) {
   try {
-    localStorage.setItem(themeStorageKey, theme);
+    localStorage.setItem(storageKey, value);
   } catch {
-    // The theme still applies for this session when storage is unavailable.
+    // The setting still applies for this session when storage is unavailable.
   }
 }
 
-function loadReadingFont(): ReadingFont {
-  try {
-    const storedFont = localStorage.getItem(fontStorageKey);
-    const isKnownFont = readingFonts.some((font) => font.value === storedFont);
+function getSteppedReadingZoom(
+  currentZoom: ReadingZoom,
+  direction: -1 | 1,
+): ReadingZoom {
+  const currentIndex = readingZoomLevels.findIndex(
+    (option) => option.value === currentZoom,
+  );
+  const nextIndex = Math.min(
+    readingZoomLevels.length - 1,
+    Math.max(0, currentIndex + direction),
+  );
 
-    return isKnownFont ? (storedFont as ReadingFont) : "pretendard";
-  } catch {
-    return "pretendard";
-  }
-}
-
-function saveReadingFont(font: ReadingFont) {
-  try {
-    localStorage.setItem(fontStorageKey, font);
-  } catch {
-    // The font still applies for this session when storage is unavailable.
-  }
-}
-
-function loadLineSpacing(): LineSpacing {
-  try {
-    const storedSpacing = localStorage.getItem(lineSpacingStorageKey);
-    const isKnownSpacing = lineSpacings.some(
-      (spacing) => spacing.value === storedSpacing,
-    );
-
-    return isKnownSpacing ? (storedSpacing as LineSpacing) : "balanced";
-  } catch {
-    return "balanced";
-  }
-}
-
-function saveLineSpacing(spacing: LineSpacing) {
-  try {
-    localStorage.setItem(lineSpacingStorageKey, spacing);
-  } catch {
-    // The spacing still applies for this session when storage is unavailable.
-  }
+  return readingZoomLevels[nextIndex].value;
 }
 
 const MarkdownPreview = memo(function MarkdownPreview({
@@ -147,7 +152,12 @@ const MarkdownPreview = memo(function MarkdownPreview({
 }) {
   return (
     <article className="markdown-body">
-      <ReactMarkdown remarkPlugins={markdownPlugins}>{content}</ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={markdownPlugins}
+        components={markdownComponents}
+      >
+        {content}
+      </ReactMarkdown>
     </article>
   );
 });
@@ -235,15 +245,63 @@ function Pane({
 function App() {
   const [markdown, setMarkdown] = useState(initialMarkdown);
   const [leftPane, setLeftPane] = useState<PaneKind>("editor");
-  const [theme, setTheme] = useState(loadTheme);
-  const [readingFont, setReadingFont] = useState(loadReadingFont);
-  const [lineSpacing, setLineSpacing] = useState(loadLineSpacing);
+  const [theme, setTheme] = useState<Theme>(() =>
+    loadPreference(themeStorageKey, themes, "paper"),
+  );
+  const [readingFont, setReadingFont] = useState<ReadingFont>(() =>
+    loadPreference(fontStorageKey, readingFonts, "pretendard"),
+  );
+  const [lineSpacing, setLineSpacing] = useState<LineSpacing>(() =>
+    loadPreference(lineSpacingStorageKey, lineSpacings, "balanced"),
+  );
+  const [readingZoom, setReadingZoom] = useState<ReadingZoom>(() =>
+    loadPreference(readingZoomStorageKey, readingZoomLevels, "100"),
+  );
   const workspaceRef = useRef<HTMLElement>(null);
   const dividerRef = useRef<HTMLDivElement>(null);
   const splitPercentRef = useRef(50);
   const deferredMarkdown = useDeferredValue(markdown);
   const isPreviewUpdating = markdown !== deferredMarkdown;
   const rightPane = oppositePane[leftPane];
+  const readingZoomStyle = {
+    "--reading-font-size": `${(17 * Number(readingZoom)) / 100}px`,
+  } as CSSProperties;
+  const isMinimumZoom = readingZoom === readingZoomLevels[0].value;
+  const isMaximumZoom =
+    readingZoom === readingZoomLevels[readingZoomLevels.length - 1].value;
+
+  useEffect(() => {
+    function handleReadingZoomShortcut(event: globalThis.KeyboardEvent) {
+      if ((!event.metaKey && !event.ctrlKey) || event.altKey) {
+        return;
+      }
+
+      let nextZoom: ((currentZoom: ReadingZoom) => ReadingZoom) | undefined;
+
+      if (event.key === "+" || event.key === "=") {
+        nextZoom = (currentZoom) => getSteppedReadingZoom(currentZoom, 1);
+      } else if (event.key === "-" || event.key === "_") {
+        nextZoom = (currentZoom) => getSteppedReadingZoom(currentZoom, -1);
+      } else if (event.key === "0") {
+        nextZoom = () => "100";
+      }
+
+      if (!nextZoom) {
+        return;
+      }
+
+      event.preventDefault();
+      setReadingZoom((currentZoom) => {
+        const updatedZoom = nextZoom(currentZoom);
+
+        savePreference(readingZoomStorageKey, updatedZoom);
+        return updatedZoom;
+      });
+    }
+
+    window.addEventListener("keydown", handleReadingZoomShortcut);
+    return () => window.removeEventListener("keydown", handleReadingZoomShortcut);
+  }, []);
 
   function updateSplit(nextPercent: number) {
     const workspace = workspaceRef.current;
@@ -332,21 +390,30 @@ function App() {
     const nextTheme = event.currentTarget.value as Theme;
 
     setTheme(nextTheme);
-    saveTheme(nextTheme);
+    savePreference(themeStorageKey, nextTheme);
   }
 
   function handleReadingFontChange(event: ChangeEvent<HTMLSelectElement>) {
     const nextFont = event.currentTarget.value as ReadingFont;
 
     setReadingFont(nextFont);
-    saveReadingFont(nextFont);
+    savePreference(fontStorageKey, nextFont);
   }
 
   function handleLineSpacingChange(event: ChangeEvent<HTMLSelectElement>) {
     const nextSpacing = event.currentTarget.value as LineSpacing;
 
     setLineSpacing(nextSpacing);
-    saveLineSpacing(nextSpacing);
+    savePreference(lineSpacingStorageKey, nextSpacing);
+  }
+
+  function adjustReadingZoom(direction: -1 | 1) {
+    setReadingZoom((currentZoom) => {
+      const nextZoom = getSteppedReadingZoom(currentZoom, direction);
+
+      savePreference(readingZoomStorageKey, nextZoom);
+      return nextZoom;
+    });
   }
 
   return (
@@ -355,6 +422,7 @@ function App() {
       data-theme={theme}
       data-font={readingFont}
       data-line-spacing={lineSpacing}
+      style={readingZoomStyle}
     >
       <header className="app-header">
         <div className="brand" aria-label="Aster 마크다운 뷰어">
@@ -367,7 +435,12 @@ function App() {
         <div className="header-actions">
           <label className="setting-picker theme-picker">
             <span>테마</span>
-            <select name="theme" value={theme} onChange={handleThemeChange}>
+            <select
+              name="theme"
+              value={theme}
+              aria-label="테마"
+              onChange={handleThemeChange}
+            >
               {themes.map((themeOption) => (
                 <option key={themeOption.value} value={themeOption.value}>
                   {themeOption.label}
@@ -380,6 +453,7 @@ function App() {
             <select
               name="reading-font"
               value={readingFont}
+              aria-label="본문 글꼴"
               onChange={handleReadingFontChange}
             >
               {readingFonts.map((fontOption) => (
@@ -394,6 +468,7 @@ function App() {
             <select
               name="line-spacing"
               value={lineSpacing}
+              aria-label="줄 간격"
               onChange={handleLineSpacingChange}
             >
               {lineSpacings.map((spacingOption) => (
@@ -403,6 +478,35 @@ function App() {
               ))}
             </select>
           </label>
+          <div className="zoom-control" role="group" aria-label="미리보기 배율">
+            <button
+              type="button"
+              className="zoom-button"
+              aria-label="미리보기 축소"
+              title="미리보기 축소 (⌘/Ctrl -)"
+              disabled={isMinimumZoom}
+              onClick={() => adjustReadingZoom(-1)}
+            >
+              −
+            </button>
+            <output
+              className="zoom-value"
+              aria-label={`미리보기 배율 ${readingZoom}%`}
+              aria-live="polite"
+            >
+              {readingZoom}%
+            </output>
+            <button
+              type="button"
+              className="zoom-button"
+              aria-label="미리보기 확대"
+              title="미리보기 확대 (⌘/Ctrl +)"
+              disabled={isMaximumZoom}
+              onClick={() => adjustReadingZoom(1)}
+            >
+              +
+            </button>
+          </div>
           <span className="character-count">
             {markdown.length.toLocaleString("ko-KR")}자
           </span>
