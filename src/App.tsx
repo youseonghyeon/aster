@@ -1,4 +1,11 @@
-import { memo, useDeferredValue, useState } from "react";
+import {
+  memo,
+  useDeferredValue,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./App.css";
@@ -34,6 +41,8 @@ console.log(message);
 `;
 
 const markdownPlugins = [remarkGfm];
+const minimumPaneWidth = 240;
+const dividerWidth = 9;
 
 type PaneKind = "editor" | "preview";
 type PaneSide = "left" | "right";
@@ -136,9 +145,95 @@ function Pane({
 function App() {
   const [markdown, setMarkdown] = useState(initialMarkdown);
   const [leftPane, setLeftPane] = useState<PaneKind>("editor");
+  const workspaceRef = useRef<HTMLElement>(null);
+  const dividerRef = useRef<HTMLDivElement>(null);
+  const splitPercentRef = useRef(50);
   const deferredMarkdown = useDeferredValue(markdown);
   const isPreviewUpdating = markdown !== deferredMarkdown;
   const rightPane = oppositePane[leftPane];
+
+  function updateSplit(nextPercent: number) {
+    const workspace = workspaceRef.current;
+
+    if (!workspace) {
+      return;
+    }
+
+    const workspaceWidth = workspace.getBoundingClientRect().width;
+    const minimumPercent = (minimumPaneWidth / workspaceWidth) * 100;
+    const maximumPercent =
+      ((workspaceWidth - dividerWidth - minimumPaneWidth) / workspaceWidth) * 100;
+    const clampedPercent = Math.min(
+      maximumPercent,
+      Math.max(minimumPercent, nextPercent),
+    );
+
+    splitPercentRef.current = clampedPercent;
+    workspace.style.setProperty("--left-pane-width", `${clampedPercent}%`);
+    dividerRef.current?.setAttribute(
+      "aria-valuenow",
+      Math.round(clampedPercent).toString(),
+    );
+  }
+
+  function updateSplitFromPointer(clientX: number) {
+    const workspace = workspaceRef.current;
+
+    if (!workspace) {
+      return;
+    }
+
+    const bounds = workspace.getBoundingClientRect();
+    updateSplit(((clientX - bounds.left) / bounds.width) * 100);
+  }
+
+  function handleDividerPointerDown(event: PointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    workspaceRef.current?.classList.add("is-resizing");
+    updateSplitFromPointer(event.clientX);
+  }
+
+  function handleDividerPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+
+    updateSplitFromPointer(event.clientX);
+  }
+
+  function handleDividerPointerEnd(event: PointerEvent<HTMLDivElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    workspaceRef.current?.classList.remove("is-resizing");
+  }
+
+  function handleDividerKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const step = event.shiftKey ? 10 : 2;
+    let nextPercent = splitPercentRef.current;
+
+    switch (event.key) {
+      case "ArrowLeft":
+        nextPercent -= step;
+        break;
+      case "ArrowRight":
+        nextPercent += step;
+        break;
+      case "Home":
+        nextPercent = 0;
+        break;
+      case "End":
+        nextPercent = 100;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    updateSplit(nextPercent);
+  }
 
   return (
     <div className="app-shell">
@@ -155,7 +250,7 @@ function App() {
         </span>
       </header>
 
-      <main className="workspace">
+      <main ref={workspaceRef} className="workspace">
         <Pane
           side="left"
           activePane={leftPane}
@@ -164,6 +259,24 @@ function App() {
           isPreviewUpdating={isPreviewUpdating}
           onSelectPane={setLeftPane}
           onMarkdownChange={setMarkdown}
+        />
+        <div
+          ref={dividerRef}
+          className="pane-divider"
+          role="separator"
+          aria-label="패널 너비 조절"
+          aria-orientation="vertical"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={50}
+          tabIndex={0}
+          title="드래그하여 패널 너비 조절 · 더블 클릭하여 초기화"
+          onDoubleClick={() => updateSplit(50)}
+          onKeyDown={handleDividerKeyDown}
+          onPointerDown={handleDividerPointerDown}
+          onPointerMove={handleDividerPointerMove}
+          onPointerUp={handleDividerPointerEnd}
+          onPointerCancel={handleDividerPointerEnd}
         />
         <Pane
           side="right"

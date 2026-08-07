@@ -88,8 +88,12 @@ textarea {
 }
 
 .workspace {
+  --left-pane-width: calc(50% - 4.5px);
+
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1fr);
+  grid-template-columns:
+    minmax(240px, var(--left-pane-width)) 9px
+    minmax(240px, 1fr);
   min-height: 0;
 }
 
@@ -101,7 +105,7 @@ textarea {
 }
 
 .pane:first-child {
-  border-right: 1px solid #d8d4ca;
+  border-right: 0;
 }
 
 .editor-pane {
@@ -110,6 +114,45 @@ textarea {
 
 .preview-pane {
   background: #fffefb;
+}
+
+.pane-divider {
+  position: relative;
+  z-index: 2;
+  width: 9px;
+  min-height: 0;
+  background: transparent;
+  cursor: col-resize;
+  outline: none;
+  touch-action: none;
+}
+
+.pane-divider::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: #d8d4ca;
+  content: "";
+  transition:
+    width 120ms ease,
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.pane-divider:hover::before,
+.pane-divider:focus-visible::before,
+.workspace.is-resizing .pane-divider::before {
+  width: 3px;
+  background: #62907f;
+  transform: translateX(-1px);
+}
+
+.workspace.is-resizing,
+.workspace.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .pane-header {
@@ -388,6 +431,10 @@ textarea {
 
   .workspace {
     grid-template-columns: 1fr;
+  }
+
+  .pane-divider {
+    display: none;
   }
 
   .pane {
