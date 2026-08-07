@@ -46,6 +46,7 @@ const minimumPaneWidth = 240;
 const dividerWidth = 9;
 const themeStorageKey = "aster:theme:v1";
 const fontStorageKey = "aster:reading-font:v1";
+const lineSpacingStorageKey = "aster:line-spacing:v1";
 
 const themes = [
   { value: "paper", label: "종이" },
@@ -61,8 +62,16 @@ const readingFonts = [
   { value: "system", label: "시스템 고딕" },
 ] as const;
 
+const lineSpacings = [
+  { value: "compact", label: "촘촘 1.5" },
+  { value: "balanced", label: "기본 1.7" },
+  { value: "relaxed", label: "여유 1.9" },
+  { value: "wide", label: "넓게 2.1" },
+] as const;
+
 type Theme = (typeof themes)[number]["value"];
 type ReadingFont = (typeof readingFonts)[number]["value"];
+type LineSpacing = (typeof lineSpacings)[number]["value"];
 
 type PaneKind = "editor" | "preview";
 type PaneSide = "left" | "right";
@@ -107,6 +116,27 @@ function saveReadingFont(font: ReadingFont) {
     localStorage.setItem(fontStorageKey, font);
   } catch {
     // The font still applies for this session when storage is unavailable.
+  }
+}
+
+function loadLineSpacing(): LineSpacing {
+  try {
+    const storedSpacing = localStorage.getItem(lineSpacingStorageKey);
+    const isKnownSpacing = lineSpacings.some(
+      (spacing) => spacing.value === storedSpacing,
+    );
+
+    return isKnownSpacing ? (storedSpacing as LineSpacing) : "balanced";
+  } catch {
+    return "balanced";
+  }
+}
+
+function saveLineSpacing(spacing: LineSpacing) {
+  try {
+    localStorage.setItem(lineSpacingStorageKey, spacing);
+  } catch {
+    // The spacing still applies for this session when storage is unavailable.
   }
 }
 
@@ -207,6 +237,7 @@ function App() {
   const [leftPane, setLeftPane] = useState<PaneKind>("editor");
   const [theme, setTheme] = useState(loadTheme);
   const [readingFont, setReadingFont] = useState(loadReadingFont);
+  const [lineSpacing, setLineSpacing] = useState(loadLineSpacing);
   const workspaceRef = useRef<HTMLElement>(null);
   const dividerRef = useRef<HTMLDivElement>(null);
   const splitPercentRef = useRef(50);
@@ -311,8 +342,20 @@ function App() {
     saveReadingFont(nextFont);
   }
 
+  function handleLineSpacingChange(event: ChangeEvent<HTMLSelectElement>) {
+    const nextSpacing = event.currentTarget.value as LineSpacing;
+
+    setLineSpacing(nextSpacing);
+    saveLineSpacing(nextSpacing);
+  }
+
   return (
-    <div className="app-shell" data-theme={theme} data-font={readingFont}>
+    <div
+      className="app-shell"
+      data-theme={theme}
+      data-font={readingFont}
+      data-line-spacing={lineSpacing}
+    >
       <header className="app-header">
         <div className="brand" aria-label="Aster 마크다운 뷰어">
           <span className="brand-mark" aria-hidden="true">
@@ -342,6 +385,20 @@ function App() {
               {readingFonts.map((fontOption) => (
                 <option key={fontOption.value} value={fontOption.value}>
                   {fontOption.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="setting-picker spacing-picker">
+            <span>행간</span>
+            <select
+              name="line-spacing"
+              value={lineSpacing}
+              onChange={handleLineSpacingChange}
+            >
+              {lineSpacings.map((spacingOption) => (
+                <option key={spacingOption.value} value={spacingOption.value}>
+                  {spacingOption.label}
                 </option>
               ))}
             </select>

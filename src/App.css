@@ -100,13 +100,28 @@ select {
   --reading-font:
     "Noto Serif KR Variable", "Noto Serif KR", "AppleMyungjo", "Batang",
     serif;
-  --reading-line-height: 1.78;
 }
 
 .app-shell[data-font="system"] {
   --reading-font:
     -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI",
     "Noto Sans KR", "Malgun Gothic", sans-serif;
+}
+
+.app-shell[data-line-spacing="compact"] {
+  --reading-line-height: 1.5;
+}
+
+.app-shell[data-line-spacing="balanced"] {
+  --reading-line-height: 1.72;
+}
+
+.app-shell[data-line-spacing="relaxed"] {
+  --reading-line-height: 1.9;
+}
+
+.app-shell[data-line-spacing="wide"] {
+  --reading-line-height: 2.1;
 }
 
 .app-shell[data-theme="snow"] {
@@ -309,6 +324,10 @@ select {
 
 .font-picker select {
   min-width: 126px;
+}
+
+.spacing-picker select {
+  min-width: 88px;
 }
 
 .workspace {
@@ -654,6 +673,19 @@ select {
 
   .app-header {
     grid-template-columns: 1fr auto;
+  }
+
+  .header-actions {
+    gap: 8px;
+  }
+
+  .setting-picker {
+    gap: 0;
+  }
+
+  .setting-picker > span,
+  .character-count {
+    display: none;
   }
 
   .document-name {
