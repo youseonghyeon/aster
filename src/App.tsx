@@ -9,6 +9,8 @@ import {
   type KeyboardEvent,
   type PointerEvent,
 } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { message, open } from "@tauri-apps/plugin-dialog";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./App.css";
@@ -61,6 +63,7 @@ const themeStorageKey = "aster:theme:v1";
 const fontStorageKey = "aster:reading-font:v1";
 const lineSpacingStorageKey = "aster:line-spacing:v1";
 const readingZoomStorageKey = "aster:reading-zoom:v1";
+const untitledDocumentNoteStorageKey = "aster:document-note:untitled:v1";
 
 const themes = [
   { value: "snow", label: "밝게" },
@@ -104,7 +107,15 @@ type LineSpacing = (typeof lineSpacings)[number]["value"];
 type ReadingZoom = (typeof readingZoomLevels)[number]["value"];
 
 type PaneKind = "editor" | "preview";
+type PaneContent = PaneKind | "notes";
 type PaneSide = "left" | "right";
+type NoteSaveStatus = "saved" | "saving" | "error";
+
+type OpenedMarkdownFile = {
+  path: string;
+  name: string;
+  content: string;
+};
 
 const oppositePane: Record<PaneKind, PaneKind> = {
   editor: "preview",
@@ -126,6 +137,24 @@ function ReadingSettingsIcon() {
       <circle cx="10" cy="5" r="2" />
       <circle cx="14" cy="10" r="2" />
       <circle cx="7" cy="15" r="2" />
+    </svg>
+  );
+}
+
+function NoteIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M5 3.5h7.5L16 7v9.5H5z" />
+      <path d="M12.5 3.5V7H16M7.5 10h6M7.5 13h4" />
+    </svg>
+  );
+}
+
+function OpenFileIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M3.5 5.5h5l1.4 1.8h6.6v8.2h-13z" />
+      <path d="M3.5 8.2h13" />
     </svg>
   );
 }
@@ -161,6 +190,46 @@ function savePreference(storageKey: string, value: string) {
   } catch {
     // The setting still applies for this session when storage is unavailable.
   }
+}
+
+function loadStoredText(storageKey: string): string {
+  try {
+    return localStorage.getItem(storageKey) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function saveStoredText(storageKey: string, value: string): boolean {
+  try {
+    localStorage.setItem(storageKey, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getDocumentNoteStorageKey(filePath: string | null): string {
+  return filePath
+    ? `aster:document-note:file:v1:${filePath}`
+    : untitledDocumentNoteStorageKey;
+}
+
+async function chooseMarkdownFile(): Promise<OpenedMarkdownFile | null> {
+  const selectedPath = await open({
+    title: "Markdown 파일 열기",
+    multiple: false,
+    directory: false,
+    filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
+  });
+
+  if (!selectedPath) {
+    return null;
+  }
+
+  return invoke<OpenedMarkdownFile>("read_markdown_file", {
+    path: selectedPath,
+  });
 }
 
 function getSteppedReadingZoom(
@@ -199,29 +268,50 @@ function Pane({
   side,
   activePane,
   markdown,
+  note,
+  noteSaveStatus,
   previewMarkdown,
   isPreviewUpdating,
   onMarkdownChange,
+  onNoteChange,
 }: {
   side: PaneSide;
-  activePane: PaneKind;
+  activePane: PaneContent;
   markdown: string;
+  note: string;
+  noteSaveStatus: NoteSaveStatus;
   previewMarkdown: string;
   isPreviewUpdating: boolean;
   onMarkdownChange: (value: string) => void;
+  onNoteChange: (value: string) => void;
 }) {
   const isEditor = activePane === "editor";
+  const isNotes = activePane === "notes";
   const paneLabel = side === "left" ? "왼쪽" : "오른쪽";
-  const paneTitle = isEditor ? "마크다운" : "미리보기";
+  const paneTitle = isEditor ? "마크다운" : isNotes ? "내 메모" : "미리보기";
+  const noteSaveLabel =
+    noteSaveStatus === "saving"
+      ? "저장 중…"
+      : noteSaveStatus === "error"
+        ? "저장하지 못함"
+        : "저장됨";
 
   return (
     <section
       id={`${side}-pane`}
-      className={`pane ${isEditor ? "editor-pane" : "preview-pane"}`}
+      className={`pane ${isEditor ? "editor-pane" : isNotes ? "notes-pane" : "preview-pane"}`}
       aria-label={`${paneLabel} ${paneTitle} 패널`}
     >
       <div className="pane-header">
         <span className="pane-title">{paneTitle}</span>
+        {isNotes ? (
+          <span
+            className={`note-save-status is-${noteSaveStatus}`}
+            aria-live="polite"
+          >
+            {noteSaveLabel}
+          </span>
+        ) : null}
       </div>
 
       {isEditor ? (
@@ -234,6 +324,19 @@ function Pane({
           aria-label="마크다운 입력"
           autoComplete="off"
           spellCheck="false"
+        />
+      ) : isNotes ? (
+        <textarea
+          id="document-note"
+          name="document-note"
+          className="note-editor"
+          value={note}
+          placeholder="이 문서를 읽으며 떠오른 생각이나 확인할 내용을 적어보세요."
+          onChange={(event) => onNoteChange(event.currentTarget.value)}
+          aria-label="이 문서에 대한 개인 메모"
+          autoComplete="off"
+          autoFocus
+          spellCheck="true"
         />
       ) : (
         <div
@@ -249,7 +352,16 @@ function Pane({
 
 function App() {
   const [markdown, setMarkdown] = useState(initialMarkdown);
+  const [documentName, setDocumentName] = useState("새 문서.md");
+  const [documentPath, setDocumentPath] = useState<string | null>(null);
+  const [isOpeningFile, setIsOpeningFile] = useState(false);
   const [leftPane, setLeftPane] = useState<PaneKind>("editor");
+  const [isNotesOpen, setIsNotesOpen] = useState(false);
+  const [note, setNote] = useState(() =>
+    loadStoredText(untitledDocumentNoteStorageKey),
+  );
+  const [noteSaveStatus, setNoteSaveStatus] =
+    useState<NoteSaveStatus>("saved");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(() =>
     loadPreference(themeStorageKey, themes, "paper"),
@@ -267,16 +379,41 @@ function App() {
   const dividerRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const openFileRef = useRef<() => void>(() => undefined);
   const splitPercentRef = useRef(50);
   const deferredMarkdown = useDeferredValue(markdown);
   const isPreviewUpdating = markdown !== deferredMarkdown;
-  const rightPane = oppositePane[leftPane];
+  const primaryPane: PaneContent = isNotesOpen ? "notes" : "editor";
+  const leftPaneContent: PaneContent =
+    leftPane === "editor" ? primaryPane : "preview";
+  const rightPaneContent: PaneContent =
+    leftPane === "editor" ? "preview" : primaryPane;
+  const documentNoteStorageKey = getDocumentNoteStorageKey(documentPath);
   const readingZoomStyle = {
     "--reading-font-size": `${(17 * Number(readingZoom)) / 100}px`,
   } as CSSProperties;
   const isMinimumZoom = readingZoom === readingZoomLevels[0].value;
   const isMaximumZoom =
     readingZoom === readingZoomLevels[readingZoomLevels.length - 1].value;
+
+  useEffect(() => {
+    function handleOpenFileShortcut(event: globalThis.KeyboardEvent) {
+      if (
+        (!event.metaKey && !event.ctrlKey) ||
+        event.shiftKey ||
+        event.altKey ||
+        event.key.toLowerCase() !== "o"
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      openFileRef.current();
+    }
+
+    window.addEventListener("keydown", handleOpenFileShortcut);
+    return () => window.removeEventListener("keydown", handleOpenFileShortcut);
+  }, []);
 
   useEffect(() => {
     function handleReadingZoomShortcut(event: globalThis.KeyboardEvent) {
@@ -310,6 +447,35 @@ function App() {
     window.addEventListener("keydown", handleReadingZoomShortcut);
     return () => window.removeEventListener("keydown", handleReadingZoomShortcut);
   }, []);
+
+  useEffect(() => {
+    function handleNoteShortcut(event: globalThis.KeyboardEvent) {
+      if (
+        (!event.metaKey && !event.ctrlKey) ||
+        !event.shiftKey ||
+        event.altKey ||
+        event.key.toLowerCase() !== "m"
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      setIsSettingsOpen(false);
+      setIsNotesOpen((isOpen) => !isOpen);
+    }
+
+    window.addEventListener("keydown", handleNoteShortcut);
+    return () => window.removeEventListener("keydown", handleNoteShortcut);
+  }, []);
+
+  useEffect(() => {
+    const saveTimer = window.setTimeout(() => {
+      const didSave = saveStoredText(documentNoteStorageKey, note);
+      setNoteSaveStatus(didSave ? "saved" : "error");
+    }, 350);
+
+    return () => window.clearTimeout(saveTimer);
+  }, [documentNoteStorageKey, note]);
 
   useEffect(() => {
     if (!isSettingsOpen) {
@@ -453,6 +619,65 @@ function App() {
     });
   }
 
+  function handleNoteChange(value: string) {
+    setNote(value);
+    setNoteSaveStatus("saving");
+  }
+
+  function toggleNotes() {
+    setIsSettingsOpen(false);
+    setIsNotesOpen((isOpen) => !isOpen);
+  }
+
+  function swapPanes() {
+    setLeftPane((currentPane) => oppositePane[currentPane]);
+
+    if (window.matchMedia("(min-width: 721px)").matches) {
+      updateSplit(100 - splitPercentRef.current);
+    }
+  }
+
+  async function handleOpenFile() {
+    if (isOpeningFile) {
+      return;
+    }
+
+    setIsOpeningFile(true);
+
+    try {
+      const openedFile = await chooseMarkdownFile();
+
+      if (!openedFile) {
+        return;
+      }
+
+      saveStoredText(documentNoteStorageKey, note);
+
+      const nextNoteStorageKey = getDocumentNoteStorageKey(openedFile.path);
+      setDocumentName(openedFile.name);
+      setDocumentPath(openedFile.path);
+      setMarkdown(openedFile.content);
+      setNote(loadStoredText(nextNoteStorageKey));
+      setNoteSaveStatus("saved");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      try {
+        await message(errorMessage, {
+          title: "파일을 열 수 없습니다",
+          kind: "error",
+        });
+      } catch {
+        console.error("파일을 열 수 없습니다:", errorMessage);
+      }
+    } finally {
+      setIsOpeningFile(false);
+    }
+  }
+
+  openFileRef.current = handleOpenFile;
+
   return (
     <div
       className="app-shell"
@@ -468,8 +693,20 @@ function App() {
           </span>
           <span>Aster</span>
         </div>
-        <span className="document-name">새 문서.md</span>
+        <span className="document-name" title={documentPath ?? documentName}>
+          {documentName}
+        </span>
         <div className="header-actions">
+          <button
+            className="header-icon-button open-file-trigger"
+            type="button"
+            aria-label="Markdown 파일 열기"
+            title="Markdown 파일 열기 (⌘/Ctrl O)"
+            disabled={isOpeningFile}
+            onClick={handleOpenFile}
+          >
+            <OpenFileIcon />
+          </button>
           <span className="character-count">
             {markdown.length.toLocaleString("ko-KR")}자
           </span>
@@ -502,10 +739,20 @@ function App() {
               +
             </button>
           </div>
+          <button
+            className={`header-icon-button note-trigger${note.trim() ? " has-note" : ""}`}
+            type="button"
+            aria-label={isNotesOpen ? "개인 메모 닫기" : "개인 메모 열기"}
+            aria-pressed={isNotesOpen}
+            title={`${isNotesOpen ? "개인 메모 닫기" : "개인 메모 열기"} (⌘/Ctrl ⇧ M)`}
+            onClick={toggleNotes}
+          >
+            <NoteIcon />
+          </button>
           <div ref={settingsRef} className="settings-menu">
             <button
               ref={settingsButtonRef}
-              className="settings-trigger"
+              className="header-icon-button settings-trigger"
               type="button"
               aria-label="읽기 설정"
               aria-expanded={isSettingsOpen}
@@ -607,11 +854,14 @@ function App() {
       <main ref={workspaceRef} className="workspace">
         <Pane
           side="left"
-          activePane={leftPane}
+          activePane={leftPaneContent}
           markdown={markdown}
+          note={note}
+          noteSaveStatus={noteSaveStatus}
           previewMarkdown={deferredMarkdown}
           isPreviewUpdating={isPreviewUpdating}
           onMarkdownChange={setMarkdown}
+          onNoteChange={handleNoteChange}
         />
         <div className="pane-divider">
           <div
@@ -635,22 +885,23 @@ function App() {
           <button
             className="pane-swap-button"
             type="button"
-            aria-label="마크다운과 미리보기 위치 바꾸기"
-            title="마크다운과 미리보기 위치 바꾸기"
-            onClick={() =>
-              setLeftPane((currentPane) => oppositePane[currentPane])
-            }
+            aria-label={`${isNotesOpen ? "메모" : "마크다운"}와 미리보기 위치 바꾸기`}
+            title={`${isNotesOpen ? "메모" : "마크다운"}와 미리보기 위치 바꾸기`}
+            onClick={swapPanes}
           >
             <SwapPaneIcon />
           </button>
         </div>
         <Pane
           side="right"
-          activePane={rightPane}
+          activePane={rightPaneContent}
           markdown={markdown}
+          note={note}
+          noteSaveStatus={noteSaveStatus}
           previewMarkdown={deferredMarkdown}
           isPreviewUpdating={isPreviewUpdating}
           onMarkdownChange={setMarkdown}
+          onNoteChange={handleNoteChange}
         />
       </main>
     </div>
