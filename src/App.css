@@ -86,6 +86,22 @@ select {
   --code-text: #eae8e1;
   --code-background: #292b2a;
   --code-border: #222422;
+  --syntax-background: var(--code-background);
+  --syntax-foreground: #eae8e1;
+  --syntax-token-comment: #a9aca6;
+  --syntax-token-keyword: #d8a7c7;
+  --syntax-token-string: #a9c181;
+  --syntax-token-constant: #e4b478;
+  --syntax-token-function: #8fb9c8;
+  --syntax-token-parameter: #d8d6cf;
+  --syntax-token-string-expression: #e0c07a;
+  --syntax-token-punctuation: #c8c6bf;
+  --syntax-token-link: #8fb9c8;
+  --syntax-bracket-1: #e7b35a;
+  --syntax-bracket-2: #8fc7b0;
+  --syntax-bracket-3: #c49ad9;
+  --syntax-bracket-4: #7fb9d0;
+  --syntax-bracket-error: #f08a92;
   --table-heading-text: #444139;
   --table-heading-background: #f2f0e9;
   --table-row-hover: #faf8f3;
@@ -170,6 +186,22 @@ select {
   --code-text: #e8edf1;
   --code-background: #252b31;
   --code-border: #1d2227;
+  --syntax-background: var(--code-background);
+  --syntax-foreground: #e8edf1;
+  --syntax-token-comment: #9aa7b3;
+  --syntax-token-keyword: #d19bd1;
+  --syntax-token-string: #9bc982;
+  --syntax-token-constant: #e1b36d;
+  --syntax-token-function: #79b8e6;
+  --syntax-token-parameter: #d7dde3;
+  --syntax-token-string-expression: #67c7c0;
+  --syntax-token-punctuation: #b9c2ca;
+  --syntax-token-link: #79b8e6;
+  --syntax-bracket-1: #e5b567;
+  --syntax-bracket-2: #69c0d1;
+  --syntax-bracket-3: #c69bea;
+  --syntax-bracket-4: #84c47c;
+  --syntax-bracket-error: #f07f85;
   --table-heading-text: #3a4651;
   --table-heading-background: #eef2f5;
   --table-row-hover: #f7f9fb;
@@ -208,6 +240,22 @@ select {
   --code-text: #f2eadb;
   --code-background: #3a322b;
   --code-border: #2f2822;
+  --syntax-background: var(--code-background);
+  --syntax-foreground: #f2eadb;
+  --syntax-token-comment: #b9aa95;
+  --syntax-token-keyword: #e3a6bd;
+  --syntax-token-string: #b5ca83;
+  --syntax-token-constant: #e5b978;
+  --syntax-token-function: #8fc0c3;
+  --syntax-token-parameter: #e7ddd0;
+  --syntax-token-string-expression: #d9c27f;
+  --syntax-token-punctuation: #c8bba8;
+  --syntax-token-link: #8fc0c3;
+  --syntax-bracket-1: #e1b86b;
+  --syntax-bracket-2: #8ec5b1;
+  --syntax-bracket-3: #d4a3d9;
+  --syntax-bracket-4: #85bacc;
+  --syntax-bracket-error: #ef8f88;
   --table-heading-text: #5a4936;
   --table-heading-background: #eadfc8;
   --table-row-hover: #f5ecd9;
@@ -246,6 +294,22 @@ select {
   --code-text: #e8e6df;
   --code-background: #131516;
   --code-border: #383c3d;
+  --syntax-background: var(--code-background);
+  --syntax-foreground: #e8e6df;
+  --syntax-token-comment: #929b96;
+  --syntax-token-keyword: #d49ab2;
+  --syntax-token-string: #9fc38e;
+  --syntax-token-constant: #deb276;
+  --syntax-token-function: #82b9cf;
+  --syntax-token-parameter: #d7d5ce;
+  --syntax-token-string-expression: #79c0ae;
+  --syntax-token-punctuation: #b7bab4;
+  --syntax-token-link: #82b9cf;
+  --syntax-bracket-1: #d9ae63;
+  --syntax-bracket-2: #79bfa8;
+  --syntax-bracket-3: #c89bd3;
+  --syntax-bracket-4: #76aec8;
+  --syntax-bracket-error: #e68189;
   --table-heading-text: #d3d0c8;
   --table-heading-background: #2c3031;
   --table-row-hover: #272a2b;
@@ -286,6 +350,22 @@ select {
   --code-text: #eee8d5;
   --code-background: #002b36;
   --code-border: #073642;
+  --syntax-background: var(--code-background);
+  --syntax-foreground: #eee8d5;
+  --syntax-token-comment: #93a1a1;
+  --syntax-token-keyword: #df6baa;
+  --syntax-token-string: #9caf1a;
+  --syntax-token-constant: #c69b19;
+  --syntax-token-function: #47a5df;
+  --syntax-token-parameter: #d8d2bf;
+  --syntax-token-string-expression: #41b3aa;
+  --syntax-token-punctuation: #9ba7a5;
+  --syntax-token-link: #47a5df;
+  --syntax-bracket-1: #c69b19;
+  --syntax-bracket-2: #41b3aa;
+  --syntax-bracket-3: #9a9de0;
+  --syntax-bracket-4: #dc774d;
+  --syntax-bracket-error: #ff7b66;
   --table-heading-text: #073642;
   --table-heading-background: #eee8d5;
   --table-row-hover: #f5eedb;
@@ -324,6 +404,22 @@ select {
   --code-text: #e5e9f0;
   --code-background: #242933;
   --code-border: #434c5e;
+  --syntax-background: var(--code-background);
+  --syntax-foreground: #e5e9f0;
+  --syntax-token-comment: #9aa4b3;
+  --syntax-token-keyword: #b48ead;
+  --syntax-token-string: #a3be8c;
+  --syntax-token-constant: #d08770;
+  --syntax-token-function: #88c0d0;
+  --syntax-token-parameter: #d8dee9;
+  --syntax-token-string-expression: #8fbcbb;
+  --syntax-token-punctuation: #bbc3d0;
+  --syntax-token-link: #88c0d0;
+  --syntax-bracket-1: #ebcb8b;
+  --syntax-bracket-2: #88c0d0;
+  --syntax-bracket-3: #b48ead;
+  --syntax-bracket-4: #a3be8c;
+  --syntax-bracket-error: #e1848c;
   --table-heading-text: #eceff4;
   --table-heading-background: #3b4252;
   --table-row-hover: #353c49;
@@ -364,6 +460,22 @@ select {
   --code-text: #f8f8f2;
   --code-background: #1e1f29;
   --code-border: #44475a;
+  --syntax-background: var(--code-background);
+  --syntax-foreground: #f8f8f2;
+  --syntax-token-comment: #9ea4c8;
+  --syntax-token-keyword: #ff79c6;
+  --syntax-token-string: #f1fa8c;
+  --syntax-token-constant: #bd93f9;
+  --syntax-token-function: #50fa7b;
+  --syntax-token-parameter: #e7e7e1;
+  --syntax-token-string-expression: #8be9fd;
+  --syntax-token-punctuation: #d4d4ce;
+  --syntax-token-link: #8be9fd;
+  --syntax-bracket-1: #f1fa8c;
+  --syntax-bracket-2: #bd93f9;
+  --syntax-bracket-3: #8be9fd;
+  --syntax-bracket-4: #50fa7b;
+  --syntax-bracket-error: #ff6e87;
   --table-heading-text: #f8f8f2;
   --table-heading-background: #44475a;
   --table-row-hover: #30323f;
@@ -404,6 +516,22 @@ select {
   --code-text: #ebdbb2;
   --code-background: #1d2021;
   --code-border: #504945;
+  --syntax-background: var(--code-background);
+  --syntax-foreground: #ebdbb2;
+  --syntax-token-comment: #a89984;
+  --syntax-token-keyword: #fb6a5a;
+  --syntax-token-string: #b8bb26;
+  --syntax-token-constant: #d3869b;
+  --syntax-token-function: #fabd2f;
+  --syntax-token-parameter: #83a598;
+  --syntax-token-string-expression: #8ec07c;
+  --syntax-token-punctuation: #d5c4a1;
+  --syntax-token-link: #83a598;
+  --syntax-bracket-1: #fabd2f;
+  --syntax-bracket-2: #83a598;
+  --syntax-bracket-3: #d3869b;
+  --syntax-bracket-4: #8ec07c;
+  --syntax-bracket-error: #ff8b80;
   --table-heading-text: #fbf1c7;
   --table-heading-background: #3c3836;
   --table-row-hover: #32302f;
@@ -1125,6 +1253,11 @@ select {
   line-height: 1.65;
 }
 
+.markdown-body pre:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 3px;
+}
+
 .markdown-body pre code {
   padding: 0;
   color: inherit;
@@ -1132,6 +1265,18 @@ select {
   border-radius: 0;
   font-size: 0.84em;
   word-break: normal;
+}
+
+.markdown-body .syntax-highlighted-code {
+  margin: 0 0 1.2em;
+}
+
+.markdown-body .syntax-highlighted-code pre {
+  margin: 0;
+}
+
+.markdown-body > .syntax-highlighted-code:last-child {
+  margin-bottom: 0;
 }
 
 .markdown-body .table-scroll {

@@ -1,4 +1,5 @@
 import {
+  isValidElement,
   memo,
   useDeferredValue,
   useEffect,
@@ -8,12 +9,14 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
+  type ReactNode,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { message, open } from "@tauri-apps/plugin-dialog";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { SyntaxHighlightedCode } from "./components/SyntaxHighlightedCode";
 import "./App.css";
 
 const initialMarkdown = `# 읽기 좋은 마크다운 뷰어
@@ -48,6 +51,39 @@ console.log(message);
 
 const markdownPlugins = [remarkGfm];
 const markdownComponents = {
+  pre: ({ node, children, ...preProps }) => {
+    void node;
+
+    if (
+      isValidElement<{
+        className?: string;
+        children?: ReactNode;
+      }>(children) &&
+      children.type === "code"
+    ) {
+      const codeClassName = children.props.className;
+      const language = /(?:^|\s)language-([^\s]+)/.exec(
+        codeClassName ?? "",
+      )?.[1];
+
+      if (language && typeof children.props.children === "string") {
+        return (
+          <SyntaxHighlightedCode
+            code={children.props.children.replace(/\n$/, "")}
+            language={language}
+            codeClassName={codeClassName}
+            preProps={preProps}
+          />
+        );
+      }
+    }
+
+    return (
+      <pre {...preProps} tabIndex={0} translate="no">
+        {children}
+      </pre>
+    );
+  },
   table: ({ node, ...tableProps }) => {
     void node;
 
