@@ -63,9 +63,13 @@ const lineSpacingStorageKey = "aster:line-spacing:v1";
 const readingZoomStorageKey = "aster:reading-zoom:v1";
 
 const themes = [
-  { value: "paper", label: "종이" },
   { value: "snow", label: "밝게" },
+  { value: "paper", label: "종이" },
+  { value: "solarized", label: "Solarized" },
   { value: "sepia", label: "세피아" },
+  { value: "nord", label: "Nord" },
+  { value: "dracula", label: "Dracula" },
+  { value: "gruvbox", label: "Gruvbox" },
   { value: "night", label: "야간" },
 ] as const;
 
@@ -106,6 +110,35 @@ const oppositePane: Record<PaneKind, PaneKind> = {
   editor: "preview",
   preview: "editor",
 };
+
+function SwapPaneIcon() {
+  return (
+    <svg viewBox="0 0 18 18" aria-hidden="true">
+      <path d="M3 6h11m-3-3 3 3-3 3M15 12H4m3-3-3 3 3 3" />
+    </svg>
+  );
+}
+
+function ReadingSettingsIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M3 5h5m4 0h5M3 10h9m4 0h1M3 15h2m4 0h8" />
+      <circle cx="10" cy="5" r="2" />
+      <circle cx="14" cy="10" r="2" />
+      <circle cx="7" cy="15" r="2" />
+    </svg>
+  );
+}
+
+function LineSpacingGlyph() {
+  return (
+    <span className="line-spacing-glyph" aria-hidden="true">
+      <span />
+      <span />
+      <span />
+    </span>
+  );
+}
 
 function loadPreference<T extends string>(
   storageKey: string,
@@ -168,7 +201,6 @@ function Pane({
   markdown,
   previewMarkdown,
   isPreviewUpdating,
-  onSelectPane,
   onMarkdownChange,
 }: {
   side: PaneSide;
@@ -176,47 +208,20 @@ function Pane({
   markdown: string;
   previewMarkdown: string;
   isPreviewUpdating: boolean;
-  onSelectPane: (pane: PaneKind) => void;
   onMarkdownChange: (value: string) => void;
 }) {
   const isEditor = activePane === "editor";
   const paneLabel = side === "left" ? "왼쪽" : "오른쪽";
+  const paneTitle = isEditor ? "마크다운" : "미리보기";
 
   return (
     <section
       id={`${side}-pane`}
       className={`pane ${isEditor ? "editor-pane" : "preview-pane"}`}
-      role="tabpanel"
-      aria-labelledby={`${side}-${activePane}-tab`}
+      aria-label={`${paneLabel} ${paneTitle} 패널`}
     >
       <div className="pane-header">
-        <div className="pane-tabs" role="tablist" aria-label={`${paneLabel} 패널`}>
-          <button
-            id={`${side}-editor-tab`}
-            className={`pane-tab${isEditor ? " is-active" : ""}`}
-            type="button"
-            role="tab"
-            aria-selected={isEditor}
-            aria-controls={`${side}-pane`}
-            onClick={() => onSelectPane("editor")}
-          >
-            마크다운
-          </button>
-          <button
-            id={`${side}-preview-tab`}
-            className={`pane-tab${isEditor ? "" : " is-active"}`}
-            type="button"
-            role="tab"
-            aria-selected={!isEditor}
-            aria-controls={`${side}-pane`}
-            onClick={() => onSelectPane("preview")}
-          >
-            미리보기
-          </button>
-        </div>
-        <span aria-live={isEditor ? undefined : "polite"}>
-          {isEditor ? "입력" : isPreviewUpdating ? "업데이트 중" : "실시간"}
-        </span>
+        <span className="pane-title">{paneTitle}</span>
       </div>
 
       {isEditor ? (
@@ -245,6 +250,7 @@ function Pane({
 function App() {
   const [markdown, setMarkdown] = useState(initialMarkdown);
   const [leftPane, setLeftPane] = useState<PaneKind>("editor");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(() =>
     loadPreference(themeStorageKey, themes, "paper"),
   );
@@ -259,6 +265,8 @@ function App() {
   );
   const workspaceRef = useRef<HTMLElement>(null);
   const dividerRef = useRef<HTMLDivElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const splitPercentRef = useRef(50);
   const deferredMarkdown = useDeferredValue(markdown);
   const isPreviewUpdating = markdown !== deferredMarkdown;
@@ -302,6 +310,39 @@ function App() {
     window.addEventListener("keydown", handleReadingZoomShortcut);
     return () => window.removeEventListener("keydown", handleReadingZoomShortcut);
   }, []);
+
+  useEffect(() => {
+    if (!isSettingsOpen) {
+      return;
+    }
+
+    function handleOutsidePointerDown(event: globalThis.PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !settingsRef.current?.contains(event.target)
+      ) {
+        setIsSettingsOpen(false);
+      }
+    }
+
+    function handleSettingsKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      event.preventDefault();
+      setIsSettingsOpen(false);
+      settingsButtonRef.current?.focus();
+    }
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    window.addEventListener("keydown", handleSettingsKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handleOutsidePointerDown);
+      window.removeEventListener("keydown", handleSettingsKeyDown);
+    };
+  }, [isSettingsOpen]);
 
   function updateSplit(nextPercent: number) {
     const workspace = workspaceRef.current;
@@ -386,9 +427,7 @@ function App() {
     updateSplit(nextPercent);
   }
 
-  function handleThemeChange(event: ChangeEvent<HTMLSelectElement>) {
-    const nextTheme = event.currentTarget.value as Theme;
-
+  function selectTheme(nextTheme: Theme) {
     setTheme(nextTheme);
     savePreference(themeStorageKey, nextTheme);
   }
@@ -400,9 +439,7 @@ function App() {
     savePreference(fontStorageKey, nextFont);
   }
 
-  function handleLineSpacingChange(event: ChangeEvent<HTMLSelectElement>) {
-    const nextSpacing = event.currentTarget.value as LineSpacing;
-
+  function selectLineSpacing(nextSpacing: LineSpacing) {
     setLineSpacing(nextSpacing);
     savePreference(lineSpacingStorageKey, nextSpacing);
   }
@@ -433,51 +470,9 @@ function App() {
         </div>
         <span className="document-name">새 문서.md</span>
         <div className="header-actions">
-          <label className="setting-picker theme-picker">
-            <span>테마</span>
-            <select
-              name="theme"
-              value={theme}
-              aria-label="테마"
-              onChange={handleThemeChange}
-            >
-              {themes.map((themeOption) => (
-                <option key={themeOption.value} value={themeOption.value}>
-                  {themeOption.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="setting-picker font-picker">
-            <span>글꼴</span>
-            <select
-              name="reading-font"
-              value={readingFont}
-              aria-label="본문 글꼴"
-              onChange={handleReadingFontChange}
-            >
-              {readingFonts.map((fontOption) => (
-                <option key={fontOption.value} value={fontOption.value}>
-                  {fontOption.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="setting-picker spacing-picker">
-            <span>행간</span>
-            <select
-              name="line-spacing"
-              value={lineSpacing}
-              aria-label="줄 간격"
-              onChange={handleLineSpacingChange}
-            >
-              {lineSpacings.map((spacingOption) => (
-                <option key={spacingOption.value} value={spacingOption.value}>
-                  {spacingOption.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <span className="character-count">
+            {markdown.length.toLocaleString("ko-KR")}자
+          </span>
           <div className="zoom-control" role="group" aria-label="미리보기 배율">
             <button
               type="button"
@@ -507,9 +502,105 @@ function App() {
               +
             </button>
           </div>
-          <span className="character-count">
-            {markdown.length.toLocaleString("ko-KR")}자
-          </span>
+          <div ref={settingsRef} className="settings-menu">
+            <button
+              ref={settingsButtonRef}
+              className="settings-trigger"
+              type="button"
+              aria-label="읽기 설정"
+              aria-expanded={isSettingsOpen}
+              aria-controls="reading-settings-popover"
+              title="읽기 설정"
+              onClick={() => setIsSettingsOpen((isOpen) => !isOpen)}
+            >
+              <ReadingSettingsIcon />
+            </button>
+
+            {isSettingsOpen ? (
+              <div
+                id="reading-settings-popover"
+                className="settings-popover"
+                role="dialog"
+                aria-labelledby="reading-settings-title"
+              >
+                <div className="settings-popover-header">
+                  <h2 id="reading-settings-title">읽기 설정</h2>
+                  <span>미리보기 모양</span>
+                </div>
+
+                <div className="settings-group">
+                  <span id="theme-setting-label" className="settings-label">
+                    테마
+                  </span>
+                  <div
+                    className="theme-options"
+                    role="group"
+                    aria-labelledby="theme-setting-label"
+                  >
+                    {themes.map((themeOption) => (
+                      <button
+                        key={themeOption.value}
+                        type="button"
+                        className="theme-option"
+                        data-theme-option={themeOption.value}
+                        aria-label={themeOption.label}
+                        aria-pressed={theme === themeOption.value}
+                        title={themeOption.label}
+                        onClick={() => selectTheme(themeOption.value)}
+                      >
+                        <span className="theme-swatch" aria-hidden="true" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label className="settings-group">
+                  <span className="settings-label">글꼴</span>
+                  <select
+                    className="settings-select"
+                    name="reading-font"
+                    value={readingFont}
+                    onChange={handleReadingFontChange}
+                  >
+                    {readingFonts.map((fontOption) => (
+                      <option key={fontOption.value} value={fontOption.value}>
+                        {fontOption.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="settings-group">
+                  <span
+                    id="line-spacing-setting-label"
+                    className="settings-label"
+                  >
+                    행간
+                  </span>
+                  <div
+                    className="line-spacing-options"
+                    role="group"
+                    aria-labelledby="line-spacing-setting-label"
+                  >
+                    {lineSpacings.map((spacingOption) => (
+                      <button
+                        key={spacingOption.value}
+                        type="button"
+                        className="line-spacing-option"
+                        data-spacing={spacingOption.value}
+                        aria-label={spacingOption.label}
+                        aria-pressed={lineSpacing === spacingOption.value}
+                        title={spacingOption.label}
+                        onClick={() => selectLineSpacing(spacingOption.value)}
+                      >
+                        <LineSpacingGlyph />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
 
@@ -520,34 +611,45 @@ function App() {
           markdown={markdown}
           previewMarkdown={deferredMarkdown}
           isPreviewUpdating={isPreviewUpdating}
-          onSelectPane={setLeftPane}
           onMarkdownChange={setMarkdown}
         />
-        <div
-          ref={dividerRef}
-          className="pane-divider"
-          role="separator"
-          aria-label="패널 너비 조절"
-          aria-orientation="vertical"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={50}
-          tabIndex={0}
-          title="드래그하여 패널 너비 조절 · 더블 클릭하여 초기화"
-          onDoubleClick={() => updateSplit(50)}
-          onKeyDown={handleDividerKeyDown}
-          onPointerDown={handleDividerPointerDown}
-          onPointerMove={handleDividerPointerMove}
-          onPointerUp={handleDividerPointerEnd}
-          onPointerCancel={handleDividerPointerEnd}
-        />
+        <div className="pane-divider">
+          <div
+            ref={dividerRef}
+            className="pane-divider-handle"
+            role="separator"
+            aria-label="패널 너비 조절"
+            aria-orientation="vertical"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={50}
+            tabIndex={0}
+            title="드래그하여 패널 너비 조절 · 더블 클릭하여 초기화"
+            onDoubleClick={() => updateSplit(50)}
+            onKeyDown={handleDividerKeyDown}
+            onPointerDown={handleDividerPointerDown}
+            onPointerMove={handleDividerPointerMove}
+            onPointerUp={handleDividerPointerEnd}
+            onPointerCancel={handleDividerPointerEnd}
+          />
+          <button
+            className="pane-swap-button"
+            type="button"
+            aria-label="마크다운과 미리보기 위치 바꾸기"
+            title="마크다운과 미리보기 위치 바꾸기"
+            onClick={() =>
+              setLeftPane((currentPane) => oppositePane[currentPane])
+            }
+          >
+            <SwapPaneIcon />
+          </button>
+        </div>
         <Pane
           side="right"
           activePane={rightPane}
           markdown={markdown}
           previewMarkdown={deferredMarkdown}
           isPreviewUpdating={isPreviewUpdating}
-          onSelectPane={(pane) => setLeftPane(oppositePane[pane])}
           onMarkdownChange={setMarkdown}
         />
       </main>
