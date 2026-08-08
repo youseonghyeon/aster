@@ -138,6 +138,10 @@ select {
     "Noto Sans KR", "Malgun Gothic", sans-serif;
 }
 
+.app-shell[data-line-spacing="tight"] {
+  --reading-line-height: 1.4;
+}
+
 .app-shell[data-line-spacing="compact"] {
   --reading-line-height: 1.5;
 }
@@ -148,10 +152,6 @@ select {
 
 .app-shell[data-line-spacing="relaxed"] {
   --reading-line-height: 1.9;
-}
-
-.app-shell[data-line-spacing="wide"] {
-  --reading-line-height: 2.1;
 }
 
 .app-shell[data-theme="snow"] {
@@ -833,19 +833,19 @@ select {
   font-size: 12px;
 }
 
-.line-spacing-option[data-spacing="compact"] {
+.line-spacing-option[data-spacing="tight"] {
   --spacing-preview-gap: 2px;
 }
 
-.line-spacing-option[data-spacing="balanced"] {
+.line-spacing-option[data-spacing="compact"] {
   --spacing-preview-gap: 4px;
 }
 
-.line-spacing-option[data-spacing="relaxed"] {
+.line-spacing-option[data-spacing="balanced"] {
   --spacing-preview-gap: 6px;
 }
 
-.line-spacing-option[data-spacing="wide"] {
+.line-spacing-option[data-spacing="relaxed"] {
   --spacing-preview-gap: 8px;
 }
 

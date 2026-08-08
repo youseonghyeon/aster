@@ -121,10 +121,10 @@ const readingFonts = [
 ] as const;
 
 const lineSpacings = [
+  { value: "tight", label: "매우 촘촘 1.4" },
   { value: "compact", label: "촘촘 1.5" },
   { value: "balanced", label: "기본 1.7" },
   { value: "relaxed", label: "여유 1.9" },
-  { value: "wide", label: "넓게 2.1" },
 ] as const;
 
 const readingZoomLevels = [
