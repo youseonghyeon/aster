@@ -1784,7 +1784,6 @@ function App() {
     const previewScrollProgress = capturePreviewScrollProgress();
     suppressScrollSyncRestore();
     previewFocusReturnAreaRef.current = lastSearchAreaRef.current;
-    setIsOutlineOpen(false);
     setIsSettingsOpen(false);
     setIsPreviewFocusMode(true);
     lastSearchAreaRef.current = "preview";

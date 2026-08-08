@@ -148,10 +148,9 @@
   display: grid;
   width: 100%;
   min-height: 36px;
-  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: 5px;
-  padding: 5px 8px 5px 6px;
+  padding: 5px 8px;
   color: var(--text-subtle);
   background: transparent;
   border: 1px solid transparent;
@@ -172,17 +171,6 @@
   background: var(--selection);
   border-color: color-mix(in srgb, var(--accent-soft) 58%, transparent);
   font-weight: 680;
-}
-
-.outline-depth {
-  color: var(--text-faint);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-}
-
-.outline-link[aria-current="location"] .outline-depth {
-  color: var(--accent-strong);
 }
 
 .outline-link-label {

@@ -105,9 +105,6 @@ function OutlineList({
               title={item.title}
               onClick={(event) => onNavigate(item.id, event.detail === 0)}
             >
-              <span className="outline-depth" aria-hidden="true">
-                {item.depth}
-              </span>
               <span className="outline-link-label">{item.title}</span>
             </button>
             {item.children.length > 0 ? (
@@ -154,6 +151,15 @@ export function DocumentOutline({
   useEffect(() => {
     searchInputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (
+      isModal &&
+      !outlineRef.current?.contains(document.activeElement)
+    ) {
+      searchInputRef.current?.focus();
+    }
+  }, [isModal]);
 
   useEffect(() => {
     setQuery("");
