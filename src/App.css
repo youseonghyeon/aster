@@ -113,7 +113,7 @@ select {
   --reading-line-height: 1.72;
 
   display: grid;
-  grid-template-rows: 58px minmax(0, 1fr);
+  grid-template-rows: 54px minmax(0, 1fr);
   height: 100vh;
   color: var(--text);
   background: var(--app-background);
