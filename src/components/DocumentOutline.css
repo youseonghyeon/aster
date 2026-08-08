@@ -1,0 +1,234 @@
+.document-outline {
+  position: absolute;
+  z-index: 22;
+  inset: 0 auto 0 0;
+  display: grid;
+  width: min(280px, calc(100% - 36px));
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  color: var(--text);
+  background: color-mix(in srgb, var(--editor-background) 97%, transparent);
+  border-right: 1px solid var(--border-strong);
+  box-shadow: 18px 0 44px rgba(23, 26, 24, 0.15);
+}
+
+.document-outline-header {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 14px 11px 18px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.document-outline-header > div {
+  display: grid;
+  gap: 3px;
+}
+
+.document-outline-eyebrow {
+  color: var(--text-faint);
+  font-size: 9px;
+  font-weight: 720;
+  letter-spacing: 0.12em;
+}
+
+.document-outline-header h2 {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: 14px;
+  font-weight: 720;
+  letter-spacing: -0.015em;
+}
+
+.outline-close-button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.outline-close-button:hover {
+  color: var(--accent-hover);
+  background: var(--table-row-hover);
+  border-color: var(--border);
+}
+
+.outline-close-button:focus-visible,
+.outline-link:focus-visible,
+.outline-search:focus-within {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 2px;
+}
+
+.outline-close-button svg,
+.outline-search svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.outline-search {
+  position: relative;
+  display: flex;
+  height: 38px;
+  align-items: center;
+  margin: 14px 14px 10px;
+  color: var(--text-faint);
+}
+
+.outline-search > svg {
+  position: absolute;
+  left: 11px;
+  pointer-events: none;
+}
+
+.outline-search input {
+  width: 100%;
+  height: 38px;
+  padding: 0 48px 0 34px;
+  color: var(--text-strong);
+  background: var(--preview-background);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  outline: none;
+  font-size: 12px;
+}
+
+.outline-search input::placeholder {
+  color: var(--text-faint);
+}
+
+.outline-result-count {
+  position: absolute;
+  right: 10px;
+  color: var(--text-faint);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.outline-navigation {
+  min-height: 0;
+  padding: 2px 10px 28px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.outline-list {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.outline-list .outline-list {
+  margin-left: 15px;
+  padding-left: 8px;
+  border-left: 1px solid
+    color-mix(in srgb, var(--border-strong) 72%, transparent);
+}
+
+.outline-list-item {
+  min-width: 0;
+}
+
+.outline-link {
+  display: grid;
+  width: 100%;
+  min-height: 36px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px 5px 6px;
+  color: var(--text-subtle);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.outline-link:hover {
+  color: var(--text-strong);
+  background: var(--table-row-hover);
+}
+
+.outline-link[aria-current="location"] {
+  color: var(--accent-strong);
+  background: var(--selection);
+  border-color: color-mix(in srgb, var(--accent-soft) 58%, transparent);
+  font-weight: 680;
+}
+
+.outline-depth {
+  color: var(--text-faint);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.outline-link[aria-current="location"] .outline-depth {
+  color: var(--accent-strong);
+}
+
+.outline-link-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-empty-state {
+  display: grid;
+  gap: 7px;
+  padding: 36px 16px;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+.outline-empty-state strong {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.outline-empty-state span {
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (min-width: 1280px) {
+  .document-outline {
+    position: relative;
+    z-index: auto;
+    inset: auto;
+    width: 264px;
+    grid-column: 1;
+    grid-row: 1;
+    box-shadow: none;
+  }
+}

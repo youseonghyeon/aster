@@ -3,6 +3,13 @@
 Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 [Semantic Versioning](https://semver.org/)을 따릅니다.
 
+## [Unreleased]
+
+### Added
+
+- 제목 검색, 현재 위치 강조와 빠른 이동을 제공하는 반응형 문서 목차
+- 마크다운·메모·미리보기별 검색과 대소문자·정규식 옵션
+
 ## [1.0.0] - 2026-08-08
 
 첫 번째 공개 릴리스입니다.
@@ -30,3 +37,4 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 - macOS 확대 단축키가 `Command+=` 대신 Shift 입력을 요구하던 문제 수정
 
 [1.0.0]: https://github.com/youseonghyeon/aster/releases/tag/v1.0.0
+[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.0.0...HEAD

@@ -25,3 +25,12 @@ dist-ssr
 
 # Personal product planning
 docs/product-roadmap.md
+
+# Local development harness
+AGENTS.md
+AGENTS.override.md
+CLAUDE.md
+CLAUDE.local.md
+.codex/
+.claude/
+.harness/

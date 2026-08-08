@@ -1,11 +1,15 @@
 import {
+  createElement,
   isValidElement,
   memo,
+  useCallback,
   useDeferredValue,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
+  type HTMLAttributes,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
@@ -15,7 +19,22 @@ import { listen } from "@tauri-apps/api/event";
 import { message, open } from "@tauri-apps/plugin-dialog";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { DocumentOutline } from "./components/DocumentOutline";
+import { PaneSearchBar, SearchIcon } from "./components/PaneSearchBar";
 import { SyntaxHighlightedCode } from "./components/SyntaxHighlightedCode";
+import { useActiveHeading } from "./hooks/useActiveHeading";
+import { usePreviewSearch } from "./hooks/usePreviewSearch";
+import { useTextSearch } from "./hooks/useTextSearch";
+import {
+  getMarkdownHeadingId,
+  getMarkdownOutline,
+} from "./lib/markdown-outline";
+import {
+  emptySearchSession,
+  normalizeSearchIndex,
+  type SearchArea,
+  type SearchSession,
+} from "./lib/text-search";
 import "./App.css";
 
 const initialMarkdown = `# 읽기 좋은 마크다운 뷰어
@@ -49,7 +68,47 @@ console.log(message);
 `;
 
 const markdownPlugins = [remarkGfm];
+type MarkdownHeadingProps = HTMLAttributes<HTMLHeadingElement> & {
+  node?: {
+    position?: {
+      start: {
+        offset?: number;
+      };
+    };
+  };
+};
+
+function createMarkdownHeading(
+  tagName: "h1" | "h2" | "h3" | "h4" | "h5" | "h6",
+) {
+  return function MarkdownHeading({
+    node,
+    ...headingProps
+  }: MarkdownHeadingProps) {
+    const id = getMarkdownHeadingId(node?.position?.start.offset);
+
+    return createElement(tagName, {
+      ...headingProps,
+      id,
+      tabIndex: id ? -1 : undefined,
+    });
+  };
+}
+
+const MarkdownHeading1 = createMarkdownHeading("h1");
+const MarkdownHeading2 = createMarkdownHeading("h2");
+const MarkdownHeading3 = createMarkdownHeading("h3");
+const MarkdownHeading4 = createMarkdownHeading("h4");
+const MarkdownHeading5 = createMarkdownHeading("h5");
+const MarkdownHeading6 = createMarkdownHeading("h6");
+
 const markdownComponents = {
+  h1: MarkdownHeading1,
+  h2: MarkdownHeading2,
+  h3: MarkdownHeading3,
+  h4: MarkdownHeading4,
+  h5: MarkdownHeading5,
+  h6: MarkdownHeading6,
   pre: ({ node, children, ...preProps }) => {
     void node;
 
@@ -148,6 +207,26 @@ type PaneContent = PaneKind | "notes";
 type PaneSide = "left" | "right";
 type NoteSaveStatus = "saved" | "saving" | "error";
 
+type SearchSessions = Record<SearchArea, SearchSession>;
+
+type SearchSnapshot = {
+  activeElement: HTMLElement | null;
+  activeElementKind:
+    | "content"
+    | "search-trigger"
+    | "area-element"
+    | "external";
+  selectionStart?: number;
+  selectionEnd?: number;
+  selectionDirection?: "forward" | "backward" | "none";
+  scrollTop: number;
+  scrollLeft: number;
+  nestedScrollPositions?: Array<{
+    scrollTop: number;
+    scrollLeft: number;
+  }>;
+};
+
 type OpenedMarkdownFile = {
   path: string;
   name: string;
@@ -158,6 +237,14 @@ const oppositePane: Record<PaneKind, PaneKind> = {
   editor: "preview",
   preview: "editor",
 };
+
+function createEmptySearchSessions(): SearchSessions {
+  return {
+    editor: { ...emptySearchSession },
+    notes: { ...emptySearchSession },
+    preview: { ...emptySearchSession },
+  };
+}
 
 function SwapPaneIcon() {
   return (
@@ -197,6 +284,14 @@ function OpenFileIcon() {
     <svg viewBox="0 0 20 20" aria-hidden="true">
       <path d="M3.25 6h4.4l1.5 1.75h7.6v7a1 1 0 0 1-1 1H4.25a1 1 0 0 1-1-1V6Z" />
       <path d="M3.25 8.75h13.5" />
+    </svg>
+  );
+}
+
+function DocumentOutlineIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M4 5.25h1.5M8.25 5.25H16M4 10h1.5M8.25 10H16M4 14.75h1.5M8.25 14.75H13.5" />
     </svg>
   );
 }
@@ -329,7 +424,9 @@ function ReadingFontSelect({ value, onChange }: ReadingFontSelectProps) {
         aria-expanded={isOpen}
         aria-controls="reading-font-options"
         aria-activedescendant={
-          isOpen ? `reading-font-option-${readingFonts[activeIndex].value}` : undefined
+          isOpen
+            ? `reading-font-option-${readingFonts[activeIndex].value}`
+            : undefined
         }
         onClick={() => (isOpen ? setIsOpen(false) : openMenu())}
         onKeyDown={handleTriggerKeyDown}
@@ -409,6 +506,66 @@ function saveStoredText(storageKey: string, value: string): boolean {
   }
 }
 
+const maximumMeasuredTextareaPrefixLength = 250_000;
+
+function scrollTextareaMatchIntoView(
+  textarea: HTMLTextAreaElement,
+  value: string,
+  matchStart: number,
+  matchEnd: number,
+) {
+  if (value.length === 0) {
+    return;
+  }
+
+  if (matchStart > maximumMeasuredTextareaPrefixLength) {
+    const scrollableHeight = Math.max(
+      0,
+      textarea.scrollHeight - textarea.clientHeight,
+    );
+    textarea.scrollTop = scrollableHeight * (matchStart / value.length);
+    return;
+  }
+
+  const computedStyle = window.getComputedStyle(textarea);
+  const mirror = document.createElement("div");
+  const marker = document.createElement("span");
+
+  mirror.setAttribute("aria-hidden", "true");
+  Object.assign(mirror.style, {
+    position: "fixed",
+    top: "0",
+    left: "-10000px",
+    width: `${textarea.offsetWidth}px`,
+    minHeight: "0",
+    height: "auto",
+    boxSizing: computedStyle.boxSizing,
+    padding: computedStyle.padding,
+    border: computedStyle.border,
+    font: computedStyle.font,
+    letterSpacing: computedStyle.letterSpacing,
+    lineHeight: computedStyle.lineHeight,
+    tabSize: computedStyle.tabSize,
+    textIndent: computedStyle.textIndent,
+    textTransform: computedStyle.textTransform,
+    whiteSpace: "pre-wrap",
+    overflowWrap: computedStyle.overflowWrap,
+    wordBreak: computedStyle.wordBreak,
+    visibility: "hidden",
+    pointerEvents: "none",
+  });
+  mirror.append(document.createTextNode(value.slice(0, matchStart)));
+  marker.textContent = value.slice(matchStart, matchEnd) || "\u200b";
+  mirror.append(marker);
+  document.body.append(mirror);
+
+  textarea.scrollTop = Math.max(
+    0,
+    marker.offsetTop - textarea.clientHeight / 2 + marker.offsetHeight / 2,
+  );
+  mirror.remove();
+}
+
 function getDocumentNoteStorageKey(filePath: string | null): string {
   return filePath
     ? `aster:document-note:file:v1:${filePath}`
@@ -475,6 +632,14 @@ function Pane({
   onMarkdownChange,
   onNoteChange,
   onSourceModeChange,
+  onPreviewScrollElementChange,
+  searchSession,
+  onSearchOpen,
+  onSearchClose,
+  onSearchChange,
+  onSearchAreaActivate,
+  onSearchInputElementChange,
+  onContentElementChange,
 }: {
   side: PaneSide;
   activePane: PaneContent;
@@ -486,6 +651,20 @@ function Pane({
   onMarkdownChange: (value: string) => void;
   onNoteChange: (value: string) => void;
   onSourceModeChange: (mode: "editor" | "notes") => void;
+  onPreviewScrollElementChange: (element: HTMLDivElement | null) => void;
+  searchSession: SearchSession;
+  onSearchOpen: (area: SearchArea) => void;
+  onSearchClose: (area: SearchArea) => void;
+  onSearchChange: (area: SearchArea, patch: Partial<SearchSession>) => void;
+  onSearchAreaActivate: (area: SearchArea) => void;
+  onSearchInputElementChange: (
+    area: SearchArea,
+    element: HTMLInputElement | null,
+  ) => void;
+  onContentElementChange: (
+    area: SearchArea,
+    element: HTMLTextAreaElement | HTMLDivElement | null,
+  ) => void;
 }) {
   const isEditor = activePane === "editor";
   const isNotes = activePane === "notes";
@@ -493,6 +672,52 @@ function Pane({
   const hasNote = note.trim().length > 0;
   const paneLabel = side === "left" ? "왼쪽" : "오른쪽";
   const paneTitle = isEditor ? "마크다운" : isNotes ? "내 메모" : "미리보기";
+  const searchArea: SearchArea = activePane;
+  const searchAreaLabel = isEditor ? "마크다운" : isNotes ? "메모" : "미리보기";
+  const sourceValue = isEditor ? markdown : isNotes ? note : "";
+  const searchOptions = useMemo(
+    () => ({
+      isCaseSensitive: searchSession.isCaseSensitive,
+      isRegex: searchSession.isRegex,
+    }),
+    [searchSession.isCaseSensitive, searchSession.isRegex],
+  );
+  const sourceSearchResult = useTextSearch(
+    sourceValue,
+    isSourcePane && searchSession.isOpen ? searchSession.query : "",
+    searchOptions,
+  );
+  const [previewElement, setPreviewElement] = useState<HTMLDivElement | null>(null);
+  const previewSearchResult = usePreviewSearch(
+    previewElement,
+    previewMarkdown,
+    searchSession,
+  );
+  const searchResult = isSourcePane ? sourceSearchResult : previewSearchResult;
+  const sourceElementRef = useRef<HTMLTextAreaElement | null>(null);
+  const searchInputElementRef = useRef<HTMLInputElement | null>(null);
+  const handleSourceElementChange = useCallback(
+    (element: HTMLTextAreaElement | null) => {
+      sourceElementRef.current = element;
+      onContentElementChange(searchArea, element);
+    },
+    [onContentElementChange, searchArea],
+  );
+  const handlePreviewElementChange = useCallback(
+    (element: HTMLDivElement | null) => {
+      setPreviewElement(element);
+      onPreviewScrollElementChange(element);
+      onContentElementChange("preview", element);
+    },
+    [onContentElementChange, onPreviewScrollElementChange],
+  );
+  const handleSearchInputElementChange = useCallback(
+    (element: HTMLInputElement | null) => {
+      searchInputElementRef.current = element;
+      onSearchInputElementChange(searchArea, element);
+    },
+    [onSearchInputElementChange, searchArea],
+  );
   const noteSaveLabel =
     noteSaveStatus === "saving"
       ? "저장 중…"
@@ -500,10 +725,71 @@ function Pane({
         ? "저장하지 못함"
         : "저장됨";
 
+  useEffect(() => {
+    const textarea = sourceElementRef.current;
+
+    if (
+      !isSourcePane ||
+      !textarea ||
+      !searchSession.isOpen ||
+      searchResult.error ||
+      searchResult.matches.length === 0
+    ) {
+      return;
+    }
+
+    const activeIndex = normalizeSearchIndex(
+      searchSession.currentIndex,
+      searchResult.matches.length,
+    );
+    const match = searchResult.matches[activeIndex];
+    let inputFocusFrame: number | null = null;
+    const selectionFrame = window.requestAnimationFrame(() => {
+      textarea.setSelectionRange(match.start, match.end, "forward");
+      scrollTextareaMatchIntoView(
+        textarea,
+        sourceValue,
+        match.start,
+        match.end,
+      );
+      textarea.focus();
+      inputFocusFrame = window.requestAnimationFrame(() =>
+        searchInputElementRef.current?.focus({ preventScroll: true }),
+      );
+    });
+
+    return () => {
+      window.cancelAnimationFrame(selectionFrame);
+
+      if (inputFocusFrame !== null) {
+        window.cancelAnimationFrame(inputFocusFrame);
+      }
+    };
+  }, [
+    isSourcePane,
+    searchResult.error,
+    searchResult.matches,
+    searchSession.currentIndex,
+    searchSession.isOpen,
+    sourceValue,
+  ]);
+
+  function navigateSearch(direction: -1 | 1) {
+    if (searchResult.matches.length === 0 || searchResult.error) {
+      return;
+    }
+
+    const activeIndex = normalizeSearchIndex(
+      searchSession.currentIndex,
+      searchResult.matches.length,
+    );
+    onSearchChange(searchArea, { currentIndex: activeIndex + direction });
+  }
+
   return (
     <section
       id={`${side}-pane`}
-      className={`pane ${isEditor ? "editor-pane" : isNotes ? "notes-pane" : "preview-pane"}`}
+      className={`pane ${isEditor ? "editor-pane" : isNotes ? "notes-pane" : "preview-pane"}${searchSession.isOpen ? " has-search" : ""}`}
       aria-label={`${paneLabel} ${paneTitle} 패널`}
     >
       <div className="pane-header">
@@ -538,18 +824,54 @@ function Pane({
         ) : (
           <span className="pane-title">{paneTitle}</span>
         )}
-        {isNotes ? (
-          <span
-            className={`note-save-status is-${noteSaveStatus}`}
-            aria-live="polite"
+        <div className="pane-header-actions">
+          {isNotes ? (
+            <span
+              className={`note-save-status is-${noteSaveStatus}`}
+              aria-live="polite"
+            >
+              {noteSaveLabel}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            className="pane-search-trigger"
+            aria-label={`${searchAreaLabel} 검색`}
+            aria-expanded={searchSession.isOpen}
+            title={`${searchAreaLabel} 검색 (⌘/Ctrl F)`}
+            onClick={() => onSearchOpen(searchArea)}
           >
-            {noteSaveLabel}
-          </span>
-        ) : null}
+            <SearchIcon />
+          </button>
+        </div>
       </div>
+
+      {searchSession.isOpen ? (
+        <PaneSearchBar
+          areaLabel={searchAreaLabel}
+          session={searchSession}
+          matchCount={searchResult.matches.length}
+          error={searchResult.error}
+          isTruncated={searchResult.isTruncated}
+          onInputElementChange={handleSearchInputElementChange}
+          onQueryChange={(query) =>
+            onSearchChange(searchArea, { query, currentIndex: 0 })
+          }
+          onCaseSensitiveChange={(isCaseSensitive) =>
+            onSearchChange(searchArea, { isCaseSensitive, currentIndex: 0 })
+          }
+          onRegexChange={(isRegex) =>
+            onSearchChange(searchArea, { isRegex, currentIndex: 0 })
+          }
+          onNavigate={navigateSearch}
+          onClose={() => onSearchClose(searchArea)}
+          onActivate={() => onSearchAreaActivate(searchArea)}
+        />
+      ) : null}
 
       {isEditor ? (
         <textarea
+          ref={handleSourceElementChange}
           id="markdown-editor"
           name="markdown"
           className="markdown-editor"
@@ -558,9 +880,12 @@ function Pane({
           aria-label="마크다운 입력"
           autoComplete="off"
           spellCheck="false"
+          onFocus={() => onSearchAreaActivate("editor")}
+          onPointerDown={() => onSearchAreaActivate("editor")}
         />
       ) : isNotes ? (
         <textarea
+          ref={handleSourceElementChange}
           id="document-note"
           name="document-note"
           className="note-editor"
@@ -571,13 +896,36 @@ function Pane({
           autoComplete="off"
           autoFocus
           spellCheck="true"
+          onFocus={() => onSearchAreaActivate("notes")}
+          onPointerDown={() => onSearchAreaActivate("notes")}
         />
       ) : (
         <div
+          ref={handlePreviewElementChange}
           className={`preview-scroll${isPreviewUpdating ? " is-updating" : ""}`}
           aria-busy={isPreviewUpdating}
+          aria-label="미리보기 내용"
+          tabIndex={0}
+          onFocus={() => onSearchAreaActivate("preview")}
+          onPointerDown={() => onSearchAreaActivate("preview")}
         >
           <MarkdownPreview content={previewMarkdown} />
+          {previewSearchResult.overlays.length > 0 ? (
+            <div className="preview-search-overlays" aria-hidden="true">
+              {previewSearchResult.overlays.map((overlay) => (
+                <span
+                  key={overlay.id}
+                  className={`preview-search-overlay${overlay.isCurrent ? " is-current" : ""}`}
+                  style={{
+                    top: overlay.top,
+                    left: overlay.left,
+                    width: overlay.width,
+                    height: overlay.height,
+                  }}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       )}
     </section>
@@ -589,13 +937,19 @@ function App() {
   const [documentName, setDocumentName] = useState("새 문서.md");
   const [documentPath, setDocumentPath] = useState<string | null>(null);
   const [isOpeningFile, setIsOpeningFile] = useState(false);
+  const [isOutlineOpen, setIsOutlineOpen] = useState(false);
+  const [isOutlineInset, setIsOutlineInset] = useState(() =>
+    window.matchMedia("(min-width: 1280px)").matches,
+  );
   const [leftPane, setLeftPane] = useState<PaneKind>("editor");
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [note, setNote] = useState(() =>
     loadStoredText(untitledDocumentNoteStorageKey),
   );
-  const [noteSaveStatus, setNoteSaveStatus] =
-    useState<NoteSaveStatus>("saved");
+  const [noteSaveStatus, setNoteSaveStatus] = useState<NoteSaveStatus>("saved");
+  const [searchSessions, setSearchSessions] = useState<SearchSessions>(
+    createEmptySearchSessions,
+  );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(() =>
     loadPreference(themeStorageKey, themes, "paper"),
@@ -611,13 +965,42 @@ function App() {
   );
   const workspaceRef = useRef<HTMLElement>(null);
   const dividerRef = useRef<HTMLDivElement>(null);
+  const outlineButtonRef = useRef<HTMLButtonElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const openFileRef = useRef<() => void>(() => undefined);
   const isOpeningFileRef = useRef(false);
-  const splitPercentRef = useRef(50);
+  const searchSessionsRef = useRef(searchSessions);
+  const lastSearchAreaRef = useRef<SearchArea>("preview");
+  const searchSnapshotsRef = useRef<Partial<Record<SearchArea, SearchSnapshot>>>(
+    {},
+  );
+  const searchInputElementsRef = useRef<
+    Record<SearchArea, HTMLInputElement | null>
+  >({ editor: null, notes: null, preview: null });
+  const contentElementsRef = useRef<
+    Record<SearchArea, HTMLTextAreaElement | HTMLDivElement | null>
+  >({ editor: null, notes: null, preview: null });
+  const isOutlineOpenRef = useRef(isOutlineOpen);
+  const isSettingsOpenRef = useRef(isSettingsOpen);
+  const requestedSplitPercentRef = useRef(50);
+  const appliedSplitPercentRef = useRef(50);
+  const [previewScrollElement, setPreviewScrollElement] =
+    useState<HTMLDivElement | null>(null);
   const deferredMarkdown = useDeferredValue(markdown);
   const isPreviewUpdating = markdown !== deferredMarkdown;
+  const outlineItems = useMemo(
+    () => (isOutlineOpen ? getMarkdownOutline(deferredMarkdown) : []),
+    [deferredMarkdown, isOutlineOpen],
+  );
+  const outlineHeadingIds = useMemo(
+    () => outlineItems.map((item) => item.id),
+    [outlineItems],
+  );
+  const { activeHeadingId, navigateToHeading } = useActiveHeading(
+    previewScrollElement,
+    outlineHeadingIds,
+  );
   const primaryPane: PaneContent = isNotesOpen ? "notes" : "editor";
   const leftPaneContent: PaneContent =
     leftPane === "editor" ? primaryPane : "preview";
@@ -627,6 +1010,26 @@ function App() {
   const readingZoomStyle = {
     "--reading-font-size": `${(17 * Number(readingZoom)) / 100}px`,
   } as CSSProperties;
+  searchSessionsRef.current = searchSessions;
+  isOutlineOpenRef.current = isOutlineOpen;
+  isSettingsOpenRef.current = isSettingsOpen;
+
+  const handleSearchInputElementChange = useCallback(
+    (area: SearchArea, element: HTMLInputElement | null) => {
+      searchInputElementsRef.current[area] = element;
+    },
+    [],
+  );
+
+  const handleContentElementChange = useCallback(
+    (
+      area: SearchArea,
+      element: HTMLTextAreaElement | HTMLDivElement | null,
+    ) => {
+      contentElementsRef.current[area] = element;
+    },
+    [],
+  );
   useEffect(() => {
     let isDisposed = false;
     let stopListening: (() => void) | undefined;
@@ -690,11 +1093,51 @@ function App() {
 
       event.preventDefault();
       setIsSettingsOpen(false);
-      setIsNotesOpen((isOpen) => !isOpen);
+      setIsNotesOpen((isOpen) => {
+        const willOpen = !isOpen;
+        lastSearchAreaRef.current = willOpen ? "notes" : "editor";
+        return willOpen;
+      });
     }
 
     window.addEventListener("keydown", handleNoteShortcut);
     return () => window.removeEventListener("keydown", handleNoteShortcut);
+  }, []);
+
+  useEffect(() => {
+    function handleSearchShortcut(event: globalThis.KeyboardEvent) {
+      const isFindShortcut =
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        event.key.toLowerCase() === "f";
+
+      if (isFindShortcut) {
+        event.preventDefault();
+        setIsOutlineOpen(false);
+        setIsSettingsOpen(false);
+        openSearch(lastSearchAreaRef.current);
+        return;
+      }
+
+      if (
+        event.key !== "Escape" ||
+        isOutlineOpenRef.current ||
+        isSettingsOpenRef.current
+      ) {
+        return;
+      }
+
+      const activeArea = lastSearchAreaRef.current;
+
+      if (searchSessionsRef.current[activeArea].isOpen) {
+        event.preventDefault();
+        closeSearch(activeArea);
+      }
+    }
+
+    window.addEventListener("keydown", handleSearchShortcut);
+    return () => window.removeEventListener("keydown", handleSearchShortcut);
   }, []);
 
   useEffect(() => {
@@ -705,6 +1148,48 @@ function App() {
 
     return () => window.clearTimeout(saveTimer);
   }, [documentNoteStorageKey, note]);
+
+  useEffect(() => {
+    const insetQuery = window.matchMedia("(min-width: 1280px)");
+    const updateOutlineMode = () => setIsOutlineInset(insetQuery.matches);
+
+    updateOutlineMode();
+    insetQuery.addEventListener("change", updateOutlineMode);
+    return () => insetQuery.removeEventListener("change", updateOutlineMode);
+  }, []);
+
+  useEffect(() => {
+    if (!isOutlineOpen) {
+      return;
+    }
+
+    function handleOutlineKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      event.preventDefault();
+      handleOutlineClose();
+    }
+
+    window.addEventListener("keydown", handleOutlineKeyDown);
+    return () => window.removeEventListener("keydown", handleOutlineKeyDown);
+  }, [isOutlineOpen]);
+
+  useEffect(() => {
+    const workspace = workspaceRef.current;
+
+    if (!workspace) {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      applySplit(requestedSplitPercentRef.current);
+    });
+
+    resizeObserver.observe(workspace);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!isSettingsOpen) {
@@ -739,7 +1224,7 @@ function App() {
     };
   }, [isSettingsOpen]);
 
-  function updateSplit(nextPercent: number) {
+  function applySplit(requestedPercent: number) {
     const workspace = workspaceRef.current;
 
     if (!workspace) {
@@ -747,20 +1232,31 @@ function App() {
     }
 
     const workspaceWidth = workspace.getBoundingClientRect().width;
-    const minimumPercent = (minimumPaneWidth / workspaceWidth) * 100;
-    const maximumPercent =
-      ((workspaceWidth - dividerWidth - minimumPaneWidth) / workspaceWidth) * 100;
-    const clampedPercent = Math.min(
-      maximumPercent,
-      Math.max(minimumPercent, nextPercent),
-    );
+    const isStacked = window.matchMedia("(max-width: 720px)").matches;
+    let appliedPercent = 50;
 
-    splitPercentRef.current = clampedPercent;
-    workspace.style.setProperty("--left-pane-width", `${clampedPercent}%`);
+    if (!isStacked && workspaceWidth > minimumPaneWidth * 2 + dividerWidth) {
+      const minimumPercent = (minimumPaneWidth / workspaceWidth) * 100;
+      const maximumPercent =
+        ((workspaceWidth - dividerWidth - minimumPaneWidth) / workspaceWidth) *
+        100;
+      appliedPercent = Math.min(
+        maximumPercent,
+        Math.max(minimumPercent, requestedPercent),
+      );
+    }
+
+    workspace.style.setProperty("--left-pane-width", `${appliedPercent}%`);
+    appliedSplitPercentRef.current = appliedPercent;
     dividerRef.current?.setAttribute(
       "aria-valuenow",
-      Math.round(clampedPercent).toString(),
+      Math.round(appliedPercent).toString(),
     );
+  }
+
+  function updateSplit(nextPercent: number) {
+    requestedSplitPercentRef.current = nextPercent;
+    applySplit(nextPercent);
   }
 
   function updateSplitFromPointer(clientX: number) {
@@ -799,7 +1295,7 @@ function App() {
 
   function handleDividerKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const step = event.shiftKey ? 10 : 2;
-    let nextPercent = splitPercentRef.current;
+    let nextPercent = appliedSplitPercentRef.current;
 
     switch (event.key) {
       case "ArrowLeft":
@@ -845,13 +1341,181 @@ function App() {
   function selectSourceMode(mode: "editor" | "notes") {
     setIsSettingsOpen(false);
     setIsNotesOpen(mode === "notes");
+    lastSearchAreaRef.current = mode;
+  }
+
+  function updateSearchSession(
+    area: SearchArea,
+    patch: Partial<SearchSession>,
+  ) {
+    setSearchSessions((currentSessions) => ({
+      ...currentSessions,
+      [area]: { ...currentSessions[area], ...patch },
+    }));
+  }
+
+  function activateSearchArea(area: SearchArea) {
+    lastSearchAreaRef.current = area;
+  }
+
+  function captureSearchSnapshot(area: SearchArea): SearchSnapshot {
+    const contentElement = contentElementsRef.current[area];
+    const activeElement =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const paneElement = contentElement?.closest(".pane");
+    const activeElementKind =
+      activeElement === contentElement
+        ? "content"
+        : activeElement?.matches(".pane-search-trigger") &&
+            paneElement?.contains(activeElement)
+          ? "search-trigger"
+          : activeElement && paneElement?.contains(activeElement)
+            ? "area-element"
+            : "external";
+
+    if (contentElement instanceof HTMLTextAreaElement) {
+      return {
+        activeElement,
+        activeElementKind,
+        selectionStart: contentElement.selectionStart,
+        selectionEnd: contentElement.selectionEnd,
+        selectionDirection: contentElement.selectionDirection ?? "none",
+        scrollTop: contentElement.scrollTop,
+        scrollLeft: contentElement.scrollLeft,
+      };
+    }
+
+    return {
+      activeElement,
+      activeElementKind,
+      scrollTop: contentElement?.scrollTop ?? 0,
+      scrollLeft: contentElement?.scrollLeft ?? 0,
+      nestedScrollPositions:
+        contentElement instanceof HTMLDivElement
+          ? Array.from(
+              contentElement.querySelectorAll<HTMLElement>(
+                ".markdown-body pre, .markdown-body .table-scroll",
+              ),
+              (element) => ({
+                scrollTop: element.scrollTop,
+                scrollLeft: element.scrollLeft,
+              }),
+            )
+          : undefined,
+    };
+  }
+
+  function openSearch(area: SearchArea) {
+    lastSearchAreaRef.current = area;
+
+    if (searchSessionsRef.current[area].isOpen) {
+      window.requestAnimationFrame(() => {
+        const input = searchInputElementsRef.current[area];
+        input?.focus({ preventScroll: true });
+        input?.select();
+      });
+      return;
+    }
+
+    searchSnapshotsRef.current[area] = captureSearchSnapshot(area);
+    updateSearchSession(area, { isOpen: true });
+  }
+
+  function closeSearch(area: SearchArea) {
+    const snapshot = searchSnapshotsRef.current[area];
+    updateSearchSession(area, { isOpen: false });
+
+    window.requestAnimationFrame(() => {
+      const contentElement = contentElementsRef.current[area];
+
+      if (contentElement instanceof HTMLTextAreaElement && snapshot) {
+        contentElement.setSelectionRange(
+          snapshot.selectionStart ?? 0,
+          snapshot.selectionEnd ?? 0,
+          snapshot.selectionDirection,
+        );
+      }
+
+      if (contentElement && snapshot) {
+        contentElement.scrollTop = snapshot.scrollTop;
+        contentElement.scrollLeft = snapshot.scrollLeft;
+      }
+
+      const currentNestedScrollElements =
+        contentElement instanceof HTMLDivElement
+          ? contentElement.querySelectorAll<HTMLElement>(
+              ".markdown-body pre, .markdown-body .table-scroll",
+            )
+          : [];
+
+      snapshot?.nestedScrollPositions?.forEach((nestedPosition, index) => {
+        const element = currentNestedScrollElements[index];
+
+        if (element) {
+          element.scrollTop = nestedPosition.scrollTop;
+          element.scrollLeft = nestedPosition.scrollLeft;
+        }
+      });
+
+      const currentPaneElement = contentElement?.closest(".pane");
+      const isSnapshotElementInCurrentArea = Boolean(
+        snapshot?.activeElement?.isConnected &&
+          currentPaneElement?.contains(snapshot.activeElement),
+      );
+      const focusTarget =
+        snapshot?.activeElementKind === "search-trigger"
+          ? currentPaneElement?.querySelector<HTMLElement>(
+              ".pane-search-trigger",
+            )
+          : snapshot?.activeElementKind === "content"
+            ? contentElement
+            : snapshot?.activeElementKind === "external" &&
+                snapshot.activeElement?.isConnected
+              ? snapshot.activeElement
+              : isSnapshotElementInCurrentArea
+                ? snapshot?.activeElement
+                : contentElement;
+      focusTarget?.focus({ preventScroll: true });
+      delete searchSnapshotsRef.current[area];
+    });
+  }
+
+  function resetSearchSessions() {
+    setSearchSessions(createEmptySearchSessions());
+    searchSnapshotsRef.current = {};
+    lastSearchAreaRef.current = "preview";
+    CSS.highlights?.delete("aster-preview-search-match");
+    CSS.highlights?.delete("aster-preview-search-current");
   }
 
   function swapPanes() {
     setLeftPane((currentPane) => oppositePane[currentPane]);
 
     if (window.matchMedia("(min-width: 721px)").matches) {
-      updateSplit(100 - splitPercentRef.current);
+      updateSplit(100 - requestedSplitPercentRef.current);
+    }
+  }
+
+  function handleOutlineClose() {
+    setIsOutlineOpen(false);
+    window.requestAnimationFrame(() => outlineButtonRef.current?.focus());
+  }
+
+  function handleOutlineNavigate(headingId: string, shouldMoveFocus: boolean) {
+    const heading = navigateToHeading(headingId);
+
+    if (!heading || isOutlineInset) {
+      return;
+    }
+
+    setIsOutlineOpen(false);
+
+    if (shouldMoveFocus) {
+      window.requestAnimationFrame(() =>
+        heading.focus({ preventScroll: true }),
+      );
     }
   }
 
@@ -878,6 +1542,7 @@ function App() {
       setMarkdown(openedFile.content);
       setNote(loadStoredText(nextNoteStorageKey));
       setNoteSaveStatus("saved");
+      resetSearchSessions();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -918,6 +1583,21 @@ function App() {
         </span>
         <div className="header-actions">
           <button
+            ref={outlineButtonRef}
+            className="header-icon-button outline-trigger"
+            type="button"
+            aria-label={isOutlineOpen ? "문서 목차 닫기" : "문서 목차 열기"}
+            aria-expanded={isOutlineOpen}
+            aria-controls="document-outline"
+            title={isOutlineOpen ? "문서 목차 닫기" : "문서 목차 열기"}
+            onClick={() => {
+              setIsSettingsOpen(false);
+              setIsOutlineOpen((isOpen) => !isOpen);
+            }}
+          >
+            <DocumentOutlineIcon />
+          </button>
+          <button
             className="header-icon-button open-file-trigger"
             type="button"
             aria-label="Markdown 파일 열기"
@@ -936,7 +1616,10 @@ function App() {
               aria-expanded={isSettingsOpen}
               aria-controls="reading-settings-popover"
               title="읽기 설정"
-              onClick={() => setIsSettingsOpen((isOpen) => !isOpen)}
+              onClick={() => {
+                setIsOutlineOpen(false);
+                setIsSettingsOpen((isOpen) => !isOpen);
+              }}
             >
               <ReadingSettingsIcon />
             </button>
@@ -1021,61 +1704,103 @@ function App() {
         </div>
       </header>
 
-      <main ref={workspaceRef} className="workspace">
-        <Pane
-          side="left"
-          activePane={leftPaneContent}
-          markdown={markdown}
-          note={note}
-          noteSaveStatus={noteSaveStatus}
-          previewMarkdown={deferredMarkdown}
-          isPreviewUpdating={isPreviewUpdating}
-          onMarkdownChange={setMarkdown}
-          onNoteChange={handleNoteChange}
-          onSourceModeChange={selectSourceMode}
-        />
-        <div className="pane-divider">
-          <div
-            ref={dividerRef}
-            className="pane-divider-handle"
-            role="separator"
-            aria-label="패널 너비 조절"
-            aria-orientation="vertical"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={50}
-            tabIndex={0}
-            title="드래그하여 패널 너비 조절 · 더블 클릭하여 초기화"
-            onDoubleClick={() => updateSplit(50)}
-            onKeyDown={handleDividerKeyDown}
-            onPointerDown={handleDividerPointerDown}
-            onPointerMove={handleDividerPointerMove}
-            onPointerUp={handleDividerPointerEnd}
-            onPointerCancel={handleDividerPointerEnd}
+      <div className={`document-stage${isOutlineOpen ? " has-outline" : ""}`}>
+        {isOutlineOpen ? (
+          <>
+            <DocumentOutline
+              items={outlineItems}
+              activeHeadingId={activeHeadingId}
+              documentKey={documentPath ?? "untitled"}
+              isModal={!isOutlineInset}
+              onClose={handleOutlineClose}
+              onNavigate={handleOutlineNavigate}
+            />
+            <button
+              type="button"
+              className="outline-scrim"
+              tabIndex={-1}
+              aria-label="목차 닫기"
+              onClick={handleOutlineClose}
+            />
+          </>
+        ) : null}
+
+        <main
+          ref={workspaceRef}
+          className="workspace"
+          inert={isOutlineOpen && !isOutlineInset}
+        >
+          <Pane
+            side="left"
+            activePane={leftPaneContent}
+            markdown={markdown}
+            note={note}
+            noteSaveStatus={noteSaveStatus}
+            previewMarkdown={deferredMarkdown}
+            isPreviewUpdating={isPreviewUpdating}
+            onMarkdownChange={setMarkdown}
+            onNoteChange={handleNoteChange}
+            onSourceModeChange={selectSourceMode}
+            onPreviewScrollElementChange={setPreviewScrollElement}
+            searchSession={searchSessions[leftPaneContent]}
+            onSearchOpen={openSearch}
+            onSearchClose={closeSearch}
+            onSearchChange={updateSearchSession}
+            onSearchAreaActivate={activateSearchArea}
+            onSearchInputElementChange={handleSearchInputElementChange}
+            onContentElementChange={handleContentElementChange}
           />
-          <button
-            className="pane-swap-button"
-            type="button"
-            aria-label={`${isNotesOpen ? "메모" : "마크다운"}와 미리보기 위치 바꾸기`}
-            title={`${isNotesOpen ? "메모" : "마크다운"}와 미리보기 위치 바꾸기`}
-            onClick={swapPanes}
-          >
-            <SwapPaneIcon />
-          </button>
-        </div>
-        <Pane
-          side="right"
-          activePane={rightPaneContent}
-          markdown={markdown}
-          note={note}
-          noteSaveStatus={noteSaveStatus}
-          previewMarkdown={deferredMarkdown}
-          isPreviewUpdating={isPreviewUpdating}
-          onMarkdownChange={setMarkdown}
-          onNoteChange={handleNoteChange}
-          onSourceModeChange={selectSourceMode}
-        />
-      </main>
+          <div className="pane-divider">
+            <div
+              ref={dividerRef}
+              className="pane-divider-handle"
+              role="separator"
+              aria-label="패널 너비 조절"
+              aria-orientation="vertical"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={50}
+              tabIndex={0}
+              title="드래그하여 패널 너비 조절 · 더블 클릭하여 초기화"
+              onDoubleClick={() => updateSplit(50)}
+              onKeyDown={handleDividerKeyDown}
+              onPointerDown={handleDividerPointerDown}
+              onPointerMove={handleDividerPointerMove}
+              onPointerUp={handleDividerPointerEnd}
+              onPointerCancel={handleDividerPointerEnd}
+            />
+            <button
+              className="pane-swap-button"
+              type="button"
+              aria-label={`${isNotesOpen ? "메모" : "마크다운"}와 미리보기 위치 바꾸기`}
+              title={`${isNotesOpen ? "메모" : "마크다운"}와 미리보기 위치 바꾸기`}
+              onClick={swapPanes}
+            >
+              <SwapPaneIcon />
+            </button>
+          </div>
+          <Pane
+            side="right"
+            activePane={rightPaneContent}
+            markdown={markdown}
+            note={note}
+            noteSaveStatus={noteSaveStatus}
+            previewMarkdown={deferredMarkdown}
+            isPreviewUpdating={isPreviewUpdating}
+            onMarkdownChange={setMarkdown}
+            onNoteChange={handleNoteChange}
+            onSourceModeChange={selectSourceMode}
+            onPreviewScrollElementChange={setPreviewScrollElement}
+            searchSession={searchSessions[rightPaneContent]}
+            onSearchOpen={openSearch}
+            onSearchClose={closeSearch}
+            onSearchChange={updateSearchSession}
+            onSearchAreaActivate={activateSearchArea}
+            onSearchInputElementChange={handleSearchInputElementChange}
+            onContentElementChange={handleContentElementChange}
+          />
+        </main>
+      </div>
     </div>
   );
 }
