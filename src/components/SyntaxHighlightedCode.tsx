@@ -11,6 +11,7 @@ type SyntaxHighlightedCodeProps = {
   language: string;
   codeClassName?: string;
   preProps: ComponentPropsWithoutRef<"pre">;
+  sourceOffset?: string | number;
 };
 
 export const SyntaxHighlightedCode = memo(function SyntaxHighlightedCode({
@@ -18,6 +19,7 @@ export const SyntaxHighlightedCode = memo(function SyntaxHighlightedCode({
   language,
   codeClassName,
   preProps,
+  sourceOffset,
 }: SyntaxHighlightedCodeProps) {
   const normalizedLanguage = normalizeSyntaxLanguage(language);
   const [highlightedCode, setHighlightedCode] = useState<string | null>(null);
@@ -61,6 +63,7 @@ export const SyntaxHighlightedCode = memo(function SyntaxHighlightedCode({
     <div
       className="syntax-highlighted-code"
       translate="no"
+      data-source-offset={sourceOffset}
       dangerouslySetInnerHTML={{ __html: highlightedCode }}
     />
   );

@@ -24,11 +24,13 @@ import { PaneSearchBar, SearchIcon } from "./components/PaneSearchBar";
 import { SyntaxHighlightedCode } from "./components/SyntaxHighlightedCode";
 import { useActiveHeading } from "./hooks/useActiveHeading";
 import { usePreviewSearch } from "./hooks/usePreviewSearch";
+import { useScrollSync } from "./hooks/useScrollSync";
 import { useTextSearch } from "./hooks/useTextSearch";
 import {
   getMarkdownHeadingId,
   getMarkdownOutline,
 } from "./lib/markdown-outline";
+import { rehypeMarkdownSourceOffsets } from "./lib/markdown-source-offsets";
 import {
   emptySearchSession,
   normalizeSearchIndex,
@@ -68,6 +70,7 @@ console.log(message);
 `;
 
 const markdownPlugins = [remarkGfm];
+const markdownRehypePlugins = [rehypeMarkdownSourceOffsets];
 type MarkdownHeadingProps = HTMLAttributes<HTMLHeadingElement> & {
   node?: {
     position?: {
@@ -111,6 +114,9 @@ const markdownComponents = {
   h6: MarkdownHeading6,
   pre: ({ node, children, ...preProps }) => {
     void node;
+    const sourceOffset = (
+      preProps as typeof preProps & { "data-source-offset"?: string | number }
+    )["data-source-offset"];
 
     if (
       isValidElement<{
@@ -131,6 +137,7 @@ const markdownComponents = {
             language={language}
             codeClassName={codeClassName}
             preProps={preProps}
+            sourceOffset={sourceOffset}
           />
         );
       }
@@ -144,9 +151,20 @@ const markdownComponents = {
   },
   table: ({ node, ...tableProps }) => {
     void node;
+    const sourceOffset = (
+      tableProps as typeof tableProps & {
+        "data-source-offset"?: string | number;
+      }
+    )["data-source-offset"];
 
     return (
-      <div className="table-scroll" role="region" aria-label="표" tabIndex={0}>
+      <div
+        className="table-scroll"
+        role="region"
+        aria-label="표"
+        tabIndex={0}
+        data-source-offset={sourceOffset}
+      >
         <table {...tableProps} />
       </div>
     );
@@ -158,6 +176,7 @@ const themeStorageKey = "aster:theme:v1";
 const fontStorageKey = "aster:reading-font:v1";
 const lineSpacingStorageKey = "aster:line-spacing:v1";
 const readingZoomStorageKey = "aster:reading-zoom:v1";
+const scrollSyncStorageKey = "aster:scroll-sync:v1";
 const untitledDocumentNoteStorageKey = "aster:document-note:untitled:v1";
 
 const themes = [
@@ -196,10 +215,13 @@ const readingZoomLevels = [
   { value: "150" },
 ] as const;
 
+const scrollSyncOptions = [{ value: "off" }, { value: "on" }] as const;
+
 type Theme = (typeof themes)[number]["value"];
 type ReadingFont = (typeof readingFonts)[number]["value"];
 type LineSpacing = (typeof lineSpacings)[number]["value"];
 type ReadingZoom = (typeof readingZoomLevels)[number]["value"];
+type ScrollSyncPreference = (typeof scrollSyncOptions)[number]["value"];
 type ReadingZoomCommand = "in" | "out" | "reset";
 
 type PaneKind = "editor" | "preview";
@@ -292,6 +314,15 @@ function PreviewFocusIcon({ isActive }: { isActive: boolean }) {
       ) : (
         <path d="M7 3.5H3.5V7M13 3.5h3.5V7M7 16.5H3.5V13M13 16.5h3.5V13" />
       )}
+    </svg>
+  );
+}
+
+function ScrollSyncIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M3.5 4.25h4v11.5h-4zM12.5 4.25h4v11.5h-4z" />
+      <path d="M10 5.5v9m-2-2 2 2 2-2M8 7.5l2-2 2 2" />
     </svg>
   );
 }
@@ -655,6 +686,7 @@ const MarkdownPreview = memo(function MarkdownPreview({
     <article className="markdown-body">
       <ReactMarkdown
         remarkPlugins={markdownPlugins}
+        rehypePlugins={markdownRehypePlugins}
         components={markdownComponents}
       >
         {content}
@@ -685,6 +717,8 @@ function Pane({
   onSearchInputElementChange,
   onContentElementChange,
   onPreviewFocusModeToggle,
+  isScrollSyncEnabled,
+  onScrollSyncToggle,
 }: {
   side: PaneSide;
   activePane: PaneContent;
@@ -713,6 +747,8 @@ function Pane({
     element: HTMLTextAreaElement | HTMLDivElement | null,
   ) => void;
   onPreviewFocusModeToggle: () => void;
+  isScrollSyncEnabled: boolean;
+  onScrollSyncToggle: () => void;
 }) {
   const isEditor = activePane === "editor";
   const isNotes = activePane === "notes";
@@ -883,6 +919,26 @@ function Pane({
               {noteSaveLabel}
             </span>
           ) : null}
+          {isEditor ? (
+            <button
+              type="button"
+              className="pane-search-trigger scroll-sync-trigger"
+              aria-label={
+                isScrollSyncEnabled
+                  ? "스크롤 동기화 끄기"
+                  : "스크롤 동기화 켜기"
+              }
+              aria-pressed={isScrollSyncEnabled}
+              title={
+                isScrollSyncEnabled
+                  ? "마크다운·미리보기 스크롤 동기화 끄기"
+                  : "마크다운·미리보기 스크롤 동기화 켜기"
+              }
+              onClick={onScrollSyncToggle}
+            >
+              <ScrollSyncIcon />
+            </button>
+          ) : null}
           <button
             type="button"
             className="pane-search-trigger"
@@ -941,6 +997,7 @@ function Pane({
 
       {isEditor ? (
         <textarea
+          key="markdown-editor"
           ref={handleSourceElementChange}
           id="markdown-editor"
           name="markdown"
@@ -955,6 +1012,7 @@ function Pane({
         />
       ) : isNotes ? (
         <textarea
+          key="document-note"
           ref={handleSourceElementChange}
           id="document-note"
           name="document-note"
@@ -1034,6 +1092,10 @@ function App() {
   const [readingZoom, setReadingZoom] = useState<ReadingZoom>(() =>
     loadPreference(readingZoomStorageKey, readingZoomLevels, "100"),
   );
+  const [scrollSyncPreference, setScrollSyncPreference] =
+    useState<ScrollSyncPreference>(() =>
+      loadPreference(scrollSyncStorageKey, scrollSyncOptions, "off"),
+    );
   const workspaceRef = useRef<HTMLElement>(null);
   const dividerRef = useRef<HTMLDivElement>(null);
   const outlineButtonRef = useRef<HTMLButtonElement>(null);
@@ -1052,14 +1114,19 @@ function App() {
   const contentElementsRef = useRef<
     Record<SearchArea, HTMLTextAreaElement | HTMLDivElement | null>
   >({ editor: null, notes: null, preview: null });
+  const sourceScrollPositionsRef = useRef({ editor: 0, notes: 0 });
+  const pendingSourceFocusRef = useRef<"editor" | "notes" | null>(null);
   const isOutlineOpenRef = useRef(isOutlineOpen);
   const isSettingsOpenRef = useRef(isSettingsOpen);
+  const isNotesOpenRef = useRef(isNotesOpen);
   const isPreviewFocusModeRef = useRef(isPreviewFocusMode);
   const previewFocusReturnAreaRef = useRef<SearchArea>("preview");
   const requestedSplitPercentRef = useRef(50);
   const appliedSplitPercentRef = useRef(50);
   const [previewScrollElement, setPreviewScrollElement] =
     useState<HTMLDivElement | null>(null);
+  const [editorScrollElement, setEditorScrollElement] =
+    useState<HTMLTextAreaElement | null>(null);
   const deferredMarkdown = useDeferredValue(markdown);
   const isPreviewUpdating = markdown !== deferredMarkdown;
   const outlineItems = useMemo(
@@ -1086,7 +1153,19 @@ function App() {
   searchSessionsRef.current = searchSessions;
   isOutlineOpenRef.current = isOutlineOpen;
   isSettingsOpenRef.current = isSettingsOpen;
+  isNotesOpenRef.current = isNotesOpen;
   isPreviewFocusModeRef.current = isPreviewFocusMode;
+  const isScrollSyncEnabled = scrollSyncPreference === "on";
+  const { suppressScrollSyncRestore } = useScrollSync({
+    enabled: isScrollSyncEnabled,
+    active:
+      !isNotesOpen &&
+      !isPreviewFocusMode &&
+      !isPreviewUpdating,
+    markdown: deferredMarkdown,
+    editorElement: editorScrollElement,
+    previewElement: previewScrollElement,
+  });
 
   const handleSearchInputElementChange = useCallback(
     (area: SearchArea, element: HTMLInputElement | null) => {
@@ -1101,8 +1180,32 @@ function App() {
       element: HTMLTextAreaElement | HTMLDivElement | null,
     ) => {
       contentElementsRef.current[area] = element;
+
+      if (area === "editor") {
+        setEditorScrollElement(
+          element instanceof HTMLTextAreaElement ? element : null,
+        );
+      }
+
+      if (
+        (area === "editor" || area === "notes") &&
+        element instanceof HTMLTextAreaElement
+      ) {
+        suppressScrollSyncRestore();
+        element.scrollTop = sourceScrollPositionsRef.current[area];
+        window.requestAnimationFrame(() => {
+          if (element.isConnected) {
+            element.scrollTop = sourceScrollPositionsRef.current[area];
+          }
+        });
+
+        if (pendingSourceFocusRef.current === area) {
+          pendingSourceFocusRef.current = null;
+          element.focus({ preventScroll: true });
+        }
+      }
     },
-    [],
+    [suppressScrollSyncRestore],
   );
   useEffect(() => {
     let isDisposed = false;
@@ -1172,11 +1275,13 @@ function App() {
       }
 
       setIsSettingsOpen(false);
-      setIsNotesOpen((isOpen) => {
-        const willOpen = !isOpen;
-        lastSearchAreaRef.current = willOpen ? "notes" : "editor";
-        return willOpen;
-      });
+      captureCurrentSourceScroll();
+      const willOpen = !isNotesOpenRef.current;
+      const nextArea = willOpen ? "notes" : "editor";
+      requestSourceFocus(nextArea);
+      isNotesOpenRef.current = willOpen;
+      setIsNotesOpen(willOpen);
+      lastSearchAreaRef.current = nextArea;
     }
 
     window.addEventListener("keydown", handleNoteShortcut);
@@ -1437,14 +1542,45 @@ function App() {
     savePreference(lineSpacingStorageKey, nextSpacing);
   }
 
+  function toggleScrollSync() {
+    setScrollSyncPreference((currentPreference) => {
+      const nextPreference = currentPreference === "on" ? "off" : "on";
+      savePreference(scrollSyncStorageKey, nextPreference);
+      return nextPreference;
+    });
+  }
+
   function handleNoteChange(value: string) {
     setNote(value);
     setNoteSaveStatus("saving");
   }
 
+  function requestSourceFocus(mode: "editor" | "notes") {
+    const existingElement = contentElementsRef.current[mode];
+
+    if (existingElement instanceof HTMLTextAreaElement) {
+      pendingSourceFocusRef.current = null;
+      existingElement.focus({ preventScroll: true });
+    } else {
+      pendingSourceFocusRef.current = mode;
+    }
+  }
+
+  function captureCurrentSourceScroll() {
+    const area = isNotesOpenRef.current ? "notes" : "editor";
+    const element = contentElementsRef.current[area];
+
+    if (element instanceof HTMLTextAreaElement) {
+      sourceScrollPositionsRef.current[area] = element.scrollTop;
+    }
+  }
+
   function selectSourceMode(mode: "editor" | "notes") {
     setIsSettingsOpen(false);
+    captureCurrentSourceScroll();
+    requestSourceFocus(mode);
     setIsNotesOpen(mode === "notes");
+    isNotesOpenRef.current = mode === "notes";
     lastSearchAreaRef.current = mode;
   }
 
@@ -1595,6 +1731,7 @@ function App() {
   }
 
   function swapPanes() {
+    captureCurrentSourceScroll();
     setLeftPane((currentPane) => oppositePane[currentPane]);
 
     if (window.matchMedia("(min-width: 721px)").matches) {
@@ -1645,6 +1782,7 @@ function App() {
 
   function enterPreviewFocusMode() {
     const previewScrollProgress = capturePreviewScrollProgress();
+    suppressScrollSyncRestore();
     previewFocusReturnAreaRef.current = lastSearchAreaRef.current;
     setIsOutlineOpen(false);
     setIsSettingsOpen(false);
@@ -1659,6 +1797,7 @@ function App() {
 
   function exitPreviewFocusMode() {
     const previewScrollProgress = capturePreviewScrollProgress();
+    suppressScrollSyncRestore();
     const returnArea = previewFocusReturnAreaRef.current;
     setIsPreviewFocusMode(false);
     lastSearchAreaRef.current = returnArea;
@@ -1939,6 +2078,8 @@ function App() {
             onSearchInputElementChange={handleSearchInputElementChange}
             onContentElementChange={handleContentElementChange}
             onPreviewFocusModeToggle={togglePreviewFocusMode}
+            isScrollSyncEnabled={isScrollSyncEnabled}
+            onScrollSyncToggle={toggleScrollSync}
           />
           <div
             className="pane-divider"
@@ -1966,8 +2107,16 @@ function App() {
             <button
               className="pane-swap-button"
               type="button"
-              aria-label={`${isNotesOpen ? "메모" : "마크다운"}와 미리보기 위치 바꾸기`}
-              title={`${isNotesOpen ? "메모" : "마크다운"}와 미리보기 위치 바꾸기`}
+              aria-label={
+                isNotesOpen
+                  ? "메모와 미리보기 위치 바꾸기"
+                  : "마크다운과 미리보기 위치 바꾸기"
+              }
+              title={
+                isNotesOpen
+                  ? "메모와 미리보기 위치 바꾸기"
+                  : "마크다운과 미리보기 위치 바꾸기"
+              }
               onClick={swapPanes}
             >
               <SwapPaneIcon />
@@ -1997,6 +2146,8 @@ function App() {
             onSearchInputElementChange={handleSearchInputElementChange}
             onContentElementChange={handleContentElementChange}
             onPreviewFocusModeToggle={togglePreviewFocusMode}
+            isScrollSyncEnabled={isScrollSyncEnabled}
+            onScrollSyncToggle={toggleScrollSync}
           />
         </main>
       </div>

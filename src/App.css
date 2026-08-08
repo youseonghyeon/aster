@@ -1177,6 +1177,7 @@ select {
 
 .pane-search-trigger:hover,
 .pane-search-trigger[aria-expanded="true"],
+.scroll-sync-trigger[aria-pressed="true"],
 .preview-focus-trigger[aria-pressed="true"] {
   color: var(--accent-hover);
   background: var(--table-row-hover);
@@ -1189,6 +1190,10 @@ select {
 }
 
 .preview-focus-trigger svg {
+  stroke-linejoin: round;
+}
+
+.scroll-sync-trigger svg {
   stroke-linejoin: round;
 }
 
