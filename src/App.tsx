@@ -5,7 +5,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type ChangeEvent,
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
@@ -209,6 +208,164 @@ function LineSpacingGlyph() {
       <span />
       <span />
     </span>
+  );
+}
+
+function SelectChevronIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="m4.5 6.25 3.5 3.5 3.5-3.5" />
+    </svg>
+  );
+}
+
+function SelectedOptionIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="m3.5 8.25 2.75 2.75 6.25-6.25" />
+    </svg>
+  );
+}
+
+type ReadingFontSelectProps = {
+  value: ReadingFont;
+  onChange: (font: ReadingFont) => void;
+};
+
+function ReadingFontSelect({ value, onChange }: ReadingFontSelectProps) {
+  const selectedIndex = readingFonts.findIndex((font) => font.value === value);
+  const selectedFont = readingFonts[selectedIndex] ?? readingFonts[0];
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(selectedIndex);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    setActiveIndex(selectedIndex);
+
+    function handleOutsidePointerDown(event: globalThis.PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !rootRef.current?.contains(event.target)
+      ) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    return () =>
+      document.removeEventListener("pointerdown", handleOutsidePointerDown);
+  }, [isOpen, selectedIndex]);
+
+  function openMenu() {
+    setActiveIndex(selectedIndex);
+    setIsOpen(true);
+  }
+
+  function selectFont(nextFont: ReadingFont) {
+    onChange(nextFont);
+    setIsOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  }
+
+  function handleTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "Escape" && isOpen) {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsOpen(false);
+      return;
+    }
+
+    if (event.key === "Tab" && isOpen) {
+      setIsOpen(false);
+      return;
+    }
+
+    if (event.key === "Enter" || event.key === " ") {
+      if (!isOpen) {
+        return;
+      }
+
+      event.preventDefault();
+      selectFont(readingFonts[activeIndex].value);
+      return;
+    }
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+
+      if (!isOpen) {
+        openMenu();
+        return;
+      }
+
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      setActiveIndex(
+        (currentIndex) =>
+          (currentIndex + direction + readingFonts.length) %
+          readingFonts.length,
+      );
+      return;
+    }
+
+    if (isOpen && (event.key === "Home" || event.key === "End")) {
+      event.preventDefault();
+      setActiveIndex(event.key === "Home" ? 0 : readingFonts.length - 1);
+    }
+  }
+
+  return (
+    <div ref={rootRef} className="font-select">
+      <button
+        ref={triggerRef}
+        type="button"
+        className="font-select-trigger"
+        aria-label="글꼴"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls="reading-font-options"
+        aria-activedescendant={
+          isOpen ? `reading-font-option-${readingFonts[activeIndex].value}` : undefined
+        }
+        onClick={() => (isOpen ? setIsOpen(false) : openMenu())}
+        onKeyDown={handleTriggerKeyDown}
+      >
+        <span>{selectedFont.label}</span>
+        <SelectChevronIcon />
+      </button>
+
+      {isOpen ? (
+        <div
+          id="reading-font-options"
+          className="font-select-options"
+          role="listbox"
+          aria-label="글꼴 선택"
+        >
+          {readingFonts.map((fontOption, index) => (
+            <button
+              id={`reading-font-option-${fontOption.value}`}
+              key={fontOption.value}
+              type="button"
+              role="option"
+              tabIndex={-1}
+              className="font-select-option"
+              data-font-option={fontOption.value}
+              aria-selected={value === fontOption.value}
+              data-active={activeIndex === index ? "true" : undefined}
+              onPointerEnter={() => setActiveIndex(index)}
+              onClick={() => selectFont(fontOption.value)}
+            >
+              <span>{fontOption.label}</span>
+              {value === fontOption.value ? <SelectedOptionIcon /> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -670,9 +827,7 @@ function App() {
     savePreference(themeStorageKey, nextTheme);
   }
 
-  function handleReadingFontChange(event: ChangeEvent<HTMLSelectElement>) {
-    const nextFont = event.currentTarget.value as ReadingFont;
-
+  function selectReadingFont(nextFont: ReadingFont) {
     setReadingFont(nextFont);
     savePreference(fontStorageKey, nextFont);
   }
@@ -824,21 +979,13 @@ function App() {
                   </div>
                 </div>
 
-                <label className="settings-group">
+                <div className="settings-group">
                   <span className="settings-label">글꼴</span>
-                  <select
-                    className="settings-select"
-                    name="reading-font"
+                  <ReadingFontSelect
                     value={readingFont}
-                    onChange={handleReadingFontChange}
-                  >
-                    {readingFonts.map((fontOption) => (
-                      <option key={fontOption.value} value={fontOption.value}>
-                        {fontOption.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    onChange={selectReadingFont}
+                  />
+                </div>
 
                 <div className="settings-group">
                   <span

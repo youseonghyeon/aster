@@ -743,7 +743,8 @@ select {
 
 .theme-option:focus-visible,
 .line-spacing-option:focus-visible,
-.settings-select:focus-visible {
+.font-select-trigger:focus-visible,
+.font-select-option:focus-visible {
   outline: 2px solid var(--accent-soft);
   outline-offset: 2px;
 }
@@ -821,16 +822,122 @@ select {
   --swatch-ink: #7c6f64;
 }
 
-.settings-select {
+.font-select {
+  position: relative;
+}
+
+.font-select-trigger {
+  display: flex;
   width: 100%;
   height: 38px;
-  padding: 0 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 11px;
   color: var(--text-strong);
   background-color: var(--preview-background);
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 560;
+}
+
+.font-select-trigger:hover,
+.font-select-trigger[aria-expanded="true"] {
+  color: var(--accent-hover);
+  background: var(--table-row-hover);
+  border-color: var(--accent-soft);
+}
+
+.font-select-trigger[aria-expanded="true"] {
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+.font-select-trigger svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+  transition: transform 140ms ease;
+}
+
+.font-select-trigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.font-select-options {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  display: grid;
+  gap: 2px;
+  padding: 5px;
+  background: var(--control-background);
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  box-shadow:
+    0 12px 28px rgba(23, 26, 24, 0.14),
+    0 2px 7px rgba(23, 26, 24, 0.08);
+}
+
+.font-select-option {
+  display: flex;
+  width: 100%;
+  height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 9px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+}
+
+.font-select-option:hover,
+.font-select-option[data-active="true"] {
+  color: var(--text-strong);
+  background: var(--table-row-hover);
+}
+
+.font-select-option[aria-selected="true"] {
+  color: var(--accent-strong);
+  font-weight: 650;
+}
+
+.font-select-option svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.font-select-option[data-font-option="pretendard"] {
+  font-family: "Pretendard", sans-serif;
+}
+
+.font-select-option[data-font-option="noto-sans"] {
+  font-family: "Noto Sans KR Variable", "Noto Sans KR", sans-serif;
+}
+
+.font-select-option[data-font-option="noto-serif"] {
+  font-family: "Noto Serif KR Variable", "Noto Serif KR", serif;
+}
+
+.font-select-option[data-font-option="system"] {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
 }
 
 .line-spacing-option[data-spacing="tight"] {
