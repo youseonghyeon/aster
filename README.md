@@ -6,6 +6,17 @@
 
 > Aster는 Markdown을 더 많이 쓰기 위한 앱이 아니라, 이미 존재하는 문서를 편하게 읽기 위한 앱입니다.
 
+## 다운로드
+
+[GitHub Releases](https://github.com/youseonghyeon/aster/releases/latest)에서 최신 버전을 내려받을 수 있습니다.
+
+| 운영체제 | 설치 파일 | 지원 범위 | 배포 상태 |
+| --- | --- | --- | --- |
+| macOS | Universal `.dmg` | Apple Silicon 및 Intel | Developer ID 서명 및 Apple 공증 완료 |
+| Windows | x64 `-setup.exe` | Windows 10·11 64비트 | 코드 서명되지 않음 |
+
+macOS에서는 DMG를 열고 Aster를 Applications 폴더로 드래그하면 됩니다. Windows 설치 파일은 아직 코드 서명 인증서가 없어 Microsoft Defender SmartScreen 경고가 표시될 수 있습니다. 파일 무결성은 각 릴리스에 첨부된 `SHA256SUMS.txt`에서 확인할 수 있습니다.
+
 ## 읽기 환경
 
 | 구분 | 지원 항목 |
@@ -130,4 +141,8 @@ Aster는 읽기 경험을 흐리지 않는 범위에서 다음 기능을 확장�
 4. 사용하지 않을 때 읽는 화면에서 물러나 있는가?
 5. 본문 너비, 행간과 스크롤의 안정성을 해치지 않는가?
 
-지금의 Aster는 초기 개발 단계입니다. 기능의 수보다 읽는 경험의 완성도를 우선합니다.
+Aster는 기능의 수보다 읽는 경험의 완성도를 우선합니다.
+
+## 라이선스
+
+Aster는 [MIT License](LICENSE)로 배포됩니다.

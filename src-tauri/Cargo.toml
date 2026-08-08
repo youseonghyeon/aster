@@ -1,8 +1,10 @@
 [package]
 name = "aster"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "1.0.0"
+description = "A readable desktop Markdown viewer"
+authors = ["seonghyeon you"]
+license = "MIT"
+repository = "https://github.com/youseonghyeon/aster"
 edition = "2021"
 autobins = false
 
