@@ -5,6 +5,8 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-08
+
 ### Added
 
 - 제목 검색, 현재 위치 강조와 빠른 이동을 제공하는 반응형 문서 목차
@@ -12,9 +14,15 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 - 입력 영역을 숨기고 읽기 도구를 유지하는 미리보기 집중 모드
 - Markdown 블록 위치를 기준으로 한 선택 가능한 양방향 스크롤 동기화
 
+### Changed
+
+- 넓은 창에서 읽기 설정을 열거나 미리보기 집중 모드에 들어가도 열린 목차를 유지
+- 목차가 문서에 없는 깊이 숫자를 생성하지 않고 작성자가 쓴 제목 번호만 표시하도록 정리
+
 ### Fixed
 
 - 메모 화면을 오간 뒤 Markdown 입력의 스크롤 위치가 초기화되는 문제 수정
+- 큰 창과 작은 창 사이를 전환할 때 목차 모달의 키보드 포커스가 빠지는 문제 수정
 
 ## [1.0.0] - 2026-08-08
 
@@ -43,4 +51,5 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 - macOS 확대 단축키가 `Command+=` 대신 Shift 입력을 요구하던 문제 수정
 
 [1.0.0]: https://github.com/youseonghyeon/aster/releases/tag/v1.0.0
-[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.0.0...HEAD
+[1.1.0]: https://github.com/youseonghyeon/aster/compare/v1.0.0...v1.1.0
+[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.1.0...HEAD
