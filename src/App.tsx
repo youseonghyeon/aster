@@ -1255,7 +1255,7 @@ function App() {
     }
 
     function handleOutlineKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key !== "Escape") {
+      if (event.key !== "Escape" || isSettingsOpenRef.current) {
         return;
       }
 
@@ -1266,6 +1266,19 @@ function App() {
     window.addEventListener("keydown", handleOutlineKeyDown);
     return () => window.removeEventListener("keydown", handleOutlineKeyDown);
   }, [isOutlineOpen]);
+
+  useEffect(() => {
+    if (!isOutlineInset && isOutlineOpen && isSettingsOpen) {
+      const shouldRestoreSettingsFocus =
+        document.activeElement instanceof Node &&
+        settingsRef.current?.contains(document.activeElement);
+      setIsSettingsOpen(false);
+
+      if (shouldRestoreSettingsFocus) {
+        window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+      }
+    }
+  }, [isOutlineInset, isOutlineOpen, isSettingsOpen]);
 
   useEffect(() => {
     const workspace = workspaceRef.current;
@@ -1757,7 +1770,10 @@ function App() {
             aria-controls="document-outline"
             title={isOutlineOpen ? "문서 목차 닫기" : "문서 목차 열기"}
             onClick={() => {
-              setIsSettingsOpen(false);
+              if (!isOutlineInset) {
+                setIsSettingsOpen(false);
+              }
+
               setIsOutlineOpen((isOpen) => !isOpen);
             }}
           >
@@ -1783,7 +1799,10 @@ function App() {
               aria-controls="reading-settings-popover"
               title="읽기 설정"
               onClick={() => {
-                setIsOutlineOpen(false);
+                if (!isOutlineInset) {
+                  setIsOutlineOpen(false);
+                }
+
                 setIsSettingsOpen((isOpen) => !isOpen);
               }}
             >
