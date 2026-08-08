@@ -227,6 +227,16 @@ type SearchSnapshot = {
   }>;
 };
 
+type ScrollProgress = {
+  top: number;
+  left: number;
+};
+
+type PreviewScrollProgress = {
+  outer: ScrollProgress;
+  nested: ScrollProgress[];
+};
+
 type OpenedMarkdownFile = {
   path: string;
   name: string;
@@ -246,10 +256,42 @@ function createEmptySearchSessions(): SearchSessions {
   };
 }
 
+function getScrollProgress(element: HTMLElement): ScrollProgress {
+  const maximumTop = element.scrollHeight - element.clientHeight;
+  const maximumLeft = element.scrollWidth - element.clientWidth;
+
+  return {
+    top: maximumTop > 0 ? element.scrollTop / maximumTop : 0,
+    left: maximumLeft > 0 ? element.scrollLeft / maximumLeft : 0,
+  };
+}
+
+function restoreScrollProgress(
+  element: HTMLElement,
+  progress: ScrollProgress,
+) {
+  element.scrollTop =
+    progress.top * Math.max(0, element.scrollHeight - element.clientHeight);
+  element.scrollLeft =
+    progress.left * Math.max(0, element.scrollWidth - element.clientWidth);
+}
+
 function SwapPaneIcon() {
   return (
     <svg viewBox="0 0 18 18" aria-hidden="true">
       <path d="M3 6h11m-3-3 3 3-3 3M15 12H4m3-3-3 3 3 3" />
+    </svg>
+  );
+}
+
+function PreviewFocusIcon({ isActive }: { isActive: boolean }) {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      {isActive ? (
+        <path d="M3.5 7h3.5V3.5M16.5 7H13V3.5M3.5 13H7v3.5M16.5 13H13v3.5" />
+      ) : (
+        <path d="M7 3.5H3.5V7M13 3.5h3.5V7M7 16.5H3.5V13M13 16.5h3.5V13" />
+      )}
     </svg>
   );
 }
@@ -629,6 +671,8 @@ function Pane({
   noteSaveStatus,
   previewMarkdown,
   isPreviewUpdating,
+  isPreviewFocusMode,
+  isHiddenByPreviewFocus,
   onMarkdownChange,
   onNoteChange,
   onSourceModeChange,
@@ -640,6 +684,7 @@ function Pane({
   onSearchAreaActivate,
   onSearchInputElementChange,
   onContentElementChange,
+  onPreviewFocusModeToggle,
 }: {
   side: PaneSide;
   activePane: PaneContent;
@@ -648,6 +693,8 @@ function Pane({
   noteSaveStatus: NoteSaveStatus;
   previewMarkdown: string;
   isPreviewUpdating: boolean;
+  isPreviewFocusMode: boolean;
+  isHiddenByPreviewFocus: boolean;
   onMarkdownChange: (value: string) => void;
   onNoteChange: (value: string) => void;
   onSourceModeChange: (mode: "editor" | "notes") => void;
@@ -665,6 +712,7 @@ function Pane({
     area: SearchArea,
     element: HTMLTextAreaElement | HTMLDivElement | null,
   ) => void;
+  onPreviewFocusModeToggle: () => void;
 }) {
   const isEditor = activePane === "editor";
   const isNotes = activePane === "notes";
@@ -789,8 +837,10 @@ function Pane({
   return (
     <section
       id={`${side}-pane`}
-      className={`pane ${isEditor ? "editor-pane" : isNotes ? "notes-pane" : "preview-pane"}${searchSession.isOpen ? " has-search" : ""}`}
+      className={`pane ${isEditor ? "editor-pane" : isNotes ? "notes-pane" : "preview-pane"}${searchSession.isOpen ? " has-search" : ""}${isHiddenByPreviewFocus ? " is-focus-hidden" : ""}`}
       aria-label={`${paneLabel} ${paneTitle} 패널`}
+      aria-hidden={isHiddenByPreviewFocus || undefined}
+      inert={isHiddenByPreviewFocus}
     >
       <div className="pane-header">
         {isSourcePane ? (
@@ -843,6 +893,26 @@ function Pane({
           >
             <SearchIcon />
           </button>
+          {!isSourcePane ? (
+            <button
+              type="button"
+              className="pane-search-trigger preview-focus-trigger"
+              aria-label={
+                isPreviewFocusMode
+                  ? "미리보기 집중 모드 종료"
+                  : "미리보기 집중 모드"
+              }
+              aria-pressed={isPreviewFocusMode}
+              title={
+                isPreviewFocusMode
+                  ? "미리보기 집중 모드 종료 (Escape)"
+                  : "미리보기 집중 모드"
+              }
+              onClick={onPreviewFocusModeToggle}
+            >
+              <PreviewFocusIcon isActive={isPreviewFocusMode} />
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -938,6 +1008,7 @@ function App() {
   const [documentPath, setDocumentPath] = useState<string | null>(null);
   const [isOpeningFile, setIsOpeningFile] = useState(false);
   const [isOutlineOpen, setIsOutlineOpen] = useState(false);
+  const [isPreviewFocusMode, setIsPreviewFocusMode] = useState(false);
   const [isOutlineInset, setIsOutlineInset] = useState(() =>
     window.matchMedia("(min-width: 1280px)").matches,
   );
@@ -983,6 +1054,8 @@ function App() {
   >({ editor: null, notes: null, preview: null });
   const isOutlineOpenRef = useRef(isOutlineOpen);
   const isSettingsOpenRef = useRef(isSettingsOpen);
+  const isPreviewFocusModeRef = useRef(isPreviewFocusMode);
+  const previewFocusReturnAreaRef = useRef<SearchArea>("preview");
   const requestedSplitPercentRef = useRef(50);
   const appliedSplitPercentRef = useRef(50);
   const [previewScrollElement, setPreviewScrollElement] =
@@ -1013,6 +1086,7 @@ function App() {
   searchSessionsRef.current = searchSessions;
   isOutlineOpenRef.current = isOutlineOpen;
   isSettingsOpenRef.current = isSettingsOpen;
+  isPreviewFocusModeRef.current = isPreviewFocusMode;
 
   const handleSearchInputElementChange = useCallback(
     (area: SearchArea, element: HTMLInputElement | null) => {
@@ -1092,6 +1166,11 @@ function App() {
       }
 
       event.preventDefault();
+
+      if (isPreviewFocusModeRef.current) {
+        return;
+      }
+
       setIsSettingsOpen(false);
       setIsNotesOpen((isOpen) => {
         const willOpen = !isOpen;
@@ -1116,7 +1195,11 @@ function App() {
         event.preventDefault();
         setIsOutlineOpen(false);
         setIsSettingsOpen(false);
-        openSearch(lastSearchAreaRef.current);
+        openSearch(
+          isPreviewFocusModeRef.current
+            ? "preview"
+            : lastSearchAreaRef.current,
+        );
         return;
       }
 
@@ -1128,11 +1211,19 @@ function App() {
         return;
       }
 
-      const activeArea = lastSearchAreaRef.current;
+      const activeArea = isPreviewFocusModeRef.current
+        ? "preview"
+        : lastSearchAreaRef.current;
 
       if (searchSessionsRef.current[activeArea].isOpen) {
         event.preventDefault();
         closeSearch(activeArea);
+        return;
+      }
+
+      if (isPreviewFocusModeRef.current) {
+        event.preventDefault();
+        exitPreviewFocusMode();
       }
     }
 
@@ -1498,6 +1589,81 @@ function App() {
     }
   }
 
+  function capturePreviewScrollProgress(): PreviewScrollProgress | null {
+    const previewElement = contentElementsRef.current.preview;
+
+    if (!(previewElement instanceof HTMLDivElement)) {
+      return null;
+    }
+
+    return {
+      outer: getScrollProgress(previewElement),
+      nested: Array.from(
+        previewElement.querySelectorAll<HTMLElement>(
+          ".markdown-body pre, .markdown-body .table-scroll",
+        ),
+        getScrollProgress,
+      ),
+    };
+  }
+
+  function restorePreviewScrollProgress(
+    progress: PreviewScrollProgress | null,
+  ) {
+    const previewElement = contentElementsRef.current.preview;
+
+    if (!(previewElement instanceof HTMLDivElement) || !progress) {
+      return;
+    }
+
+    restoreScrollProgress(previewElement, progress.outer);
+    const nestedElements = previewElement.querySelectorAll<HTMLElement>(
+      ".markdown-body pre, .markdown-body .table-scroll",
+    );
+
+    progress.nested.forEach((nestedProgress, index) => {
+      const element = nestedElements[index];
+
+      if (element) {
+        restoreScrollProgress(element, nestedProgress);
+      }
+    });
+  }
+
+  function enterPreviewFocusMode() {
+    const previewScrollProgress = capturePreviewScrollProgress();
+    previewFocusReturnAreaRef.current = lastSearchAreaRef.current;
+    setIsOutlineOpen(false);
+    setIsSettingsOpen(false);
+    setIsPreviewFocusMode(true);
+    lastSearchAreaRef.current = "preview";
+
+    window.requestAnimationFrame(() => {
+      restorePreviewScrollProgress(previewScrollProgress);
+      contentElementsRef.current.preview?.focus({ preventScroll: true });
+    });
+  }
+
+  function exitPreviewFocusMode() {
+    const previewScrollProgress = capturePreviewScrollProgress();
+    const returnArea = previewFocusReturnAreaRef.current;
+    setIsPreviewFocusMode(false);
+    lastSearchAreaRef.current = returnArea;
+
+    window.requestAnimationFrame(() => {
+      restorePreviewScrollProgress(previewScrollProgress);
+      contentElementsRef.current[returnArea]?.focus({ preventScroll: true });
+    });
+  }
+
+  function togglePreviewFocusMode() {
+    if (isPreviewFocusModeRef.current) {
+      exitPreviewFocusMode();
+    } else {
+      enterPreviewFocusMode();
+    }
+  }
+
   function handleOutlineClose() {
     setIsOutlineOpen(false);
     window.requestAnimationFrame(() => outlineButtonRef.current?.focus());
@@ -1727,7 +1893,7 @@ function App() {
 
         <main
           ref={workspaceRef}
-          className="workspace"
+          className={`workspace${isPreviewFocusMode ? " is-preview-focus" : ""}`}
           inert={isOutlineOpen && !isOutlineInset}
         >
           <Pane
@@ -1738,6 +1904,10 @@ function App() {
             noteSaveStatus={noteSaveStatus}
             previewMarkdown={deferredMarkdown}
             isPreviewUpdating={isPreviewUpdating}
+            isPreviewFocusMode={isPreviewFocusMode}
+            isHiddenByPreviewFocus={
+              isPreviewFocusMode && leftPaneContent !== "preview"
+            }
             onMarkdownChange={setMarkdown}
             onNoteChange={handleNoteChange}
             onSourceModeChange={selectSourceMode}
@@ -1749,8 +1919,13 @@ function App() {
             onSearchAreaActivate={activateSearchArea}
             onSearchInputElementChange={handleSearchInputElementChange}
             onContentElementChange={handleContentElementChange}
+            onPreviewFocusModeToggle={togglePreviewFocusMode}
           />
-          <div className="pane-divider">
+          <div
+            className="pane-divider"
+            aria-hidden={isPreviewFocusMode || undefined}
+            inert={isPreviewFocusMode}
+          >
             <div
               ref={dividerRef}
               className="pane-divider-handle"
@@ -1787,6 +1962,10 @@ function App() {
             noteSaveStatus={noteSaveStatus}
             previewMarkdown={deferredMarkdown}
             isPreviewUpdating={isPreviewUpdating}
+            isPreviewFocusMode={isPreviewFocusMode}
+            isHiddenByPreviewFocus={
+              isPreviewFocusMode && rightPaneContent !== "preview"
+            }
             onMarkdownChange={setMarkdown}
             onNoteChange={handleNoteChange}
             onSourceModeChange={selectSourceMode}
@@ -1798,6 +1977,7 @@ function App() {
             onSearchAreaActivate={activateSearchArea}
             onSearchInputElementChange={handleSearchInputElementChange}
             onContentElementChange={handleContentElementChange}
+            onPreviewFocusModeToggle={togglePreviewFocusMode}
           />
         </main>
       </div>
