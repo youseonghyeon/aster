@@ -73,7 +73,7 @@ pub fn run() {
                 .build(app)?;
             let file_separator = PredefinedMenuItem::separator(app)?;
             let zoom_in_item = MenuItemBuilder::with_id("zoom_in", "Zoom In")
-                .accelerator("CmdOrCtrl+Shift+=")
+                .accelerator("CmdOrCtrl+=")
                 .build(app)?;
             let zoom_out_item = MenuItemBuilder::with_id("zoom_out", "Zoom Out")
                 .accelerator("CmdOrCtrl+-")
