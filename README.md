@@ -1,4 +1,4 @@
-![Aster에서 Markdown 문서를 입력하고 미리보는 화면](docs/assets/aster-overview.png)
+![Aster의 문서 목차, Markdown 편집기와 미리보기 개별 검색](docs/assets/aster-overview.png)
 
 # Aster
 
