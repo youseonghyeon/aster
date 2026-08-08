@@ -168,13 +168,27 @@ function SwapPaneIcon() {
   );
 }
 
+function AsterBrandIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4.2 6.8c3.1-1 5.7-.7 7.8.8V18c-2.3-1.4-4.9-1.7-7.8-.8V6.8Z" />
+      <path d="M19.8 6.8c-3.1-1-5.7-.7-7.8.8V18c2.3-1.4 4.9-1.7 7.8-.8V6.8Z" />
+      <g className="brand-aster">
+        <path d="M12 9v5" />
+        <path d="m9.85 10.25 4.3 2.5" />
+        <path d="m9.85 12.75 4.3-2.5" />
+      </g>
+    </svg>
+  );
+}
+
 function ReadingSettingsIcon() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M3 5h5m4 0h5M3 10h9m4 0h1M3 15h2m4 0h8" />
-      <circle cx="10" cy="5" r="2" />
-      <circle cx="14" cy="10" r="2" />
-      <circle cx="7" cy="15" r="2" />
+      <path d="M3.25 5.25h4.1m3.3 0h6.1M3.25 10h8.1m3.3 0h2.1M3.25 14.75h2.1m3.3 0h8.1" />
+      <circle cx="9" cy="5.25" r="1.65" />
+      <circle cx="13" cy="10" r="1.65" />
+      <circle cx="7" cy="14.75" r="1.65" />
     </svg>
   );
 }
@@ -182,8 +196,8 @@ function ReadingSettingsIcon() {
 function OpenFileIcon() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M3.5 5.5h5l1.4 1.8h6.6v8.2h-13z" />
-      <path d="M3.5 8.2h13" />
+      <path d="M3.25 6h4.4l1.5 1.75h7.6v7a1 1 0 0 1-1 1H4.25a1 1 0 0 1-1-1V6Z" />
+      <path d="M3.25 8.75h13.5" />
     </svg>
   );
 }
@@ -740,7 +754,7 @@ function App() {
       <header className="app-header">
         <div className="brand" aria-label="Aster 마크다운 뷰어">
           <span className="brand-mark" aria-hidden="true">
-            A
+            <AsterBrandIcon />
           </span>
           <span>Aster</span>
         </div>

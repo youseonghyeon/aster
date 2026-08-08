@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="cover" x1="512" y1="72" x2="512" y2="952" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3F7161"/>
+      <stop offset="1" stop-color="#24493F"/>
+    </linearGradient>
+    <linearGradient id="left-page" x1="214" y1="310" x2="512" y2="734" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFDF7"/>
+      <stop offset="1" stop-color="#EEE5D5"/>
+    </linearGradient>
+    <linearGradient id="right-page" x1="810" y1="310" x2="512" y2="734" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFDF7"/>
+      <stop offset="1" stop-color="#EEE5D5"/>
+    </linearGradient>
+    <filter id="tile-shadow" x="20" y="28" width="984" height="984" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#142A24" flood-opacity=".2"/>
+    </filter>
+    <filter id="book-shadow" x="172" y="262" width="680" height="532" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#10251F" flood-opacity=".25"/>
+    </filter>
+  </defs>
+
+  <rect x="72" y="72" width="880" height="880" rx="220" fill="url(#cover)" filter="url(#tile-shadow)"/>
+  <rect x="82" y="82" width="860" height="860" rx="210" fill="none" stroke="#FFFFFF" stroke-opacity=".12" stroke-width="4"/>
+
+  <g filter="url(#book-shadow)">
+    <path d="M214 326C318 291 414 302 493 345C505 352 512 365 512 379V744C425 691 326 680 214 712V326Z" fill="url(#left-page)"/>
+    <path d="M810 326C706 291 610 302 531 345C519 352 512 365 512 379V744C599 691 698 680 810 712V326Z" fill="url(#right-page)"/>
+    <path d="M512 379V744" fill="none" stroke="#D8CCB8" stroke-width="10" stroke-linecap="round"/>
+  </g>
+
+  <g fill="#CBA25C">
+    <rect x="490" y="398" width="44" height="200" rx="22"/>
+    <rect x="490" y="398" width="44" height="200" rx="22" transform="rotate(60 512 498)"/>
+    <rect x="490" y="398" width="44" height="200" rx="22" transform="rotate(120 512 498)"/>
+  </g>
+</svg>

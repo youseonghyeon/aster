@@ -570,11 +570,23 @@ select {
   width: 28px;
   height: 28px;
   place-items: center;
-  color: var(--brand-text);
-  background: var(--brand);
+  color: #f7f1e5;
+  background: #315a4e;
   border-radius: 8px;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 16px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.brand-mark svg {
+  width: 21px;
+  height: 21px;
+  fill: currentColor;
+}
+
+.brand-mark .brand-aster {
+  fill: none;
+  stroke: #cba25c;
+  stroke-linecap: round;
+  stroke-width: 1.65;
 }
 
 .document-name {
@@ -599,8 +611,8 @@ select {
 .header-icon-button {
   position: relative;
   display: grid;
-  width: 30px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   place-items: center;
   color: var(--text-muted);
@@ -620,7 +632,7 @@ select {
 }
 
 .settings-trigger svg {
-  fill: currentColor;
+  fill: none;
 }
 
 .open-file-trigger svg {
