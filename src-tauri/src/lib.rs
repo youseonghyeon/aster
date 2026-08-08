@@ -71,23 +71,53 @@ pub fn run() {
             let open_item = MenuItemBuilder::with_id("open_markdown", "Open…")
                 .accelerator("CmdOrCtrl+O")
                 .build(app)?;
-            let separator = PredefinedMenuItem::separator(app)?;
+            let file_separator = PredefinedMenuItem::separator(app)?;
+            let zoom_in_item = MenuItemBuilder::with_id("zoom_in", "Zoom In")
+                .accelerator("CmdOrCtrl+Shift+=")
+                .build(app)?;
+            let zoom_out_item = MenuItemBuilder::with_id("zoom_out", "Zoom Out")
+                .accelerator("CmdOrCtrl+-")
+                .build(app)?;
+            let actual_size_item = MenuItemBuilder::with_id("actual_size", "Actual Size")
+                .accelerator("CmdOrCtrl+0")
+                .build(app)?;
+            let view_separator = PredefinedMenuItem::separator(app)?;
 
             for item in menu.items()? {
                 if let MenuItemKind::Submenu(submenu) = item {
-                    if submenu.text()? == "File" {
-                        submenu.prepend_items(&[&open_item, &separator])?;
-                        break;
+                    match submenu.text()?.as_str() {
+                        "File" => {
+                            submenu.prepend_items(&[&open_item, &file_separator])?;
+                        }
+                        "View" => {
+                            submenu.prepend_items(&[
+                                &zoom_in_item,
+                                &zoom_out_item,
+                                &actual_size_item,
+                                &view_separator,
+                            ])?;
+                        }
+                        _ => {}
                     }
                 }
             }
 
             Ok(menu)
         })
-        .on_menu_event(|app, event| {
-            if event.id() == "open_markdown" {
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "open_markdown" => {
                 let _ = app.emit("open-markdown-requested", ());
             }
+            "zoom_in" => {
+                let _ = app.emit("reading-zoom-requested", "in");
+            }
+            "zoom_out" => {
+                let _ = app.emit("reading-zoom-requested", "out");
+            }
+            "actual_size" => {
+                let _ = app.emit("reading-zoom-requested", "reset");
+            }
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![read_markdown_file])
         .run(tauri::generate_context!())

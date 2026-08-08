@@ -142,6 +142,7 @@ type Theme = (typeof themes)[number]["value"];
 type ReadingFont = (typeof readingFonts)[number]["value"];
 type LineSpacing = (typeof lineSpacings)[number]["value"];
 type ReadingZoom = (typeof readingZoomLevels)[number]["value"];
+type ReadingZoomCommand = "in" | "out" | "reset";
 
 type PaneKind = "editor" | "preview";
 type PaneContent = PaneKind | "notes";
@@ -174,15 +175,6 @@ function ReadingSettingsIcon() {
       <circle cx="10" cy="5" r="2" />
       <circle cx="14" cy="10" r="2" />
       <circle cx="7" cy="15" r="2" />
-    </svg>
-  );
-}
-
-function NoteIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M5 3.5h7.5L16 7v9.5H5z" />
-      <path d="M12.5 3.5V7H16M7.5 10h6M7.5 13h4" />
     </svg>
   );
 }
@@ -311,6 +303,7 @@ function Pane({
   isPreviewUpdating,
   onMarkdownChange,
   onNoteChange,
+  onSourceModeChange,
 }: {
   side: PaneSide;
   activePane: PaneContent;
@@ -321,9 +314,12 @@ function Pane({
   isPreviewUpdating: boolean;
   onMarkdownChange: (value: string) => void;
   onNoteChange: (value: string) => void;
+  onSourceModeChange: (mode: "editor" | "notes") => void;
 }) {
   const isEditor = activePane === "editor";
   const isNotes = activePane === "notes";
+  const isSourcePane = isEditor || isNotes;
+  const hasNote = note.trim().length > 0;
   const paneLabel = side === "left" ? "왼쪽" : "오른쪽";
   const paneTitle = isEditor ? "마크다운" : isNotes ? "내 메모" : "미리보기";
   const noteSaveLabel =
@@ -340,7 +336,37 @@ function Pane({
       aria-label={`${paneLabel} ${paneTitle} 패널`}
     >
       <div className="pane-header">
-        <span className="pane-title">{paneTitle}</span>
+        {isSourcePane ? (
+          <div
+            className="document-mode-tabs"
+            role="group"
+            aria-label="작성 화면 선택"
+          >
+            <button
+              type="button"
+              className="document-mode-tab"
+              aria-pressed={isEditor}
+              onClick={() => onSourceModeChange("editor")}
+            >
+              마크다운
+            </button>
+            <button
+              type="button"
+              className="document-mode-tab"
+              aria-label={hasNote ? "메모, 작성된 내용 있음" : "메모"}
+              aria-pressed={isNotes}
+              title="메모 (⌘/Ctrl ⇧ M)"
+              onClick={() => onSourceModeChange("notes")}
+            >
+              메모
+              {hasNote ? (
+                <span className="note-presence-dot" aria-hidden="true" />
+              ) : null}
+            </button>
+          </div>
+        ) : (
+          <span className="pane-title">{paneTitle}</span>
+        )}
         {isNotes ? (
           <span
             className={`note-save-status is-${noteSaveStatus}`}
@@ -430,10 +456,6 @@ function App() {
   const readingZoomStyle = {
     "--reading-font-size": `${(17 * Number(readingZoom)) / 100}px`,
   } as CSSProperties;
-  const isMinimumZoom = readingZoom === readingZoomLevels[0].value;
-  const isMaximumZoom =
-    readingZoom === readingZoomLevels[readingZoomLevels.length - 1].value;
-
   useEffect(() => {
     let isDisposed = false;
     let stopListening: (() => void) | undefined;
@@ -455,36 +477,33 @@ function App() {
   }, []);
 
   useEffect(() => {
-    function handleReadingZoomShortcut(event: globalThis.KeyboardEvent) {
-      if ((!event.metaKey && !event.ctrlKey) || event.altKey) {
-        return;
-      }
+    let isDisposed = false;
+    let stopListening: (() => void) | undefined;
 
-      let nextZoom: ((currentZoom: ReadingZoom) => ReadingZoom) | undefined;
-
-      if (event.key === "+" || event.key === "=") {
-        nextZoom = (currentZoom) => getSteppedReadingZoom(currentZoom, 1);
-      } else if (event.key === "-" || event.key === "_") {
-        nextZoom = (currentZoom) => getSteppedReadingZoom(currentZoom, -1);
-      } else if (event.key === "0") {
-        nextZoom = () => "100";
-      }
-
-      if (!nextZoom) {
-        return;
-      }
-
-      event.preventDefault();
+    void listen<ReadingZoomCommand>("reading-zoom-requested", (event) => {
       setReadingZoom((currentZoom) => {
-        const updatedZoom = nextZoom(currentZoom);
+        const updatedZoom =
+          event.payload === "in"
+            ? getSteppedReadingZoom(currentZoom, 1)
+            : event.payload === "out"
+              ? getSteppedReadingZoom(currentZoom, -1)
+              : "100";
 
         savePreference(readingZoomStorageKey, updatedZoom);
         return updatedZoom;
       });
-    }
+    }).then((unlisten) => {
+      if (isDisposed) {
+        unlisten();
+      } else {
+        stopListening = unlisten;
+      }
+    });
 
-    window.addEventListener("keydown", handleReadingZoomShortcut);
-    return () => window.removeEventListener("keydown", handleReadingZoomShortcut);
+    return () => {
+      isDisposed = true;
+      stopListening?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -649,23 +668,14 @@ function App() {
     savePreference(lineSpacingStorageKey, nextSpacing);
   }
 
-  function adjustReadingZoom(direction: -1 | 1) {
-    setReadingZoom((currentZoom) => {
-      const nextZoom = getSteppedReadingZoom(currentZoom, direction);
-
-      savePreference(readingZoomStorageKey, nextZoom);
-      return nextZoom;
-    });
-  }
-
   function handleNoteChange(value: string) {
     setNote(value);
     setNoteSaveStatus("saving");
   }
 
-  function toggleNotes() {
+  function selectSourceMode(mode: "editor" | "notes") {
     setIsSettingsOpen(false);
-    setIsNotesOpen((isOpen) => !isOpen);
+    setIsNotesOpen(mode === "notes");
   }
 
   function swapPanes() {
@@ -747,48 +757,6 @@ function App() {
             onClick={handleOpenFile}
           >
             <OpenFileIcon />
-          </button>
-          <span className="character-count">
-            {markdown.length.toLocaleString("ko-KR")}자
-          </span>
-          <div className="zoom-control" role="group" aria-label="미리보기 배율">
-            <button
-              type="button"
-              className="zoom-button"
-              aria-label="미리보기 축소"
-              title="미리보기 축소 (⌘/Ctrl -)"
-              disabled={isMinimumZoom}
-              onClick={() => adjustReadingZoom(-1)}
-            >
-              −
-            </button>
-            <output
-              className="zoom-value"
-              aria-label={`미리보기 배율 ${readingZoom}%`}
-              aria-live="polite"
-            >
-              {readingZoom}%
-            </output>
-            <button
-              type="button"
-              className="zoom-button"
-              aria-label="미리보기 확대"
-              title="미리보기 확대 (⌘/Ctrl +)"
-              disabled={isMaximumZoom}
-              onClick={() => adjustReadingZoom(1)}
-            >
-              +
-            </button>
-          </div>
-          <button
-            className={`header-icon-button note-trigger${note.trim() ? " has-note" : ""}`}
-            type="button"
-            aria-label={isNotesOpen ? "개인 메모 닫기" : "개인 메모 열기"}
-            aria-pressed={isNotesOpen}
-            title={`${isNotesOpen ? "개인 메모 닫기" : "개인 메모 열기"} (⌘/Ctrl ⇧ M)`}
-            onClick={toggleNotes}
-          >
-            <NoteIcon />
           </button>
           <div ref={settingsRef} className="settings-menu">
             <button
@@ -903,6 +871,7 @@ function App() {
           isPreviewUpdating={isPreviewUpdating}
           onMarkdownChange={setMarkdown}
           onNoteChange={handleNoteChange}
+          onSourceModeChange={selectSourceMode}
         />
         <div className="pane-divider">
           <div
@@ -943,6 +912,7 @@ function App() {
           isPreviewUpdating={isPreviewUpdating}
           onMarkdownChange={setMarkdown}
           onNoteChange={handleNoteChange}
+          onSourceModeChange={selectSourceMode}
         />
       </main>
     </div>

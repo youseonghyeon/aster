@@ -585,69 +585,11 @@ select {
   white-space: nowrap;
 }
 
-.character-count {
-  font-variant-numeric: tabular-nums;
-}
-
 .header-actions {
   display: flex;
   align-items: center;
   justify-self: end;
   gap: 10px;
-}
-
-.zoom-control {
-  display: flex;
-  height: 28px;
-  align-items: stretch;
-  overflow: hidden;
-  color: var(--text-strong);
-  background: var(--control-background);
-  border: 1px solid var(--border-strong);
-  border-radius: 7px;
-}
-
-.zoom-button {
-  display: grid;
-  min-width: 28px;
-  padding: 0;
-  place-items: center;
-  color: var(--text-muted);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  font-size: 15px;
-  line-height: 1;
-}
-
-.zoom-button:hover:not(:disabled) {
-  color: var(--accent-hover);
-  background: var(--table-row-hover);
-}
-
-.zoom-button:focus-visible {
-  position: relative;
-  z-index: 1;
-  outline: 2px solid var(--accent-soft);
-  outline-offset: -2px;
-}
-
-.zoom-button:disabled {
-  color: var(--text-faint);
-  cursor: default;
-  opacity: 0.45;
-}
-
-.zoom-value {
-  display: grid;
-  min-width: 46px;
-  padding: 0 6px;
-  place-items: center;
-  border-right: 1px solid var(--border-soft);
-  border-left: 1px solid var(--border-soft);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 650;
 }
 
 .settings-menu {
@@ -681,7 +623,6 @@ select {
   fill: currentColor;
 }
 
-.note-trigger svg,
 .open-file-trigger svg {
   fill: none;
 }
@@ -702,18 +643,6 @@ select {
 .header-icon-button:disabled {
   cursor: wait;
   opacity: 0.5;
-}
-
-.note-trigger.has-note::after {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 5px;
-  height: 5px;
-  background: var(--accent);
-  border: 1px solid var(--control-background);
-  border-radius: 50%;
-  content: "";
 }
 
 .settings-popover {
@@ -1050,6 +979,65 @@ select {
   letter-spacing: -0.005em;
 }
 
+.document-mode-tabs {
+  display: flex;
+  height: 100%;
+  align-items: stretch;
+  gap: 2px;
+  margin-left: -8px;
+}
+
+.document-mode-tab {
+  position: relative;
+  display: flex;
+  padding: 0 8px;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-subtle);
+  background: transparent;
+  border: 0;
+  border-radius: 5px 5px 0 0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 620;
+  letter-spacing: -0.005em;
+  touch-action: manipulation;
+}
+
+.document-mode-tab:hover {
+  color: var(--text-strong);
+  background: var(--table-row-hover);
+}
+
+.document-mode-tab[aria-pressed="true"] {
+  color: var(--text-strong);
+  font-weight: 680;
+}
+
+.document-mode-tab[aria-pressed="true"]::after {
+  position: absolute;
+  right: 8px;
+  bottom: -1px;
+  left: 8px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+  content: "";
+}
+
+.document-mode-tab:focus-visible {
+  z-index: 1;
+  outline: 2px solid var(--accent-soft);
+  outline-offset: -3px;
+}
+
+.note-presence-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
 .note-save-status {
   color: var(--text-faint);
   font-size: 10px;
@@ -1372,10 +1360,6 @@ select {
 
   .app-header {
     grid-template-columns: 1fr auto;
-  }
-
-  .character-count {
-    display: none;
   }
 
   .document-name {
