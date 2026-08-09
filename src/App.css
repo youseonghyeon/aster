@@ -1041,6 +1041,27 @@ select {
   min-height: 0;
 }
 
+.split-resize-guide {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--preview-background) 72%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  will-change: transform;
+}
+
+.workspace.is-split-guide-visible .split-resize-guide {
+  opacity: 1;
+  visibility: visible;
+}
+
 .external-file-notice {
   position: absolute;
   z-index: 12;
@@ -1224,10 +1245,14 @@ select {
 }
 
 .pane-divider-handle:hover::before,
-.pane-divider-handle:focus-visible::before,
-.workspace.is-resizing .pane-divider-handle::before {
+.pane-divider-handle:focus-visible::before {
   background: var(--accent);
   transform: scaleX(3);
+}
+
+.workspace.is-resizing .pane-divider-handle::before {
+  background: var(--border-strong);
+  transform: none;
 }
 
 .panel-layout-control {
@@ -1391,8 +1416,7 @@ select {
   stroke-width: 1.8;
 }
 
-.workspace.is-resizing,
-.workspace.is-resizing * {
+.workspace.is-resizing {
   cursor: col-resize !important;
   user-select: none !important;
 }
