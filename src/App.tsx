@@ -15,12 +15,13 @@ import {
   type RefObject,
   type ReactNode,
 } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { confirm, message, open } from "@tauri-apps/plugin-dialog";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { DocumentOutline } from "./components/DocumentOutline";
+import { DocumentSidebar } from "./components/DocumentSidebar";
 import { PaneSearchBar, SearchIcon } from "./components/PaneSearchBar";
 import { SyntaxHighlightedCode } from "./components/SyntaxHighlightedCode";
 import { useActiveHeading } from "./hooks/useActiveHeading";
@@ -32,6 +33,12 @@ import {
   getMarkdownOutline,
 } from "./lib/markdown-outline";
 import { rehypeMarkdownSourceOffsets } from "./lib/markdown-source-offsets";
+import {
+  loadRecentDocuments,
+  promoteRecentDocument,
+  saveRecentDocuments,
+  type RecentDocument,
+} from "./lib/recent-documents";
 import {
   emptySearchSession,
   normalizeSearchIndex,
@@ -229,6 +236,8 @@ type PaneKind = "editor" | "preview";
 type PaneContent = PaneKind | "notes";
 type PaneSide = "left" | "right";
 type NoteSaveStatus = "saved" | "saving" | "error";
+type StageSidebar = "outline" | "recent" | null;
+type DocumentOperation = "open" | "reload";
 
 type SearchSessions = Record<SearchArea, SearchSession>;
 
@@ -393,6 +402,15 @@ function DocumentOutlineIcon() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true">
       <path d="M4 5.25h1.5M8.25 5.25H16M4 10h1.5M8.25 10H16M4 14.75h1.5M8.25 14.75H13.5" />
+    </svg>
+  );
+}
+
+function RecentDocumentsIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M6.25 3.5h8.25v10.75H6.25z" />
+      <path d="M6.25 6H3.5v10.5h8.25v-2.25" />
     </svg>
   );
 }
@@ -673,7 +691,7 @@ function getDocumentNoteStorageKey(filePath: string | null): string {
     : untitledDocumentNoteStorageKey;
 }
 
-async function chooseMarkdownFile(): Promise<OpenedMarkdownFile | null> {
+async function chooseMarkdownFilePath(): Promise<string | null> {
   const selectedPath = await open({
     title: "Markdown 파일 열기",
     multiple: false,
@@ -681,13 +699,7 @@ async function chooseMarkdownFile(): Promise<OpenedMarkdownFile | null> {
     filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
   });
 
-  if (!selectedPath) {
-    return null;
-  }
-
-  return invoke<OpenedMarkdownFile>("read_markdown_file", {
-    path: selectedPath,
-  });
+  return selectedPath || null;
 }
 
 function getSteppedReadingZoom(
@@ -1165,11 +1177,20 @@ function App() {
     useState<ExternalFileState | null>(null);
   const [dismissedExternalObservationKey, setDismissedExternalObservationKey] =
     useState<string | null>(null);
-  const [isOutlineOpen, setIsOutlineOpen] = useState(false);
+  const [stageSidebar, setStageSidebar] = useState<StageSidebar>(null);
   const [isPreviewFocusMode, setIsPreviewFocusMode] = useState(false);
-  const [isOutlineInset, setIsOutlineInset] = useState(() =>
+  const [isSidebarInset, setIsSidebarInset] = useState(() =>
     window.matchMedia("(min-width: 1280px)").matches,
   );
+  const [recentDocuments, setRecentDocuments] = useState<RecentDocument[]>(
+    loadRecentDocuments,
+  );
+  const [unavailableRecentDocumentPaths, setUnavailableRecentDocumentPaths] =
+    useState<Set<string>>(() => new Set());
+  const [
+    isRecentDocumentPersistenceLimited,
+    setIsRecentDocumentPersistenceLimited,
+  ] = useState(false);
   const [leftPane, setLeftPane] = useState<PaneKind>("editor");
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [note, setNote] = useState(() =>
@@ -1199,18 +1220,21 @@ function App() {
   const workspaceRef = useRef<HTMLElement>(null);
   const dividerRef = useRef<HTMLDivElement>(null);
   const outlineButtonRef = useRef<HTMLButtonElement>(null);
+  const recentDocumentsButtonRef = useRef<HTMLButtonElement>(null);
   const externalFileNoticeRef = useRef<HTMLElement>(null);
   const externalFileNoticeReturnFocusRef = useRef<HTMLElement | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const openFileRef = useRef<() => void>(() => undefined);
-  const isOpeningFileRef = useRef(false);
-  const isReloadingFileRef = useRef(false);
+  const documentOperationRef = useRef<DocumentOperation | null>(null);
   const markdownRef = useRef(markdown);
   const loadedMarkdownRef = useRef(loadedMarkdown);
+  const noteRef = useRef(note);
   const documentPathRef = useRef(documentPath);
   const documentGenerationRef = useRef(0);
   const markdownEditVersionRef = useRef(0);
+  const recentDocumentsRef = useRef(recentDocuments);
+  const recentStatusBatchRef = useRef(0);
   const searchSessionsRef = useRef(searchSessions);
   const lastSearchAreaRef = useRef<SearchArea>("preview");
   const searchSnapshotsRef = useRef<Partial<Record<SearchArea, SearchSnapshot>>>(
@@ -1224,7 +1248,7 @@ function App() {
   >({ editor: null, notes: null, preview: null });
   const sourceScrollPositionsRef = useRef({ editor: 0, notes: 0 });
   const pendingSourceFocusRef = useRef<"editor" | "notes" | null>(null);
-  const isOutlineOpenRef = useRef(isOutlineOpen);
+  const stageSidebarRef = useRef(stageSidebar);
   const isSettingsOpenRef = useRef(isSettingsOpen);
   const isNotesOpenRef = useRef(isNotesOpen);
   const isPreviewFocusModeRef = useRef(isPreviewFocusMode);
@@ -1236,6 +1260,8 @@ function App() {
   const [editorScrollElement, setEditorScrollElement] =
     useState<HTMLTextAreaElement | null>(null);
   const deferredMarkdown = useDeferredValue(markdown);
+  const isOutlineOpen = stageSidebar === "outline";
+  const isRecentDocumentsOpen = stageSidebar === "recent";
   const isPreviewUpdating = markdown !== deferredMarkdown;
   const outlineItems = useMemo(
     () => (isOutlineOpen ? getMarkdownOutline(deferredMarkdown) : []),
@@ -1264,13 +1290,15 @@ function App() {
     "--reading-font-size": `${(17 * Number(readingZoom)) / 100}px`,
   } as CSSProperties;
   searchSessionsRef.current = searchSessions;
-  isOutlineOpenRef.current = isOutlineOpen;
+  stageSidebarRef.current = stageSidebar;
   isSettingsOpenRef.current = isSettingsOpen;
   isNotesOpenRef.current = isNotesOpen;
   isPreviewFocusModeRef.current = isPreviewFocusMode;
   markdownRef.current = markdown;
   loadedMarkdownRef.current = loadedMarkdown;
+  noteRef.current = note;
   documentPathRef.current = documentPath;
+  recentDocumentsRef.current = recentDocuments;
   const isScrollSyncEnabled = scrollSyncPreference === "on";
   const { suppressScrollSyncRestore } = useScrollSync({
     enabled: isScrollSyncEnabled,
@@ -1498,6 +1526,7 @@ function App() {
         return;
       }
 
+      setStageSidebar(null);
       setIsSettingsOpen(false);
       captureCurrentSourceScroll();
       const willOpen = !isNotesOpenRef.current;
@@ -1522,7 +1551,7 @@ function App() {
 
       if (isFindShortcut) {
         event.preventDefault();
-        setIsOutlineOpen(false);
+        setStageSidebar(null);
         setIsSettingsOpen(false);
         openSearch(
           isPreviewFocusModeRef.current
@@ -1534,7 +1563,7 @@ function App() {
 
       if (
         event.key !== "Escape" ||
-        isOutlineOpenRef.current ||
+        stageSidebarRef.current !== null ||
         isSettingsOpenRef.current
       ) {
         return;
@@ -1571,43 +1600,89 @@ function App() {
 
   useEffect(() => {
     const insetQuery = window.matchMedia("(min-width: 1280px)");
-    const updateOutlineMode = () => setIsOutlineInset(insetQuery.matches);
+    const updateSidebarMode = () => setIsSidebarInset(insetQuery.matches);
 
-    updateOutlineMode();
-    insetQuery.addEventListener("change", updateOutlineMode);
-    return () => insetQuery.removeEventListener("change", updateOutlineMode);
+    updateSidebarMode();
+    insetQuery.addEventListener("change", updateSidebarMode);
+    return () => insetQuery.removeEventListener("change", updateSidebarMode);
   }, []);
 
   useEffect(() => {
-    if (!isOutlineOpen) {
+    if (!stageSidebar) {
       return;
     }
 
-    function handleOutlineKeyDown(event: globalThis.KeyboardEvent) {
+    function handleSidebarKeyDown(event: globalThis.KeyboardEvent) {
       if (event.key !== "Escape" || isSettingsOpenRef.current) {
         return;
       }
 
       event.preventDefault();
-      handleOutlineClose();
-    }
-
-    window.addEventListener("keydown", handleOutlineKeyDown);
-    return () => window.removeEventListener("keydown", handleOutlineKeyDown);
-  }, [isOutlineOpen]);
-
-  useEffect(() => {
-    if (!isOutlineInset && isOutlineOpen && isSettingsOpen) {
-      const shouldRestoreSettingsFocus =
-        document.activeElement instanceof Node &&
-        settingsRef.current?.contains(document.activeElement);
-      setIsSettingsOpen(false);
-
-      if (shouldRestoreSettingsFocus) {
-        window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+      if (stageSidebar === "outline") {
+        handleOutlineClose();
+      } else {
+        handleDocumentSidebarClose();
       }
     }
-  }, [isOutlineInset, isOutlineOpen, isSettingsOpen]);
+
+    window.addEventListener("keydown", handleSidebarKeyDown);
+    return () => window.removeEventListener("keydown", handleSidebarKeyDown);
+  }, [stageSidebar]);
+
+  useEffect(() => {
+    if (!isRecentDocumentsOpen || !isTauri()) {
+      return;
+    }
+
+    const batch = recentStatusBatchRef.current + 1;
+    recentStatusBatchRef.current = batch;
+    let isDisposed = false;
+
+    void Promise.all(
+      recentDocuments.map(async (document) => {
+        try {
+          const status = await invoke<MarkdownFileStatus>(
+            "get_markdown_file_status",
+            { path: document.path },
+          );
+          return { path: document.path, status };
+        } catch {
+          return null;
+        }
+      }),
+    ).then((results) => {
+      if (isDisposed || batch !== recentStatusBatchRef.current) {
+        return;
+      }
+
+      const recentPaths = new Set(
+        recentDocuments.map((document) => document.path),
+      );
+      setUnavailableRecentDocumentPaths((currentPaths) => {
+        const nextPaths = new Set(
+          Array.from(currentPaths).filter((path) => recentPaths.has(path)),
+        );
+
+        for (const result of results) {
+          if (!result) {
+            continue;
+          }
+
+          if (result.status.kind === "unavailable") {
+            nextPaths.add(result.path);
+          } else {
+            nextPaths.delete(result.path);
+          }
+        }
+
+        return nextPaths;
+      });
+    });
+
+    return () => {
+      isDisposed = true;
+    };
+  }, [isRecentDocumentsOpen, recentDocuments]);
 
   useEffect(() => {
     const workspace = workspaceRef.current;
@@ -1800,6 +1875,7 @@ function App() {
   }
 
   function selectSourceMode(mode: "editor" | "notes") {
+    setStageSidebar(null);
     setIsSettingsOpen(false);
     captureCurrentSourceScroll();
     requestSourceFocus(mode);
@@ -2008,6 +2084,7 @@ function App() {
     const previewScrollProgress = capturePreviewScrollProgress();
     suppressScrollSyncRestore();
     previewFocusReturnAreaRef.current = lastSearchAreaRef.current;
+    setStageSidebar(null);
     setIsSettingsOpen(false);
     setIsPreviewFocusMode(true);
     lastSearchAreaRef.current = "preview";
@@ -2040,18 +2117,25 @@ function App() {
   }
 
   function handleOutlineClose() {
-    setIsOutlineOpen(false);
+    setStageSidebar(null);
     window.requestAnimationFrame(() => outlineButtonRef.current?.focus());
+  }
+
+  function handleDocumentSidebarClose() {
+    setStageSidebar(null);
+    window.requestAnimationFrame(() =>
+      recentDocumentsButtonRef.current?.focus(),
+    );
   }
 
   function handleOutlineNavigate(headingId: string, shouldMoveFocus: boolean) {
     const heading = navigateToHeading(headingId);
 
-    if (!heading || isOutlineInset) {
+    if (!heading || isSidebarInset) {
       return;
     }
 
-    setIsOutlineOpen(false);
+    setStageSidebar(null);
 
     if (shouldMoveFocus) {
       window.requestAnimationFrame(() =>
@@ -2086,13 +2170,13 @@ function App() {
   }
 
   async function handleReloadExternalFile() {
-    if (!documentPath || isReloadingFileRef.current) {
+    if (!documentPath || documentOperationRef.current !== null) {
       return;
     }
 
     const pathToReload = documentPath;
     const documentGenerationToReload = documentGenerationRef.current;
-    isReloadingFileRef.current = true;
+    documentOperationRef.current = "reload";
     setIsReloadingFile(true);
 
     try {
@@ -2177,56 +2261,219 @@ function App() {
       setExternalFileState(nextState);
       setDismissedExternalObservationKey(null);
     } finally {
-      isReloadingFileRef.current = false;
+      if (documentOperationRef.current === "reload") {
+        documentOperationRef.current = null;
+      }
       setIsReloadingFile(false);
     }
   }
 
-  async function handleOpenFile() {
-    if (isOpeningFileRef.current) {
+  async function showDocumentOpenError(error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    try {
+      await message(errorMessage, {
+        title: "파일을 열 수 없습니다",
+        kind: "error",
+      });
+    } catch {
+      console.error("파일을 열 수 없습니다:", errorMessage);
+    }
+  }
+
+  function promoteOpenedDocument(
+    openedFile: OpenedMarkdownFile,
+    requestedPath: string,
+  ) {
+    const nextRecentDocuments = promoteRecentDocument(
+      recentDocumentsRef.current,
+      { path: openedFile.path, name: openedFile.name },
+      [requestedPath],
+    );
+    recentDocumentsRef.current = nextRecentDocuments;
+    setRecentDocuments(nextRecentDocuments);
+    setIsRecentDocumentPersistenceLimited(
+      !saveRecentDocuments(nextRecentDocuments),
+    );
+    setUnavailableRecentDocumentPaths((currentPaths) => {
+      const nextPaths = new Set(currentPaths);
+      nextPaths.delete(requestedPath);
+      nextPaths.delete(openedFile.path);
+      return nextPaths;
+    });
+  }
+
+  async function switchToMarkdownDocument(
+    requestedPath: string,
+    markUnavailableOnFailure: boolean,
+  ) {
+    let openedFile: OpenedMarkdownFile;
+
+    try {
+      openedFile = await invoke<OpenedMarkdownFile>("read_markdown_file", {
+        path: requestedPath,
+      });
+    } catch (error) {
+      if (markUnavailableOnFailure && isTauri()) {
+        try {
+          const status = await invoke<MarkdownFileStatus>(
+            "get_markdown_file_status",
+            { path: requestedPath },
+          );
+          setUnavailableRecentDocumentPaths((currentPaths) => {
+            const nextPaths = new Set(currentPaths);
+
+            if (status.kind === "unavailable") {
+              nextPaths.add(requestedPath);
+            } else {
+              nextPaths.delete(requestedPath);
+            }
+
+            return nextPaths;
+          });
+        } catch {
+          // Transport failures do not prove that the document is unavailable.
+        }
+      }
+
+      await showDocumentOpenError(error);
       return;
     }
 
-    isOpeningFileRef.current = true;
-    setIsOpeningFile(true);
+    const documentGenerationBeforeConfirmation =
+      documentGenerationRef.current;
+    const documentPathBeforeConfirmation = documentPathRef.current;
+    const markdownEditVersionBeforeConfirmation =
+      markdownEditVersionRef.current;
+    const markdownBaseline = loadedMarkdownRef.current ?? initialMarkdown;
+    const hasUnsavedMarkdown = markdownRef.current !== markdownBaseline;
 
-    try {
-      const openedFile = await chooseMarkdownFile();
+    if (hasUnsavedMarkdown) {
+      let shouldSwitch: boolean;
 
-      if (!openedFile) {
+      try {
+        shouldSwitch = await confirm(
+          "다른 문서를 열면 Aster에서 수정한 Markdown 내용이 사라집니다. 문서를 전환할까요?",
+          {
+            title: "Markdown 변경 내용 버리기",
+            kind: "warning",
+            okLabel: "문서 전환",
+            cancelLabel: "취소",
+          },
+        );
+      } catch (error) {
+        await showDocumentOpenError(error);
         return;
       }
 
-      saveStoredText(documentNoteStorageKey, note);
-
-      const nextNoteStorageKey = getDocumentNoteStorageKey(openedFile.path);
-      documentGenerationRef.current += 1;
-      setDocumentName(openedFile.name);
-      setDocumentPath(openedFile.path);
-      markdownRef.current = openedFile.content;
-      setMarkdown(openedFile.content);
-      loadedMarkdownRef.current = openedFile.content;
-      setLoadedMarkdown(openedFile.content);
-      setLoadedRevision(openedFile.revision);
-      setExternalFileState(null);
-      setDismissedExternalObservationKey(null);
-      setNote(loadStoredText(nextNoteStorageKey));
-      setNoteSaveStatus("saved");
-      resetSearchSessions();
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-
-      try {
-        await message(errorMessage, {
-          title: "파일을 열 수 없습니다",
-          kind: "error",
-        });
-      } catch {
-        console.error("파일을 열 수 없습니다:", errorMessage);
+      if (!shouldSwitch) {
+        return;
       }
+    }
+
+    if (
+      documentGenerationRef.current !==
+        documentGenerationBeforeConfirmation ||
+      documentPathRef.current !== documentPathBeforeConfirmation ||
+      markdownEditVersionRef.current !== markdownEditVersionBeforeConfirmation
+    ) {
+      return;
+    }
+
+    const currentNoteStorageKey = getDocumentNoteStorageKey(
+      documentPathRef.current,
+    );
+    if (!saveStoredText(currentNoteStorageKey, noteRef.current)) {
+      setNoteSaveStatus("error");
+      try {
+        await message(
+          "현재 문서의 메모를 저장하지 못해 문서 전환을 중단했습니다. 저장 공간을 확인한 뒤 다시 시도해 주세요.",
+          {
+            title: "메모를 보존할 수 없습니다",
+            kind: "error",
+          },
+        );
+      } catch {
+        console.error("메모를 저장하지 못해 문서 전환을 중단했습니다.");
+      }
+      return;
+    }
+
+    const shouldRestoreRecentFocus = stageSidebarRef.current === "recent";
+    const nextNoteStorageKey = getDocumentNoteStorageKey(openedFile.path);
+    documentGenerationRef.current += 1;
+    setDocumentName(openedFile.name);
+    documentPathRef.current = openedFile.path;
+    setDocumentPath(openedFile.path);
+    markdownRef.current = openedFile.content;
+    setMarkdown(openedFile.content);
+    loadedMarkdownRef.current = openedFile.content;
+    setLoadedMarkdown(openedFile.content);
+    setLoadedRevision(openedFile.revision);
+    setExternalFileState(null);
+    setDismissedExternalObservationKey(null);
+    const nextNote = loadStoredText(nextNoteStorageKey);
+    noteRef.current = nextNote;
+    setNote(nextNote);
+    setNoteSaveStatus("saved");
+    resetSearchSessions();
+    promoteOpenedDocument(openedFile, requestedPath);
+    setStageSidebar(null);
+
+    if (shouldRestoreRecentFocus) {
+      window.requestAnimationFrame(() =>
+        recentDocumentsButtonRef.current?.focus(),
+      );
+    }
+  }
+
+  async function handleOpenFile() {
+    if (documentOperationRef.current !== null) {
+      return;
+    }
+
+    documentOperationRef.current = "open";
+    setIsOpeningFile(true);
+
+    try {
+      const selectedPath = await chooseMarkdownFilePath();
+
+      if (!selectedPath) {
+        return;
+      }
+
+      await switchToMarkdownDocument(selectedPath, false);
+    } catch (error) {
+      await showDocumentOpenError(error);
     } finally {
-      isOpeningFileRef.current = false;
+      if (documentOperationRef.current === "open") {
+        documentOperationRef.current = null;
+      }
+      setIsOpeningFile(false);
+    }
+  }
+
+  async function handleRecentDocumentSelect(document: RecentDocument) {
+    if (document.path === documentPathRef.current) {
+      handleDocumentSidebarClose();
+      return;
+    }
+
+    if (documentOperationRef.current !== null) {
+      return;
+    }
+
+    documentOperationRef.current = "open";
+    setIsOpeningFile(true);
+
+    try {
+      await switchToMarkdownDocument(document.path, true);
+    } catch (error) {
+      await showDocumentOpenError(error);
+    } finally {
+      if (documentOperationRef.current === "open") {
+        documentOperationRef.current = null;
+      }
       setIsOpeningFile(false);
     }
   }
@@ -2253,6 +2500,27 @@ function App() {
         </span>
         <div className="header-actions">
           <button
+            ref={recentDocumentsButtonRef}
+            className="header-icon-button recent-documents-trigger"
+            type="button"
+            aria-label={
+              isRecentDocumentsOpen ? "최근 문서 닫기" : "최근 문서 열기"
+            }
+            aria-expanded={isRecentDocumentsOpen}
+            aria-controls="document-sidebar"
+            title={
+              isRecentDocumentsOpen ? "최근 문서 닫기" : "최근 문서 열기"
+            }
+            onClick={() => {
+              setIsSettingsOpen(false);
+              setStageSidebar((currentSidebar) =>
+                currentSidebar === "recent" ? null : "recent",
+              );
+            }}
+          >
+            <RecentDocumentsIcon />
+          </button>
+          <button
             ref={outlineButtonRef}
             className="header-icon-button outline-trigger"
             type="button"
@@ -2261,11 +2529,10 @@ function App() {
             aria-controls="document-outline"
             title={isOutlineOpen ? "문서 목차 닫기" : "문서 목차 열기"}
             onClick={() => {
-              if (!isOutlineInset) {
-                setIsSettingsOpen(false);
-              }
-
-              setIsOutlineOpen((isOpen) => !isOpen);
+              setIsSettingsOpen(false);
+              setStageSidebar((currentSidebar) =>
+                currentSidebar === "outline" ? null : "outline",
+              );
             }}
           >
             <DocumentOutlineIcon />
@@ -2275,7 +2542,7 @@ function App() {
             type="button"
             aria-label="Markdown 파일 열기"
             title="Markdown 파일 열기 (⌘/Ctrl O)"
-            disabled={isOpeningFile}
+            disabled={isOpeningFile || isReloadingFile}
             onClick={handleOpenFile}
           >
             <OpenFileIcon />
@@ -2290,10 +2557,7 @@ function App() {
               aria-controls="reading-settings-popover"
               title="읽기 설정"
               onClick={() => {
-                if (!isOutlineInset) {
-                  setIsOutlineOpen(false);
-                }
-
+                setStageSidebar(null);
                 setIsSettingsOpen((isOpen) => !isOpen);
               }}
             >
@@ -2380,20 +2644,43 @@ function App() {
         </div>
       </header>
 
-      <div className={`document-stage${isOutlineOpen ? " has-outline" : ""}`}>
+      <div className={`document-stage${stageSidebar ? " has-sidebar" : ""}`}>
+        {isRecentDocumentsOpen ? (
+          <>
+            <DocumentSidebar
+              documents={recentDocuments}
+              currentDocumentPath={documentPath}
+              unavailableDocumentPaths={unavailableRecentDocumentPaths}
+              isModal={!isSidebarInset}
+              isBusy={isOpeningFile || isReloadingFile}
+              isPersistenceLimited={isRecentDocumentPersistenceLimited}
+              onClose={handleDocumentSidebarClose}
+              onOpenFile={handleOpenFile}
+              onSelectDocument={handleRecentDocumentSelect}
+            />
+            <button
+              type="button"
+              className="sidebar-scrim"
+              tabIndex={-1}
+              aria-label="최근 문서 닫기"
+              onClick={handleDocumentSidebarClose}
+            />
+          </>
+        ) : null}
+
         {isOutlineOpen ? (
           <>
             <DocumentOutline
               items={outlineItems}
               activeHeadingId={activeHeadingId}
               documentKey={documentPath ?? "untitled"}
-              isModal={!isOutlineInset}
+              isModal={!isSidebarInset}
               onClose={handleOutlineClose}
               onNavigate={handleOutlineNavigate}
             />
             <button
               type="button"
-              className="outline-scrim"
+              className="sidebar-scrim"
               tabIndex={-1}
               aria-label="목차 닫기"
               onClick={handleOutlineClose}
@@ -2404,7 +2691,7 @@ function App() {
         <main
           ref={workspaceRef}
           className={`workspace${isPreviewFocusMode ? " is-preview-focus" : ""}`}
-          inert={isOutlineOpen && !isOutlineInset}
+          inert={stageSidebar !== null && !isSidebarInset}
         >
           <Pane
             side="left"

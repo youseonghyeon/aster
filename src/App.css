@@ -638,13 +638,15 @@ select {
   fill: none;
 }
 
-.outline-trigger svg {
+.outline-trigger svg,
+.recent-documents-trigger svg {
   fill: none;
 }
 
 .header-icon-button:hover,
 .header-icon-button[aria-pressed="true"],
 .outline-trigger[aria-expanded="true"],
+.recent-documents-trigger[aria-expanded="true"],
 .settings-trigger[aria-expanded="true"] {
   color: var(--accent-hover);
   background: var(--table-row-hover);
@@ -982,7 +984,7 @@ select {
   overflow: hidden;
 }
 
-.outline-scrim {
+.sidebar-scrim {
   position: absolute;
   z-index: 21;
   inset: 0;
@@ -1736,15 +1738,15 @@ select {
 }
 
 @media (min-width: 1280px) {
-  .document-stage.has-outline {
+  .document-stage.has-sidebar {
     grid-template-columns: 264px minmax(0, 1fr);
   }
 
-  .document-stage.has-outline .workspace {
+  .document-stage.has-sidebar .workspace {
     grid-column: 2;
   }
 
-  .outline-scrim {
+  .sidebar-scrim {
     display: none;
   }
 }
