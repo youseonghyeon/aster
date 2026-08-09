@@ -5,10 +5,19 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-09
+
 ### Added
 
 - 열린 Markdown 파일의 외부 변경·삭제를 감지하고 현재 내용을 보존한 채 다시 불러올 수 있는 알림
-- 최근에 연 Markdown 문서를 최대 10개까지 복원하고 안전하게 전환하는 반응형 문서 사이드바
+- 최근에 연 Markdown 문서 목록을 최대 10개까지 기억하고 안전하게 다시 여는 반응형 문서 사이드바
+
+### Changed
+
+- 최근 문서와 문서 목차를 왼쪽 탐색 그룹으로 옮기고, 파일 열기와 읽기 설정을 오른쪽 전역 그룹으로 정리
+- 스크롤 동기화, 패널 위치 교환과 50:50 초기화를 가운데 구분선의 패널 배치 메뉴로 통합
+- 문서 목차의 행간과 깊이별 들여쓰기를 줄여 긴 제목을 더 넓게 표시
+- 패널 너비를 드래그할 때 본문 패널을 계속 다시 배치하지 않고 안내선만 움직여 긴 문서의 조절 성능 개선
 
 ### Fixed
 
@@ -61,4 +70,5 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 
 [1.0.0]: https://github.com/youseonghyeon/aster/releases/tag/v1.0.0
 [1.1.0]: https://github.com/youseonghyeon/aster/compare/v1.0.0...v1.1.0
-[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.1.0...HEAD
+[1.2.0]: https://github.com/youseonghyeon/aster/compare/v1.1.0...v1.2.0
+[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.2.0...HEAD
