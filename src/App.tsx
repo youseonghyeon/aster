@@ -12,11 +12,12 @@ import {
   type HTMLAttributes,
   type KeyboardEvent,
   type PointerEvent,
+  type RefObject,
   type ReactNode,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { message, open } from "@tauri-apps/plugin-dialog";
+import { confirm, message, open } from "@tauri-apps/plugin-dialog";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { DocumentOutline } from "./components/DocumentOutline";
@@ -263,7 +264,16 @@ type OpenedMarkdownFile = {
   path: string;
   name: string;
   content: string;
+  revision: string;
 };
+
+type MarkdownFileStatus =
+  | { kind: "available"; revision: string }
+  | { kind: "unavailable"; message: string };
+
+type ExternalFileState =
+  | { kind: "modified"; revision: string; observationKey: string }
+  | { kind: "unavailable"; message: string; observationKey: string };
 
 const oppositePane: Record<PaneKind, PaneKind> = {
   editor: "preview",
@@ -357,6 +367,24 @@ function OpenFileIcon() {
     <svg viewBox="0 0 20 20" aria-hidden="true">
       <path d="M3.25 6h4.4l1.5 1.75h7.6v7a1 1 0 0 1-1 1H4.25a1 1 0 0 1-1-1V6Z" />
       <path d="M3.25 8.75h13.5" />
+    </svg>
+  );
+}
+
+function FileChangeIcon({ kind }: { kind: ExternalFileState["kind"] }) {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      {kind === "modified" ? (
+        <>
+          <path d="M10 3.25a6.75 6.75 0 1 0 6.2 4.08" />
+          <path d="M13.25 3.25H16.5V6.5M16.5 3.25l-3.7 3.7" />
+        </>
+      ) : (
+        <>
+          <path d="M10 3.25 17 16H3L10 3.25Z" />
+          <path d="M10 7.4v4.2M10 14.1v.1" />
+        </>
+      )}
     </svg>
   );
 }
@@ -675,6 +703,71 @@ function getSteppedReadingZoom(
   );
 
   return readingZoomLevels[nextIndex].value;
+}
+
+type ExternalFileNoticeProps = {
+  state: ExternalFileState;
+  isReloading: boolean;
+  noticeRef: RefObject<HTMLElement | null>;
+  onReload: () => void;
+  onDismiss: () => void;
+};
+
+function ExternalFileNotice({
+  state,
+  isReloading,
+  noticeRef,
+  onReload,
+  onDismiss,
+}: ExternalFileNoticeProps) {
+  const messageText =
+    state.kind === "modified"
+      ? "원본 파일이 다른 앱에서 변경되었습니다."
+      : "원본 파일을 확인할 수 없습니다. 현재 내용은 그대로 유지됩니다.";
+
+  return (
+    <aside
+      ref={noticeRef}
+      className={`external-file-notice is-${state.kind}`}
+      aria-label="원본 파일 상태"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          onDismiss();
+        }
+      }}
+    >
+      <span className="external-file-notice-icon">
+        <FileChangeIcon kind={state.kind} />
+      </span>
+      <span className="external-file-notice-message" role="status" aria-live="polite">
+        <strong>{state.kind === "modified" ? "새 변경 사항" : "파일 연결 끊김"}</strong>
+        <span>{messageText}</span>
+      </span>
+      <button
+        type="button"
+        className="external-file-reload"
+        disabled={isReloading}
+        onClick={onReload}
+      >
+        {isReloading
+          ? "확인 중…"
+          : state.kind === "modified"
+            ? "다시 불러오기"
+            : "다시 확인"}
+      </button>
+      <button
+        type="button"
+        className="external-file-dismiss"
+        aria-label="원본 파일 상태 알림 닫기"
+        title="닫기"
+        onClick={onDismiss}
+      >
+        <span aria-hidden="true">×</span>
+      </button>
+    </aside>
+  );
 }
 
 const MarkdownPreview = memo(function MarkdownPreview({
@@ -1062,9 +1155,16 @@ function Pane({
 
 function App() {
   const [markdown, setMarkdown] = useState(initialMarkdown);
+  const [loadedMarkdown, setLoadedMarkdown] = useState<string | null>(null);
+  const [loadedRevision, setLoadedRevision] = useState<string | null>(null);
   const [documentName, setDocumentName] = useState("새 문서.md");
   const [documentPath, setDocumentPath] = useState<string | null>(null);
   const [isOpeningFile, setIsOpeningFile] = useState(false);
+  const [isReloadingFile, setIsReloadingFile] = useState(false);
+  const [externalFileState, setExternalFileState] =
+    useState<ExternalFileState | null>(null);
+  const [dismissedExternalObservationKey, setDismissedExternalObservationKey] =
+    useState<string | null>(null);
   const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [isPreviewFocusMode, setIsPreviewFocusMode] = useState(false);
   const [isOutlineInset, setIsOutlineInset] = useState(() =>
@@ -1099,10 +1199,18 @@ function App() {
   const workspaceRef = useRef<HTMLElement>(null);
   const dividerRef = useRef<HTMLDivElement>(null);
   const outlineButtonRef = useRef<HTMLButtonElement>(null);
+  const externalFileNoticeRef = useRef<HTMLElement>(null);
+  const externalFileNoticeReturnFocusRef = useRef<HTMLElement | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const openFileRef = useRef<() => void>(() => undefined);
   const isOpeningFileRef = useRef(false);
+  const isReloadingFileRef = useRef(false);
+  const markdownRef = useRef(markdown);
+  const loadedMarkdownRef = useRef(loadedMarkdown);
+  const documentPathRef = useRef(documentPath);
+  const documentGenerationRef = useRef(0);
+  const markdownEditVersionRef = useRef(0);
   const searchSessionsRef = useRef(searchSessions);
   const lastSearchAreaRef = useRef<SearchArea>("preview");
   const searchSnapshotsRef = useRef<Partial<Record<SearchArea, SearchSnapshot>>>(
@@ -1147,6 +1255,11 @@ function App() {
   const rightPaneContent: PaneContent =
     leftPane === "editor" ? "preview" : primaryPane;
   const documentNoteStorageKey = getDocumentNoteStorageKey(documentPath);
+  const visibleExternalFileState =
+    externalFileState &&
+    externalFileState.observationKey !== dismissedExternalObservationKey
+      ? externalFileState
+      : null;
   const readingZoomStyle = {
     "--reading-font-size": `${(17 * Number(readingZoom)) / 100}px`,
   } as CSSProperties;
@@ -1155,6 +1268,9 @@ function App() {
   isSettingsOpenRef.current = isSettingsOpen;
   isNotesOpenRef.current = isNotesOpen;
   isPreviewFocusModeRef.current = isPreviewFocusMode;
+  markdownRef.current = markdown;
+  loadedMarkdownRef.current = loadedMarkdown;
+  documentPathRef.current = documentPath;
   const isScrollSyncEnabled = scrollSyncPreference === "on";
   const { suppressScrollSyncRestore } = useScrollSync({
     enabled: isScrollSyncEnabled,
@@ -1256,6 +1372,114 @@ function App() {
       stopListening?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (!documentPath || !loadedRevision) {
+      return;
+    }
+
+    let isDisposed = false;
+    let isChecking = false;
+    let unavailableObservationCount = 0;
+    let nextCheckTimer: number | undefined;
+
+    function showExternalFileState(nextState: ExternalFileState) {
+      setExternalFileState((currentState) => {
+        if (currentState?.observationKey === nextState.observationKey) {
+          return currentState;
+        }
+
+        if (document.activeElement instanceof HTMLElement) {
+          externalFileNoticeReturnFocusRef.current = document.activeElement;
+        }
+
+        return nextState;
+      });
+    }
+
+    function scheduleNextCheck() {
+      if (!isDisposed && document.visibilityState === "visible") {
+        nextCheckTimer = window.setTimeout(checkFileStatus, 2000);
+      }
+    }
+
+    async function checkFileStatus() {
+      if (isDisposed || isChecking) {
+        return;
+      }
+
+      if (document.visibilityState === "hidden") {
+        return;
+      }
+
+      isChecking = true;
+
+      try {
+        const status = await invoke<MarkdownFileStatus>(
+          "get_markdown_file_status",
+          { path: documentPath },
+        );
+
+        if (isDisposed) {
+          return;
+        }
+
+        if (status.kind === "available") {
+          unavailableObservationCount = 0;
+
+          if (status.revision === loadedRevision) {
+            setExternalFileState(null);
+            setDismissedExternalObservationKey(null);
+          } else {
+            showExternalFileState({
+              kind: "modified",
+              revision: status.revision,
+              observationKey: `modified:${status.revision}`,
+            });
+          }
+        } else {
+          unavailableObservationCount += 1;
+
+          if (unavailableObservationCount >= 2) {
+            showExternalFileState({
+              kind: "unavailable",
+              message: status.message,
+              observationKey: `unavailable:${status.message}`,
+            });
+          }
+        }
+      } catch (error) {
+        if (!isDisposed) {
+          console.error("파일 상태를 확인할 수 없습니다:", error);
+        }
+      } finally {
+        isChecking = false;
+        scheduleNextCheck();
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "visible" || isChecking) {
+        return;
+      }
+
+      if (nextCheckTimer !== undefined) {
+        window.clearTimeout(nextCheckTimer);
+      }
+      void checkFileStatus();
+    }
+
+    void checkFileStatus();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isDisposed = true;
+      if (nextCheckTimer !== undefined) {
+        window.clearTimeout(nextCheckTimer);
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [documentPath, loadedRevision]);
 
   useEffect(() => {
     function handleNoteShortcut(event: globalThis.KeyboardEvent) {
@@ -1836,6 +2060,128 @@ function App() {
     }
   }
 
+  function handleExternalFileNoticeDismiss() {
+    if (!externalFileState) {
+      return;
+    }
+
+    const returnFocusElement = externalFileNoticeReturnFocusRef.current;
+    setDismissedExternalObservationKey(externalFileState.observationKey);
+
+    window.requestAnimationFrame(() => {
+      if (returnFocusElement?.isConnected) {
+        returnFocusElement.focus({ preventScroll: true });
+      } else {
+        contentElementsRef.current[lastSearchAreaRef.current]?.focus({
+          preventScroll: true,
+        });
+      }
+    });
+  }
+
+  function handleMarkdownChange(nextMarkdown: string) {
+    markdownEditVersionRef.current += 1;
+    markdownRef.current = nextMarkdown;
+    setMarkdown(nextMarkdown);
+  }
+
+  async function handleReloadExternalFile() {
+    if (!documentPath || isReloadingFileRef.current) {
+      return;
+    }
+
+    const pathToReload = documentPath;
+    const documentGenerationToReload = documentGenerationRef.current;
+    isReloadingFileRef.current = true;
+    setIsReloadingFile(true);
+
+    try {
+      if (
+        loadedMarkdownRef.current !== null &&
+        markdownRef.current !== loadedMarkdownRef.current
+      ) {
+        const shouldReload = await confirm(
+          "다시 불러오면 Aster에서 수정한 Markdown 내용이 사라집니다. 원본 파일을 다시 불러올까요?",
+          {
+            title: "Markdown 변경 내용 버리기",
+            kind: "warning",
+            okLabel: "다시 불러오기",
+            cancelLabel: "취소",
+          },
+        );
+
+        if (!shouldReload) {
+          return;
+        }
+      }
+
+      if (
+        documentGenerationRef.current !== documentGenerationToReload ||
+        documentPathRef.current !== pathToReload
+      ) {
+        return;
+      }
+
+      const approvedMarkdownEditVersion = markdownEditVersionRef.current;
+
+      const reloadedFile = await invoke<OpenedMarkdownFile>(
+        "read_markdown_file",
+        { path: pathToReload },
+      );
+
+      if (
+        documentGenerationRef.current !== documentGenerationToReload ||
+        documentPathRef.current !== pathToReload
+      ) {
+        return;
+      }
+
+      if (markdownEditVersionRef.current !== approvedMarkdownEditVersion) {
+        try {
+          await message(
+            "다시 불러오는 동안 Markdown이 수정되어 현재 내용을 유지했습니다. 최신 원본을 적용하려면 다시 시도해 주세요.",
+            {
+              title: "현재 변경 내용 유지",
+              kind: "info",
+            },
+          );
+        } catch {
+          console.info("다시 불러오는 동안 수정된 Markdown을 유지했습니다.");
+        }
+        return;
+      }
+
+      setDocumentName(reloadedFile.name);
+      markdownRef.current = reloadedFile.content;
+      setMarkdown(reloadedFile.content);
+      loadedMarkdownRef.current = reloadedFile.content;
+      setLoadedMarkdown(reloadedFile.content);
+      setLoadedRevision(reloadedFile.revision);
+      setExternalFileState(null);
+      setDismissedExternalObservationKey(null);
+      resetSearchSessions();
+    } catch (error) {
+      if (
+        documentGenerationRef.current !== documentGenerationToReload ||
+        documentPathRef.current !== pathToReload
+      ) {
+        return;
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const nextState: ExternalFileState = {
+        kind: "unavailable",
+        message: errorMessage,
+        observationKey: `unavailable:${errorMessage}`,
+      };
+      setExternalFileState(nextState);
+      setDismissedExternalObservationKey(null);
+    } finally {
+      isReloadingFileRef.current = false;
+      setIsReloadingFile(false);
+    }
+  }
+
   async function handleOpenFile() {
     if (isOpeningFileRef.current) {
       return;
@@ -1854,9 +2200,16 @@ function App() {
       saveStoredText(documentNoteStorageKey, note);
 
       const nextNoteStorageKey = getDocumentNoteStorageKey(openedFile.path);
+      documentGenerationRef.current += 1;
       setDocumentName(openedFile.name);
       setDocumentPath(openedFile.path);
+      markdownRef.current = openedFile.content;
       setMarkdown(openedFile.content);
+      loadedMarkdownRef.current = openedFile.content;
+      setLoadedMarkdown(openedFile.content);
+      setLoadedRevision(openedFile.revision);
+      setExternalFileState(null);
+      setDismissedExternalObservationKey(null);
       setNote(loadStoredText(nextNoteStorageKey));
       setNoteSaveStatus("saved");
       resetSearchSessions();
@@ -2065,7 +2418,7 @@ function App() {
             isHiddenByPreviewFocus={
               isPreviewFocusMode && leftPaneContent !== "preview"
             }
-            onMarkdownChange={setMarkdown}
+            onMarkdownChange={handleMarkdownChange}
             onNoteChange={handleNoteChange}
             onSourceModeChange={selectSourceMode}
             onPreviewScrollElementChange={setPreviewScrollElement}
@@ -2133,7 +2486,7 @@ function App() {
             isHiddenByPreviewFocus={
               isPreviewFocusMode && rightPaneContent !== "preview"
             }
-            onMarkdownChange={setMarkdown}
+            onMarkdownChange={handleMarkdownChange}
             onNoteChange={handleNoteChange}
             onSourceModeChange={selectSourceMode}
             onPreviewScrollElementChange={setPreviewScrollElement}
@@ -2148,6 +2501,15 @@ function App() {
             isScrollSyncEnabled={isScrollSyncEnabled}
             onScrollSyncToggle={toggleScrollSync}
           />
+          {visibleExternalFileState ? (
+            <ExternalFileNotice
+              state={visibleExternalFileState}
+              isReloading={isReloadingFile}
+              noticeRef={externalFileNoticeRef}
+              onReload={handleReloadExternalFile}
+              onDismiss={handleExternalFileNoticeDismiss}
+            />
+          ) : null}
         </main>
       </div>
     </div>
