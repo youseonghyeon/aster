@@ -325,6 +325,24 @@ function SwapPaneIcon() {
   );
 }
 
+function PanelLayoutIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <rect x="3.25" y="4" width="13.5" height="12" rx="1.75" />
+      <path d="M10 4v12" />
+    </svg>
+  );
+}
+
+function ResetSplitIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M4 5.25h12v9.5H4zM10 5.25v9.5" />
+      <path d="m6.25 3-2.5 2.25 2.5 2.25M13.75 17l2.5-2.25-2.5-2.25" />
+    </svg>
+  );
+}
+
 function PreviewFocusIcon({ isActive }: { isActive: boolean }) {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -585,6 +603,207 @@ function ReadingFontSelect({ value, onChange }: ReadingFontSelectProps) {
   );
 }
 
+type PanelLayoutMenuProps = {
+  isOpen: boolean;
+  isScrollSyncEnabled: boolean;
+  isScrollSyncAvailable: boolean;
+  isStacked: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  onScrollSyncToggle: () => void;
+  onSwapPanes: () => void;
+  onResetSplit: () => void;
+};
+
+function PanelLayoutMenu({
+  isOpen,
+  isScrollSyncEnabled,
+  isScrollSyncAvailable,
+  isStacked,
+  onOpen,
+  onClose,
+  onScrollSyncToggle,
+  onSwapPanes,
+  onResetSplit,
+}: PanelLayoutMenuProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const syncState = !isScrollSyncEnabled
+    ? "off"
+    : isScrollSyncAvailable
+      ? "on"
+      : "paused";
+  const triggerLabel =
+    syncState === "on"
+      ? "패널 배치, 스크롤 동기화 켜짐"
+      : syncState === "paused"
+        ? "패널 배치, 스크롤 동기화 일시 중지"
+        : "패널 배치, 스크롤 동기화 꺼짐";
+
+  function getMenuItems() {
+    return Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>(
+        '[role^="menuitem"]:not(:disabled)',
+      ) ?? [],
+    );
+  }
+
+  function closeAndRestoreFocus() {
+    onClose();
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const focusFrame = window.requestAnimationFrame(() =>
+      getMenuItems()[0]?.focus(),
+    );
+
+    function handleOutsidePointerDown(event: globalThis.PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !rootRef.current?.contains(event.target)
+      ) {
+        onClose();
+      }
+    }
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("pointerdown", handleOutsidePointerDown);
+    };
+  }, [isOpen, onClose]);
+
+  function handleTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "ArrowDown" && !isOpen) {
+      event.preventDefault();
+      onOpen();
+    }
+  }
+
+  function handleMenuKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeAndRestoreFocus();
+      return;
+    }
+
+    if (event.key === "Tab") {
+      onClose();
+      return;
+    }
+
+    const items = getMenuItems();
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+    let nextIndex: number | null = null;
+
+    if (event.key === "ArrowDown") {
+      nextIndex = (currentIndex + 1 + items.length) % items.length;
+    } else if (event.key === "ArrowUp") {
+      nextIndex = (currentIndex - 1 + items.length) % items.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = items.length - 1;
+    }
+
+    if (nextIndex !== null) {
+      event.preventDefault();
+      items[nextIndex]?.focus();
+    }
+  }
+
+  function runAndClose(action: () => void) {
+    action();
+    closeAndRestoreFocus();
+  }
+
+  return (
+    <div ref={rootRef} className="panel-layout-control">
+      <button
+        ref={triggerRef}
+        className="pane-layout-button"
+        data-sync-state={syncState}
+        type="button"
+        aria-label={triggerLabel}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-controls="panel-layout-menu"
+        title={triggerLabel}
+        onClick={() => (isOpen ? closeAndRestoreFocus() : onOpen())}
+        onKeyDown={handleTriggerKeyDown}
+      >
+        <PanelLayoutIcon />
+        {isScrollSyncEnabled ? (
+          <span className="panel-layout-sync-indicator" aria-hidden="true" />
+        ) : null}
+      </button>
+
+      {isOpen ? (
+        <div
+          ref={menuRef}
+          id="panel-layout-menu"
+          className="panel-layout-menu"
+          role="menu"
+          aria-label="패널 배치"
+          onKeyDown={handleMenuKeyDown}
+        >
+          <button
+            type="button"
+            className="panel-layout-menu-item"
+            role="menuitemcheckbox"
+            aria-checked={isScrollSyncEnabled}
+            aria-disabled={!isScrollSyncAvailable}
+            disabled={!isScrollSyncAvailable}
+            onClick={() => {
+              if (isScrollSyncAvailable) {
+                onScrollSyncToggle();
+              }
+            }}
+          >
+            <ScrollSyncIcon />
+            <span className="panel-layout-menu-copy">
+              <span>스크롤 동기화</span>
+              {!isScrollSyncAvailable ? (
+                <span>Markdown 화면에서 사용 가능</span>
+              ) : null}
+            </span>
+            <span className="panel-layout-menu-check" aria-hidden="true">
+              {isScrollSyncEnabled ? <SelectedOptionIcon /> : null}
+            </span>
+          </button>
+          <button
+            type="button"
+            className="panel-layout-menu-item"
+            role="menuitem"
+            onClick={() => runAndClose(onSwapPanes)}
+          >
+            <SwapPaneIcon />
+            <span>{isStacked ? "패널 순서 바꾸기" : "좌우 위치 바꾸기"}</span>
+          </button>
+          {!isStacked ? (
+            <button
+              type="button"
+              className="panel-layout-menu-item"
+              role="menuitem"
+              onClick={() => runAndClose(onResetSplit)}
+            >
+              <ResetSplitIcon />
+              <span>패널 너비 50:50으로 초기화</span>
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function loadPreference<T extends string>(
   storageKey: string,
   options: readonly { value: T }[],
@@ -822,8 +1041,6 @@ function Pane({
   onSearchInputElementChange,
   onContentElementChange,
   onPreviewFocusModeToggle,
-  isScrollSyncEnabled,
-  onScrollSyncToggle,
 }: {
   side: PaneSide;
   activePane: PaneContent;
@@ -852,8 +1069,6 @@ function Pane({
     element: HTMLTextAreaElement | HTMLDivElement | null,
   ) => void;
   onPreviewFocusModeToggle: () => void;
-  isScrollSyncEnabled: boolean;
-  onScrollSyncToggle: () => void;
 }) {
   const isEditor = activePane === "editor";
   const isNotes = activePane === "notes";
@@ -1024,26 +1239,6 @@ function Pane({
               {noteSaveLabel}
             </span>
           ) : null}
-          {isEditor ? (
-            <button
-              type="button"
-              className="pane-search-trigger scroll-sync-trigger"
-              aria-label={
-                isScrollSyncEnabled
-                  ? "스크롤 동기화 끄기"
-                  : "스크롤 동기화 켜기"
-              }
-              aria-pressed={isScrollSyncEnabled}
-              title={
-                isScrollSyncEnabled
-                  ? "마크다운·미리보기 스크롤 동기화 끄기"
-                  : "마크다운·미리보기 스크롤 동기화 켜기"
-              }
-              onClick={onScrollSyncToggle}
-            >
-              <ScrollSyncIcon />
-            </button>
-          ) : null}
           <button
             type="button"
             className="pane-search-trigger"
@@ -1201,6 +1396,10 @@ function App() {
     createEmptySearchSessions,
   );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPanelLayoutMenuOpen, setIsPanelLayoutMenuOpen] = useState(false);
+  const [isWorkspaceStacked, setIsWorkspaceStacked] = useState(() =>
+    window.matchMedia("(max-width: 720px)").matches,
+  );
   const [theme, setTheme] = useState<Theme>(() =>
     loadPreference(themeStorageKey, themes, "paper"),
   );
@@ -1250,6 +1449,7 @@ function App() {
   const pendingSourceFocusRef = useRef<"editor" | "notes" | null>(null);
   const stageSidebarRef = useRef(stageSidebar);
   const isSettingsOpenRef = useRef(isSettingsOpen);
+  const isPanelLayoutMenuOpenRef = useRef(isPanelLayoutMenuOpen);
   const isNotesOpenRef = useRef(isNotesOpen);
   const isPreviewFocusModeRef = useRef(isPreviewFocusMode);
   const previewFocusReturnAreaRef = useRef<SearchArea>("preview");
@@ -1292,6 +1492,7 @@ function App() {
   searchSessionsRef.current = searchSessions;
   stageSidebarRef.current = stageSidebar;
   isSettingsOpenRef.current = isSettingsOpen;
+  isPanelLayoutMenuOpenRef.current = isPanelLayoutMenuOpen;
   isNotesOpenRef.current = isNotesOpen;
   isPreviewFocusModeRef.current = isPreviewFocusMode;
   markdownRef.current = markdown;
@@ -1300,6 +1501,7 @@ function App() {
   documentPathRef.current = documentPath;
   recentDocumentsRef.current = recentDocuments;
   const isScrollSyncEnabled = scrollSyncPreference === "on";
+  const isScrollSyncAvailable = !isNotesOpen && !isPreviewFocusMode;
   const { suppressScrollSyncRestore } = useScrollSync({
     enabled: isScrollSyncEnabled,
     active:
@@ -1351,6 +1553,14 @@ function App() {
     },
     [suppressScrollSyncRestore],
   );
+  const openPanelLayoutMenu = useCallback(() => {
+    setIsSettingsOpen(false);
+    setIsPanelLayoutMenuOpen(true);
+  }, []);
+  const closePanelLayoutMenu = useCallback(() => {
+    setIsPanelLayoutMenuOpen(false);
+  }, []);
+
   useEffect(() => {
     let isDisposed = false;
     let stopListening: (() => void) | undefined;
@@ -1528,6 +1738,7 @@ function App() {
 
       setStageSidebar(null);
       setIsSettingsOpen(false);
+      setIsPanelLayoutMenuOpen(false);
       captureCurrentSourceScroll();
       const willOpen = !isNotesOpenRef.current;
       const nextArea = willOpen ? "notes" : "editor";
@@ -1553,6 +1764,7 @@ function App() {
         event.preventDefault();
         setStageSidebar(null);
         setIsSettingsOpen(false);
+        setIsPanelLayoutMenuOpen(false);
         openSearch(
           isPreviewFocusModeRef.current
             ? "preview"
@@ -1564,7 +1776,8 @@ function App() {
       if (
         event.key !== "Escape" ||
         stageSidebarRef.current !== null ||
-        isSettingsOpenRef.current
+        isSettingsOpenRef.current ||
+        isPanelLayoutMenuOpenRef.current
       ) {
         return;
       }
@@ -1611,6 +1824,14 @@ function App() {
         setIsSettingsOpen(false);
       }
 
+      if (
+        !nextIsSidebarInset &&
+        stageSidebarRef.current !== null &&
+        isPanelLayoutMenuOpenRef.current
+      ) {
+        setIsPanelLayoutMenuOpen(false);
+      }
+
       setIsSidebarInset(nextIsSidebarInset);
     };
 
@@ -1620,12 +1841,27 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const stackedQuery = window.matchMedia("(max-width: 720px)");
+    const updateWorkspaceMode = () =>
+      setIsWorkspaceStacked(stackedQuery.matches);
+
+    updateWorkspaceMode();
+    stackedQuery.addEventListener("change", updateWorkspaceMode);
+    return () =>
+      stackedQuery.removeEventListener("change", updateWorkspaceMode);
+  }, []);
+
+  useEffect(() => {
     if (!stageSidebar) {
       return;
     }
 
     function handleSidebarKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key !== "Escape" || isSettingsOpenRef.current) {
+      if (
+        event.key !== "Escape" ||
+        isSettingsOpenRef.current ||
+        isPanelLayoutMenuOpenRef.current
+      ) {
         return;
       }
 
@@ -2098,6 +2334,7 @@ function App() {
     previewFocusReturnAreaRef.current = lastSearchAreaRef.current;
     setStageSidebar(null);
     setIsSettingsOpen(false);
+    setIsPanelLayoutMenuOpen(false);
     setIsPreviewFocusMode(true);
     lastSearchAreaRef.current = "preview";
 
@@ -2501,54 +2738,61 @@ function App() {
       style={readingZoomStyle}
     >
       <header className="app-header">
-        <div className="brand" aria-label="Aster 마크다운 뷰어">
-          <span className="brand-mark" aria-hidden="true">
-            <AsterBrandIcon />
-          </span>
-          <span>Aster</span>
+        <div className="header-leading">
+          <div className="brand" aria-label="Aster 마크다운 뷰어">
+            <span className="brand-mark" aria-hidden="true">
+              <AsterBrandIcon />
+            </span>
+            <span>Aster</span>
+          </div>
+          <span className="header-group-divider" aria-hidden="true" />
+          <nav className="stage-navigation" aria-label="문서 탐색">
+            <button
+              ref={recentDocumentsButtonRef}
+              className="header-icon-button recent-documents-trigger"
+              type="button"
+              aria-label={
+                isRecentDocumentsOpen ? "최근 문서 닫기" : "최근 문서 열기"
+              }
+              aria-expanded={isRecentDocumentsOpen}
+              aria-controls="document-sidebar"
+              title={
+                isRecentDocumentsOpen ? "최근 문서 닫기" : "최근 문서 열기"
+              }
+              onClick={() => {
+                setIsSettingsOpen(false);
+                setIsPanelLayoutMenuOpen(false);
+                setStageSidebar((currentSidebar) =>
+                  currentSidebar === "recent" ? null : "recent",
+                );
+              }}
+            >
+              <RecentDocumentsIcon />
+            </button>
+            <button
+              ref={outlineButtonRef}
+              className="header-icon-button outline-trigger"
+              type="button"
+              aria-label={isOutlineOpen ? "문서 목차 닫기" : "문서 목차 열기"}
+              aria-expanded={isOutlineOpen}
+              aria-controls="document-outline"
+              title={isOutlineOpen ? "문서 목차 닫기" : "문서 목차 열기"}
+              onClick={() => {
+                setIsSettingsOpen(false);
+                setIsPanelLayoutMenuOpen(false);
+                setStageSidebar((currentSidebar) =>
+                  currentSidebar === "outline" ? null : "outline",
+                );
+              }}
+            >
+              <DocumentOutlineIcon />
+            </button>
+          </nav>
         </div>
         <span className="document-name" title={documentPath ?? documentName}>
           {documentName}
         </span>
         <div className="header-actions">
-          <button
-            ref={recentDocumentsButtonRef}
-            className="header-icon-button recent-documents-trigger"
-            type="button"
-            aria-label={
-              isRecentDocumentsOpen ? "최근 문서 닫기" : "최근 문서 열기"
-            }
-            aria-expanded={isRecentDocumentsOpen}
-            aria-controls="document-sidebar"
-            title={
-              isRecentDocumentsOpen ? "최근 문서 닫기" : "최근 문서 열기"
-            }
-            onClick={() => {
-              setIsSettingsOpen(false);
-              setStageSidebar((currentSidebar) =>
-                currentSidebar === "recent" ? null : "recent",
-              );
-            }}
-          >
-            <RecentDocumentsIcon />
-          </button>
-          <button
-            ref={outlineButtonRef}
-            className="header-icon-button outline-trigger"
-            type="button"
-            aria-label={isOutlineOpen ? "문서 목차 닫기" : "문서 목차 열기"}
-            aria-expanded={isOutlineOpen}
-            aria-controls="document-outline"
-            title={isOutlineOpen ? "문서 목차 닫기" : "문서 목차 열기"}
-            onClick={() => {
-              setIsSettingsOpen(false);
-              setStageSidebar((currentSidebar) =>
-                currentSidebar === "outline" ? null : "outline",
-              );
-            }}
-          >
-            <DocumentOutlineIcon />
-          </button>
           <button
             className="header-icon-button open-file-trigger"
             type="button"
@@ -2569,6 +2813,7 @@ function App() {
               aria-controls="reading-settings-popover"
               title="읽기 설정"
               onClick={() => {
+                setIsPanelLayoutMenuOpen(false);
                 if (!isSidebarInset) {
                   setStageSidebar(null);
                 }
@@ -2731,8 +2976,6 @@ function App() {
             onSearchInputElementChange={handleSearchInputElementChange}
             onContentElementChange={handleContentElementChange}
             onPreviewFocusModeToggle={togglePreviewFocusMode}
-            isScrollSyncEnabled={isScrollSyncEnabled}
-            onScrollSyncToggle={toggleScrollSync}
           />
           <div
             className="pane-divider"
@@ -2757,23 +3000,17 @@ function App() {
               onPointerUp={handleDividerPointerEnd}
               onPointerCancel={handleDividerPointerEnd}
             />
-            <button
-              className="pane-swap-button"
-              type="button"
-              aria-label={
-                isNotesOpen
-                  ? "메모와 미리보기 위치 바꾸기"
-                  : "마크다운과 미리보기 위치 바꾸기"
-              }
-              title={
-                isNotesOpen
-                  ? "메모와 미리보기 위치 바꾸기"
-                  : "마크다운과 미리보기 위치 바꾸기"
-              }
-              onClick={swapPanes}
-            >
-              <SwapPaneIcon />
-            </button>
+            <PanelLayoutMenu
+              isOpen={isPanelLayoutMenuOpen}
+              isScrollSyncEnabled={isScrollSyncEnabled}
+              isScrollSyncAvailable={isScrollSyncAvailable}
+              isStacked={isWorkspaceStacked}
+              onOpen={openPanelLayoutMenu}
+              onClose={closePanelLayoutMenu}
+              onScrollSyncToggle={toggleScrollSync}
+              onSwapPanes={swapPanes}
+              onResetSplit={() => updateSplit(50)}
+            />
           </div>
           <Pane
             side="right"
@@ -2799,8 +3036,6 @@ function App() {
             onSearchInputElementChange={handleSearchInputElementChange}
             onContentElementChange={handleContentElementChange}
             onPreviewFocusModeToggle={togglePreviewFocusMode}
-            isScrollSyncEnabled={isScrollSyncEnabled}
-            onScrollSyncToggle={toggleScrollSync}
           />
           {visibleExternalFileState ? (
             <ExternalFileNotice
