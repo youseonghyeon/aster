@@ -1600,7 +1600,19 @@ function App() {
 
   useEffect(() => {
     const insetQuery = window.matchMedia("(min-width: 1280px)");
-    const updateSidebarMode = () => setIsSidebarInset(insetQuery.matches);
+    const updateSidebarMode = () => {
+      const nextIsSidebarInset = insetQuery.matches;
+
+      if (
+        !nextIsSidebarInset &&
+        stageSidebarRef.current !== null &&
+        isSettingsOpenRef.current
+      ) {
+        setIsSettingsOpen(false);
+      }
+
+      setIsSidebarInset(nextIsSidebarInset);
+    };
 
     updateSidebarMode();
     insetQuery.addEventListener("change", updateSidebarMode);
@@ -2557,7 +2569,9 @@ function App() {
               aria-controls="reading-settings-popover"
               title="읽기 설정"
               onClick={() => {
-                setStageSidebar(null);
+                if (!isSidebarInset) {
+                  setStageSidebar(null);
+                }
                 setIsSettingsOpen((isOpen) => !isOpen);
               }}
             >
