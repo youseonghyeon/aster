@@ -249,6 +249,13 @@ type PaneContent = PaneKind | "notes";
 type PaneSide = "left" | "right";
 type NoteSaveStatus = "saved" | "saving" | "error";
 type StageSidebar = "outline" | "recent" | null;
+
+function isEventInsideStageSidebar(target: EventTarget | null) {
+  return (
+    target instanceof Element &&
+    Boolean(target.closest("#document-outline, #document-sidebar"))
+  );
+}
 type DocumentOperation = "open" | "reload";
 
 type SearchSessions = Record<SearchArea, SearchSession>;
@@ -1461,6 +1468,7 @@ function App() {
   const sourceScrollPositionsRef = useRef({ editor: 0, notes: 0 });
   const pendingSourceFocusRef = useRef<"editor" | "notes" | null>(null);
   const stageSidebarRef = useRef(stageSidebar);
+  const isSidebarInsetRef = useRef(isSidebarInset);
   const isSettingsOpenRef = useRef(isSettingsOpen);
   const isPanelLayoutMenuOpenRef = useRef(isPanelLayoutMenuOpen);
   const isNotesOpenRef = useRef(isNotesOpen);
@@ -1505,6 +1513,7 @@ function App() {
   } as CSSProperties;
   searchSessionsRef.current = searchSessions;
   stageSidebarRef.current = stageSidebar;
+  isSidebarInsetRef.current = isSidebarInset;
   isSettingsOpenRef.current = isSettingsOpen;
   isPanelLayoutMenuOpenRef.current = isPanelLayoutMenuOpen;
   isNotesOpenRef.current = isNotesOpen;
@@ -1551,11 +1560,24 @@ function App() {
         (area === "editor" || area === "notes") &&
         element instanceof HTMLTextAreaElement
       ) {
+        const pendingSearchSnapshot =
+          !searchSessionsRef.current[area].isOpen
+            ? searchSnapshotsRef.current[area]
+            : undefined;
+        const restoredScrollTop =
+          pendingSearchSnapshot?.scrollTop ??
+          sourceScrollPositionsRef.current[area];
         suppressScrollSyncRestore();
-        element.scrollTop = sourceScrollPositionsRef.current[area];
+        if (pendingSearchSnapshot) {
+          restorePendingSourceSearchSnapshot(area, element);
+        } else {
+          element.scrollTop = restoredScrollTop;
+          element.scrollLeft = 0;
+        }
+
         window.requestAnimationFrame(() => {
           if (element.isConnected) {
-            element.scrollTop = sourceScrollPositionsRef.current[area];
+            element.scrollTop = restoredScrollTop;
           }
         });
 
@@ -1750,7 +1772,7 @@ function App() {
         return;
       }
 
-      setStageSidebar(null);
+      dismissNonPersistentStageSidebar();
       setIsSettingsOpen(false);
       setIsPanelLayoutMenuOpen(false);
       captureCurrentSourceScroll();
@@ -1776,7 +1798,6 @@ function App() {
 
       if (isFindShortcut) {
         event.preventDefault();
-        setStageSidebar(null);
         setIsSettingsOpen(false);
         setIsPanelLayoutMenuOpen(false);
         openSearch(
@@ -1789,9 +1810,12 @@ function App() {
 
       if (
         event.key !== "Escape" ||
-        stageSidebarRef.current !== null ||
+        event.defaultPrevented ||
         isSettingsOpenRef.current ||
-        isPanelLayoutMenuOpenRef.current
+        isPanelLayoutMenuOpenRef.current ||
+        (stageSidebarRef.current !== null &&
+          (!isSidebarInsetRef.current ||
+            isEventInsideStageSidebar(event.target)))
       ) {
         return;
       }
@@ -1846,6 +1870,7 @@ function App() {
         setIsPanelLayoutMenuOpen(false);
       }
 
+      isSidebarInsetRef.current = nextIsSidebarInset;
       setIsSidebarInset(nextIsSidebarInset);
     };
 
@@ -1871,10 +1896,21 @@ function App() {
     }
 
     function handleSidebarKeyDown(event: globalThis.KeyboardEvent) {
+      const activeArea = isPreviewFocusModeRef.current
+        ? "preview"
+        : lastSearchAreaRef.current;
+      const shouldWorkspaceHandleEscape =
+        isSidebarInsetRef.current &&
+        !isEventInsideStageSidebar(event.target) &&
+        (searchSessionsRef.current[activeArea].isOpen ||
+          isPreviewFocusModeRef.current);
+
       if (
         event.key !== "Escape" ||
+        event.defaultPrevented ||
         isSettingsOpenRef.current ||
-        isPanelLayoutMenuOpenRef.current
+        isPanelLayoutMenuOpenRef.current ||
+        shouldWorkspaceHandleEscape
       ) {
         return;
       }
@@ -2303,8 +2339,20 @@ function App() {
     }
   }
 
-  function selectSourceMode(mode: "editor" | "notes") {
+  function dismissNonPersistentStageSidebar() {
+    const shouldPreserveOutline =
+      stageSidebarRef.current === "outline" && isSidebarInsetRef.current;
+
+    if (shouldPreserveOutline) {
+      return;
+    }
+
+    stageSidebarRef.current = null;
     setStageSidebar(null);
+  }
+
+  function selectSourceMode(mode: "editor" | "notes") {
+    dismissNonPersistentStageSidebar();
     setIsSettingsOpen(false);
     captureCurrentSourceScroll();
     requestSourceFocus(mode);
@@ -2378,6 +2426,7 @@ function App() {
 
   function openSearch(area: SearchArea) {
     lastSearchAreaRef.current = area;
+    dismissNonPersistentStageSidebar();
 
     if (searchSessionsRef.current[area].isOpen) {
       window.requestAnimationFrame(() => {
@@ -2392,9 +2441,19 @@ function App() {
     updateSearchSession(area, { isOpen: true });
   }
 
-  function closeSearch(area: SearchArea) {
+  function closeSearch(
+    area: SearchArea,
+    {
+      restoreFocus = true,
+      deferRestore = false,
+    }: { restoreFocus?: boolean; deferRestore?: boolean } = {},
+  ) {
     const snapshot = searchSnapshotsRef.current[area];
     updateSearchSession(area, { isOpen: false });
+
+    if (deferRestore) {
+      return;
+    }
 
     window.requestAnimationFrame(() => {
       const contentElement = contentElementsRef.current[area];
@@ -2446,9 +2505,46 @@ function App() {
               : isSnapshotElementInCurrentArea
                 ? snapshot?.activeElement
                 : contentElement;
-      focusTarget?.focus({ preventScroll: true });
+      if (restoreFocus) {
+        focusTarget?.focus({ preventScroll: true });
+      }
+
+      if (!contentElement && snapshot && !restoreFocus) {
+        return;
+      }
+
       delete searchSnapshotsRef.current[area];
     });
+  }
+
+  function closeSourceSearchesForPreviewFocus() {
+    (["editor", "notes"] as const).forEach((area) => {
+      if (searchSessionsRef.current[area].isOpen) {
+        closeSearch(area, { restoreFocus: false, deferRestore: true });
+      }
+    });
+  }
+
+  function restorePendingSourceSearchSnapshot(
+    area: "editor" | "notes",
+    element: HTMLTextAreaElement,
+  ) {
+    const snapshot = searchSnapshotsRef.current[area];
+
+    if (!snapshot || searchSessionsRef.current[area].isOpen) {
+      return null;
+    }
+
+    element.setSelectionRange(
+      snapshot.selectionStart ?? 0,
+      snapshot.selectionEnd ?? 0,
+      snapshot.selectionDirection,
+    );
+    element.scrollTop = snapshot.scrollTop;
+    element.scrollLeft = snapshot.scrollLeft;
+    sourceScrollPositionsRef.current[area] = snapshot.scrollTop;
+    delete searchSnapshotsRef.current[area];
+    return snapshot.scrollTop;
   }
 
   function resetSearchSessions() {
@@ -2513,7 +2609,8 @@ function App() {
     const previewScrollProgress = capturePreviewScrollProgress();
     suppressScrollSyncRestore();
     previewFocusReturnAreaRef.current = lastSearchAreaRef.current;
-    setStageSidebar(null);
+    closeSourceSearchesForPreviewFocus();
+    dismissNonPersistentStageSidebar();
     setIsSettingsOpen(false);
     setIsPanelLayoutMenuOpen(false);
     setIsPreviewFocusMode(true);
@@ -2534,7 +2631,31 @@ function App() {
 
     window.requestAnimationFrame(() => {
       restorePreviewScrollProgress(previewScrollProgress);
-      contentElementsRef.current[returnArea]?.focus({ preventScroll: true });
+      const returnElement = contentElementsRef.current[returnArea];
+      const restoredSourceScrollPositions = (["editor", "notes"] as const)
+        .map((area) => {
+          const element = contentElementsRef.current[area];
+          const scrollTop =
+            element instanceof HTMLTextAreaElement
+              ? restorePendingSourceSearchSnapshot(area, element)
+              : null;
+          return element instanceof HTMLTextAreaElement && scrollTop !== null
+            ? { element, scrollTop, scrollLeft: element.scrollLeft }
+            : null;
+        })
+        .filter((restoredPosition) => restoredPosition !== null);
+      returnElement?.focus({ preventScroll: true });
+
+      if (restoredSourceScrollPositions.length > 0) {
+        window.requestAnimationFrame(() => {
+          restoredSourceScrollPositions.forEach(
+            ({ element, scrollTop, scrollLeft }) => {
+              element.scrollTop = scrollTop;
+              element.scrollLeft = scrollLeft;
+            },
+          );
+        });
+      }
     });
   }
 
