@@ -29,6 +29,7 @@ import { useActiveHeading } from "./hooks/useActiveHeading";
 import { usePreviewSearch } from "./hooks/usePreviewSearch";
 import { useScrollSync } from "./hooks/useScrollSync";
 import { useTextSearch } from "./hooks/useTextSearch";
+import { useWorkspaceSearch } from "./hooks/useWorkspaceSearch";
 import {
   getMarkdownHeadingId,
   getMarkdownOutline,
@@ -41,7 +42,6 @@ import {
   type RecentDocument,
 } from "./lib/recent-documents";
 import {
-  emptySearchSession,
   normalizeSearchIndex,
   type SearchArea,
   type SearchSession,
@@ -262,26 +262,6 @@ function isEventInsideStageSidebar(target: EventTarget | null) {
 }
 type DocumentOperation = "open" | "reload";
 
-type SearchSessions = Record<SearchArea, SearchSession>;
-
-type SearchSnapshot = {
-  activeElement: HTMLElement | null;
-  activeElementKind:
-    | "content"
-    | "search-trigger"
-    | "area-element"
-    | "external";
-  selectionStart?: number;
-  selectionEnd?: number;
-  selectionDirection?: "forward" | "backward" | "none";
-  scrollTop: number;
-  scrollLeft: number;
-  nestedScrollPositions?: Array<{
-    scrollTop: number;
-    scrollLeft: number;
-  }>;
-};
-
 type ScrollProgress = {
   top: number;
   left: number;
@@ -311,14 +291,6 @@ const oppositePane: Record<PaneKind, PaneKind> = {
   editor: "preview",
   preview: "editor",
 };
-
-function createEmptySearchSessions(): SearchSessions {
-  return {
-    editor: { ...emptySearchSession },
-    notes: { ...emptySearchSession },
-    preview: { ...emptySearchSession },
-  };
-}
 
 function getScrollProgress(element: HTMLElement): ScrollProgress {
   const maximumTop = element.scrollHeight - element.clientHeight;
@@ -1425,9 +1397,6 @@ function App() {
     loadStoredText(untitledDocumentNoteStorageKey),
   );
   const [noteSaveStatus, setNoteSaveStatus] = useState<NoteSaveStatus>("saved");
-  const [searchSessions, setSearchSessions] = useState<SearchSessions>(
-    createEmptySearchSessions,
-  );
   const [isWorkspaceStacked, setIsWorkspaceStacked] = useState(() =>
     window.matchMedia("(max-width: 720px)").matches,
   );
@@ -1466,17 +1435,6 @@ function App() {
   const markdownEditVersionRef = useRef(0);
   const recentDocumentsRef = useRef(recentDocuments);
   const recentStatusBatchRef = useRef(0);
-  const searchSessionsRef = useRef(searchSessions);
-  const lastSearchAreaRef = useRef<SearchArea>("preview");
-  const searchSnapshotsRef = useRef<Partial<Record<SearchArea, SearchSnapshot>>>(
-    {},
-  );
-  const searchInputElementsRef = useRef<
-    Record<SearchArea, HTMLInputElement | null>
-  >({ editor: null, notes: null, preview: null });
-  const contentElementsRef = useRef<
-    Record<SearchArea, HTMLTextAreaElement | HTMLDivElement | null>
-  >({ editor: null, notes: null, preview: null });
   const sourceScrollPositionsRef = useRef({ editor: 0, notes: 0 });
   const pendingSourceFocusRef = useRef<"editor" | "notes" | null>(null);
   const stageSidebarRef = useRef(stageSidebar);
@@ -1493,6 +1451,21 @@ function App() {
     useState<HTMLDivElement | null>(null);
   const [editorScrollElement, setEditorScrollElement] =
     useState<HTMLTextAreaElement | null>(null);
+  const {
+    searchSessions,
+    searchSessionsRef,
+    lastSearchAreaRef,
+    searchSnapshotsRef,
+    searchInputElementsRef,
+    contentElementsRef,
+    updateSearchSession,
+    activateSearchArea,
+    openSearch,
+    closeSearch,
+    closeSourceSearchesForPreviewFocus,
+    restorePendingSourceSearchSnapshot,
+    resetSearchSessions,
+  } = useWorkspaceSearch(dismissNonPersistentStageSidebar);
   const deferredMarkdown = useDeferredValue(markdown);
   const isOutlineOpen = stageSidebar === "outline";
   const isRecentDocumentsOpen = stageSidebar === "recent";
@@ -1523,7 +1496,6 @@ function App() {
   const readingZoomStyle = {
     "--reading-font-size": `${(17 * Number(readingZoom)) / 100}px`,
   } as CSSProperties;
-  searchSessionsRef.current = searchSessions;
   stageSidebarRef.current = stageSidebar;
   isSidebarInsetRef.current = isSidebarInset;
   isSettingsOpenRef.current = isSettingsOpen;
@@ -1581,7 +1553,13 @@ function App() {
           sourceScrollPositionsRef.current[area];
         suppressScrollSyncRestore();
         if (pendingSearchSnapshot) {
-          restorePendingSourceSearchSnapshot(area, element);
+          const restoredScrollTop = restorePendingSourceSearchSnapshot(
+            area,
+            element,
+          );
+          if (restoredScrollTop !== null) {
+            sourceScrollPositionsRef.current[area] = restoredScrollTop;
+          }
         } else {
           element.scrollTop = restoredScrollTop;
           element.scrollLeft = 0;
@@ -2368,200 +2346,6 @@ function App() {
     lastSearchAreaRef.current = mode;
   }
 
-  function updateSearchSession(
-    area: SearchArea,
-    patch: Partial<SearchSession>,
-  ) {
-    setSearchSessions((currentSessions) => ({
-      ...currentSessions,
-      [area]: { ...currentSessions[area], ...patch },
-    }));
-  }
-
-  function activateSearchArea(area: SearchArea) {
-    lastSearchAreaRef.current = area;
-  }
-
-  function captureSearchSnapshot(area: SearchArea): SearchSnapshot {
-    const contentElement = contentElementsRef.current[area];
-    const activeElement =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-    const paneElement = contentElement?.closest(".pane");
-    const activeElementKind =
-      activeElement === contentElement
-        ? "content"
-        : activeElement?.matches(".pane-search-trigger") &&
-            paneElement?.contains(activeElement)
-          ? "search-trigger"
-          : activeElement && paneElement?.contains(activeElement)
-            ? "area-element"
-            : "external";
-
-    if (contentElement instanceof HTMLTextAreaElement) {
-      return {
-        activeElement,
-        activeElementKind,
-        selectionStart: contentElement.selectionStart,
-        selectionEnd: contentElement.selectionEnd,
-        selectionDirection: contentElement.selectionDirection ?? "none",
-        scrollTop: contentElement.scrollTop,
-        scrollLeft: contentElement.scrollLeft,
-      };
-    }
-
-    return {
-      activeElement,
-      activeElementKind,
-      scrollTop: contentElement?.scrollTop ?? 0,
-      scrollLeft: contentElement?.scrollLeft ?? 0,
-      nestedScrollPositions:
-        contentElement instanceof HTMLDivElement
-          ? Array.from(
-              contentElement.querySelectorAll<HTMLElement>(
-                ".markdown-body pre, .markdown-body .table-scroll",
-              ),
-              (element) => ({
-                scrollTop: element.scrollTop,
-                scrollLeft: element.scrollLeft,
-              }),
-            )
-          : undefined,
-    };
-  }
-
-  function openSearch(area: SearchArea) {
-    lastSearchAreaRef.current = area;
-    dismissNonPersistentStageSidebar();
-
-    if (searchSessionsRef.current[area].isOpen) {
-      window.requestAnimationFrame(() => {
-        const input = searchInputElementsRef.current[area];
-        input?.focus({ preventScroll: true });
-        input?.select();
-      });
-      return;
-    }
-
-    searchSnapshotsRef.current[area] = captureSearchSnapshot(area);
-    updateSearchSession(area, { isOpen: true });
-  }
-
-  function closeSearch(
-    area: SearchArea,
-    {
-      restoreFocus = true,
-      deferRestore = false,
-    }: { restoreFocus?: boolean; deferRestore?: boolean } = {},
-  ) {
-    const snapshot = searchSnapshotsRef.current[area];
-    updateSearchSession(area, { isOpen: false });
-
-    if (deferRestore) {
-      return;
-    }
-
-    window.requestAnimationFrame(() => {
-      const contentElement = contentElementsRef.current[area];
-
-      if (contentElement instanceof HTMLTextAreaElement && snapshot) {
-        contentElement.setSelectionRange(
-          snapshot.selectionStart ?? 0,
-          snapshot.selectionEnd ?? 0,
-          snapshot.selectionDirection,
-        );
-      }
-
-      if (contentElement && snapshot) {
-        contentElement.scrollTop = snapshot.scrollTop;
-        contentElement.scrollLeft = snapshot.scrollLeft;
-      }
-
-      const currentNestedScrollElements =
-        contentElement instanceof HTMLDivElement
-          ? contentElement.querySelectorAll<HTMLElement>(
-              ".markdown-body pre, .markdown-body .table-scroll",
-            )
-          : [];
-
-      snapshot?.nestedScrollPositions?.forEach((nestedPosition, index) => {
-        const element = currentNestedScrollElements[index];
-
-        if (element) {
-          element.scrollTop = nestedPosition.scrollTop;
-          element.scrollLeft = nestedPosition.scrollLeft;
-        }
-      });
-
-      const currentPaneElement = contentElement?.closest(".pane");
-      const isSnapshotElementInCurrentArea = Boolean(
-        snapshot?.activeElement?.isConnected &&
-          currentPaneElement?.contains(snapshot.activeElement),
-      );
-      const focusTarget =
-        snapshot?.activeElementKind === "search-trigger"
-          ? currentPaneElement?.querySelector<HTMLElement>(
-              ".pane-search-trigger",
-            )
-          : snapshot?.activeElementKind === "content"
-            ? contentElement
-            : snapshot?.activeElementKind === "external" &&
-                snapshot.activeElement?.isConnected
-              ? snapshot.activeElement
-              : isSnapshotElementInCurrentArea
-                ? snapshot?.activeElement
-                : contentElement;
-      if (restoreFocus) {
-        focusTarget?.focus({ preventScroll: true });
-      }
-
-      if (!contentElement && snapshot && !restoreFocus) {
-        return;
-      }
-
-      delete searchSnapshotsRef.current[area];
-    });
-  }
-
-  function closeSourceSearchesForPreviewFocus() {
-    (["editor", "notes"] as const).forEach((area) => {
-      if (searchSessionsRef.current[area].isOpen) {
-        closeSearch(area, { restoreFocus: false, deferRestore: true });
-      }
-    });
-  }
-
-  function restorePendingSourceSearchSnapshot(
-    area: "editor" | "notes",
-    element: HTMLTextAreaElement,
-  ) {
-    const snapshot = searchSnapshotsRef.current[area];
-
-    if (!snapshot || searchSessionsRef.current[area].isOpen) {
-      return null;
-    }
-
-    element.setSelectionRange(
-      snapshot.selectionStart ?? 0,
-      snapshot.selectionEnd ?? 0,
-      snapshot.selectionDirection,
-    );
-    element.scrollTop = snapshot.scrollTop;
-    element.scrollLeft = snapshot.scrollLeft;
-    sourceScrollPositionsRef.current[area] = snapshot.scrollTop;
-    delete searchSnapshotsRef.current[area];
-    return snapshot.scrollTop;
-  }
-
-  function resetSearchSessions() {
-    setSearchSessions(createEmptySearchSessions());
-    searchSnapshotsRef.current = {};
-    lastSearchAreaRef.current = "preview";
-    CSS.highlights?.delete("aster-preview-search-match");
-    CSS.highlights?.delete("aster-preview-search-current");
-  }
-
   function swapPanes() {
     captureCurrentSourceScroll();
     setLeftPane((currentPane) => oppositePane[currentPane]);
@@ -2644,6 +2428,9 @@ function App() {
             element instanceof HTMLTextAreaElement
               ? restorePendingSourceSearchSnapshot(area, element)
               : null;
+          if (scrollTop !== null) {
+            sourceScrollPositionsRef.current[area] = scrollTop;
+          }
           return element instanceof HTMLTextAreaElement && scrollTop !== null
             ? { element, scrollTop, scrollLeft: element.scrollLeft }
             : null;
