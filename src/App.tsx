@@ -6,6 +6,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   type CSSProperties,
@@ -45,6 +46,11 @@ import {
   type SearchArea,
   type SearchSession,
 } from "./lib/text-search";
+import {
+  createWorkspaceInteractionState,
+  getEscapeOwner,
+  workspaceInteractionReducer,
+} from "./lib/workspace-interactions";
 import "./App.css";
 
 const initialMarkdown = `# 읽기 좋은 마크다운 뷰어
@@ -248,8 +254,6 @@ type PaneKind = "editor" | "preview";
 type PaneContent = PaneKind | "notes";
 type PaneSide = "left" | "right";
 type NoteSaveStatus = "saved" | "saving" | "error";
-type StageSidebar = "outline" | "recent" | null;
-
 function isEventInsideStageSidebar(target: EventTarget | null) {
   return (
     target instanceof Element &&
@@ -1391,11 +1395,22 @@ function App() {
     useState<ExternalFileState | null>(null);
   const [dismissedExternalObservationKey, setDismissedExternalObservationKey] =
     useState<string | null>(null);
-  const [stageSidebar, setStageSidebar] = useState<StageSidebar>(null);
-  const [isPreviewFocusMode, setIsPreviewFocusMode] = useState(false);
-  const [isSidebarInset, setIsSidebarInset] = useState(() =>
-    window.matchMedia("(min-width: 1280px)").matches,
+  const [workspaceInteraction, dispatchWorkspaceInteraction] = useReducer(
+    workspaceInteractionReducer,
+    undefined,
+    () =>
+      createWorkspaceInteractionState(
+        window.matchMedia("(min-width: 1280px)").matches,
+      ),
   );
+  const {
+    stageSidebar,
+    isPreviewFocusMode,
+    isSidebarInset,
+    isNotesOpen,
+    isSettingsOpen,
+    isPanelLayoutMenuOpen,
+  } = workspaceInteraction;
   const [recentDocuments, setRecentDocuments] = useState<RecentDocument[]>(
     loadRecentDocuments,
   );
@@ -1406,7 +1421,6 @@ function App() {
     setIsRecentDocumentPersistenceLimited,
   ] = useState(false);
   const [leftPane, setLeftPane] = useState<PaneKind>("editor");
-  const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [note, setNote] = useState(() =>
     loadStoredText(untitledDocumentNoteStorageKey),
   );
@@ -1414,8 +1428,6 @@ function App() {
   const [searchSessions, setSearchSessions] = useState<SearchSessions>(
     createEmptySearchSessions,
   );
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isPanelLayoutMenuOpen, setIsPanelLayoutMenuOpen] = useState(false);
   const [isWorkspaceStacked, setIsWorkspaceStacked] = useState(() =>
     window.matchMedia("(max-width: 720px)").matches,
   );
@@ -1590,11 +1602,10 @@ function App() {
     [suppressScrollSyncRestore],
   );
   const openPanelLayoutMenu = useCallback(() => {
-    setIsSettingsOpen(false);
-    setIsPanelLayoutMenuOpen(true);
+    dispatchWorkspaceInteraction({ type: "open-panel-layout-menu" });
   }, []);
   const closePanelLayoutMenu = useCallback(() => {
-    setIsPanelLayoutMenuOpen(false);
+    dispatchWorkspaceInteraction({ type: "close-panel-layout-menu" });
   }, []);
 
   useEffect(() => {
@@ -1773,14 +1784,15 @@ function App() {
       }
 
       dismissNonPersistentStageSidebar();
-      setIsSettingsOpen(false);
-      setIsPanelLayoutMenuOpen(false);
       captureCurrentSourceScroll();
       const willOpen = !isNotesOpenRef.current;
       const nextArea = willOpen ? "notes" : "editor";
       requestSourceFocus(nextArea);
       isNotesOpenRef.current = willOpen;
-      setIsNotesOpen(willOpen);
+      dispatchWorkspaceInteraction({
+        type: "set-notes-open",
+        isOpen: willOpen,
+      });
       lastSearchAreaRef.current = nextArea;
     }
 
@@ -1798,8 +1810,8 @@ function App() {
 
       if (isFindShortcut) {
         event.preventDefault();
-        setIsSettingsOpen(false);
-        setIsPanelLayoutMenuOpen(false);
+        dispatchWorkspaceInteraction({ type: "close-settings" });
+        dispatchWorkspaceInteraction({ type: "close-panel-layout-menu" });
         openSearch(
           isPreviewFocusModeRef.current
             ? "preview"
@@ -1808,21 +1820,27 @@ function App() {
         return;
       }
 
+      const activeArea = isPreviewFocusModeRef.current
+        ? "preview"
+        : lastSearchAreaRef.current;
+      const hasWorkspaceLayer =
+        searchSessionsRef.current[activeArea].isOpen ||
+        isPreviewFocusModeRef.current;
+
       if (
         event.key !== "Escape" ||
         event.defaultPrevented ||
         isSettingsOpenRef.current ||
         isPanelLayoutMenuOpenRef.current ||
-        (stageSidebarRef.current !== null &&
-          (!isSidebarInsetRef.current ||
-            isEventInsideStageSidebar(event.target)))
+        getEscapeOwner({
+          hasStageSidebar: stageSidebarRef.current !== null,
+          isSidebarInset: isSidebarInsetRef.current,
+          isEventInsideSidebar: isEventInsideStageSidebar(event.target),
+          hasWorkspaceLayer,
+        }) !== "workspace"
       ) {
         return;
       }
-
-      const activeArea = isPreviewFocusModeRef.current
-        ? "preview"
-        : lastSearchAreaRef.current;
 
       if (searchSessionsRef.current[activeArea].isOpen) {
         event.preventDefault();
@@ -1854,24 +1872,11 @@ function App() {
     const updateSidebarMode = () => {
       const nextIsSidebarInset = insetQuery.matches;
 
-      if (
-        !nextIsSidebarInset &&
-        stageSidebarRef.current !== null &&
-        isSettingsOpenRef.current
-      ) {
-        setIsSettingsOpen(false);
-      }
-
-      if (
-        !nextIsSidebarInset &&
-        stageSidebarRef.current !== null &&
-        isPanelLayoutMenuOpenRef.current
-      ) {
-        setIsPanelLayoutMenuOpen(false);
-      }
-
       isSidebarInsetRef.current = nextIsSidebarInset;
-      setIsSidebarInset(nextIsSidebarInset);
+      dispatchWorkspaceInteraction({
+        type: "set-sidebar-inset",
+        isInset: nextIsSidebarInset,
+      });
     };
 
     updateSidebarMode();
@@ -1899,18 +1904,21 @@ function App() {
       const activeArea = isPreviewFocusModeRef.current
         ? "preview"
         : lastSearchAreaRef.current;
-      const shouldWorkspaceHandleEscape =
-        isSidebarInsetRef.current &&
-        !isEventInsideStageSidebar(event.target) &&
-        (searchSessionsRef.current[activeArea].isOpen ||
-          isPreviewFocusModeRef.current);
+      const escapeOwner = getEscapeOwner({
+        hasStageSidebar: true,
+        isSidebarInset: isSidebarInsetRef.current,
+        isEventInsideSidebar: isEventInsideStageSidebar(event.target),
+        hasWorkspaceLayer:
+          searchSessionsRef.current[activeArea].isOpen ||
+          isPreviewFocusModeRef.current,
+      });
 
       if (
         event.key !== "Escape" ||
         event.defaultPrevented ||
         isSettingsOpenRef.current ||
         isPanelLayoutMenuOpenRef.current ||
-        shouldWorkspaceHandleEscape
+        escapeOwner !== "sidebar"
       ) {
         return;
       }
@@ -2034,7 +2042,7 @@ function App() {
         event.target instanceof Node &&
         !settingsRef.current?.contains(event.target)
       ) {
-        setIsSettingsOpen(false);
+        dispatchWorkspaceInteraction({ type: "close-settings" });
       }
     }
 
@@ -2044,7 +2052,7 @@ function App() {
       }
 
       event.preventDefault();
-      setIsSettingsOpen(false);
+      dispatchWorkspaceInteraction({ type: "close-settings" });
       settingsButtonRef.current?.focus();
     }
 
@@ -2342,21 +2350,20 @@ function App() {
   function dismissNonPersistentStageSidebar() {
     const shouldPreserveOutline =
       stageSidebarRef.current === "outline" && isSidebarInsetRef.current;
-
-    if (shouldPreserveOutline) {
-      return;
-    }
-
-    stageSidebarRef.current = null;
-    setStageSidebar(null);
+    stageSidebarRef.current = shouldPreserveOutline ? "outline" : null;
+    isSettingsOpenRef.current = false;
+    isPanelLayoutMenuOpenRef.current = false;
+    dispatchWorkspaceInteraction({ type: "start-document-action" });
   }
 
   function selectSourceMode(mode: "editor" | "notes") {
     dismissNonPersistentStageSidebar();
-    setIsSettingsOpen(false);
     captureCurrentSourceScroll();
     requestSourceFocus(mode);
-    setIsNotesOpen(mode === "notes");
+    dispatchWorkspaceInteraction({
+      type: "set-notes-open",
+      isOpen: mode === "notes",
+    });
     isNotesOpenRef.current = mode === "notes";
     lastSearchAreaRef.current = mode;
   }
@@ -2611,9 +2618,7 @@ function App() {
     previewFocusReturnAreaRef.current = lastSearchAreaRef.current;
     closeSourceSearchesForPreviewFocus();
     dismissNonPersistentStageSidebar();
-    setIsSettingsOpen(false);
-    setIsPanelLayoutMenuOpen(false);
-    setIsPreviewFocusMode(true);
+    dispatchWorkspaceInteraction({ type: "set-preview-focus", isOpen: true });
     lastSearchAreaRef.current = "preview";
 
     window.requestAnimationFrame(() => {
@@ -2626,7 +2631,7 @@ function App() {
     const previewScrollProgress = capturePreviewScrollProgress();
     suppressScrollSyncRestore();
     const returnArea = previewFocusReturnAreaRef.current;
-    setIsPreviewFocusMode(false);
+    dispatchWorkspaceInteraction({ type: "set-preview-focus", isOpen: false });
     lastSearchAreaRef.current = returnArea;
 
     window.requestAnimationFrame(() => {
@@ -2668,12 +2673,14 @@ function App() {
   }
 
   function handleOutlineClose() {
-    setStageSidebar(null);
+    stageSidebarRef.current = null;
+    dispatchWorkspaceInteraction({ type: "close-stage-sidebar" });
     window.requestAnimationFrame(() => outlineButtonRef.current?.focus());
   }
 
   function handleDocumentSidebarClose() {
-    setStageSidebar(null);
+    stageSidebarRef.current = null;
+    dispatchWorkspaceInteraction({ type: "close-stage-sidebar" });
     window.requestAnimationFrame(() =>
       recentDocumentsButtonRef.current?.focus(),
     );
@@ -2686,7 +2693,8 @@ function App() {
       return;
     }
 
-    setStageSidebar(null);
+    stageSidebarRef.current = null;
+    dispatchWorkspaceInteraction({ type: "close-stage-sidebar" });
 
     if (shouldMoveFocus) {
       window.requestAnimationFrame(() =>
@@ -2969,7 +2977,8 @@ function App() {
     setNoteSaveStatus("saved");
     resetSearchSessions();
     promoteOpenedDocument(openedFile, requestedPath);
-    setStageSidebar(null);
+    stageSidebarRef.current = null;
+    dispatchWorkspaceInteraction({ type: "close-stage-sidebar" });
 
     if (shouldRestoreRecentFocus) {
       window.requestAnimationFrame(() =>
@@ -3062,11 +3071,10 @@ function App() {
                 isRecentDocumentsOpen ? "최근 문서 닫기" : "최근 문서 열기"
               }
               onClick={() => {
-                setIsSettingsOpen(false);
-                setIsPanelLayoutMenuOpen(false);
-                setStageSidebar((currentSidebar) =>
-                  currentSidebar === "recent" ? null : "recent",
-                );
+                dispatchWorkspaceInteraction({
+                  type: "toggle-stage-sidebar",
+                  sidebar: "recent",
+                });
               }}
             >
               <RecentDocumentsIcon />
@@ -3080,11 +3088,10 @@ function App() {
               aria-controls="document-outline"
               title={isOutlineOpen ? "문서 목차 닫기" : "문서 목차 열기"}
               onClick={() => {
-                setIsSettingsOpen(false);
-                setIsPanelLayoutMenuOpen(false);
-                setStageSidebar((currentSidebar) =>
-                  currentSidebar === "outline" ? null : "outline",
-                );
+                dispatchWorkspaceInteraction({
+                  type: "toggle-stage-sidebar",
+                  sidebar: "outline",
+                });
               }}
             >
               <DocumentOutlineIcon />
@@ -3115,11 +3122,7 @@ function App() {
               aria-controls="reading-settings-popover"
               title="읽기 설정"
               onClick={() => {
-                setIsPanelLayoutMenuOpen(false);
-                if (!isSidebarInset) {
-                  setStageSidebar(null);
-                }
-                setIsSettingsOpen((isOpen) => !isOpen);
+                dispatchWorkspaceInteraction({ type: "toggle-settings" });
               }}
             >
               <ReadingSettingsIcon />
