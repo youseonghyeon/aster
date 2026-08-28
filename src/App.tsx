@@ -1,7 +1,4 @@
 import {
-  createElement,
-  isValidElement,
-  memo,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -10,23 +7,32 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type HTMLAttributes,
-  type KeyboardEvent,
   type RefObject,
-  type ReactNode,
 } from "react";
 import { listen } from "@tauri-apps/api/event";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { DocumentOutline } from "./components/DocumentOutline";
-import { DocumentSidebar } from "./components/DocumentSidebar";
-import { PaneSearchBar, SearchIcon } from "./components/PaneSearchBar";
-import { SyntaxHighlightedCode } from "./components/SyntaxHighlightedCode";
+import { AppHeader } from "./components/AppHeader";
+import { DocumentStage } from "./components/DocumentStage";
+import { PaneDivider } from "./components/PaneDivider";
+import {
+  lineSpacings,
+  readingFonts,
+  readingZoomLevels,
+  themes,
+  ReadingSettings,
+  type LineSpacing,
+  type ReadingFont,
+  type ReadingZoom,
+  type Theme,
+} from "./components/ReadingSettings";
+import {
+  WorkspacePane,
+  type NoteSaveStatus,
+  type PaneContent,
+  type PaneKind,
+} from "./components/WorkspacePane";
 import { useActiveHeading } from "./hooks/useActiveHeading";
-import { usePreviewSearch } from "./hooks/usePreviewSearch";
 import { usePaneSplit } from "./hooks/usePaneSplit";
 import { useScrollSync } from "./hooks/useScrollSync";
-import { useTextSearch } from "./hooks/useTextSearch";
 import { useWorkspaceSearch } from "./hooks/useWorkspaceSearch";
 import {
   useExternalFileStatus,
@@ -40,11 +46,7 @@ import {
   saveDocumentNote,
   untitledDocumentNoteStorageKey,
 } from "./lib/document-session";
-import {
-  getMarkdownHeadingId,
-  getMarkdownOutline,
-} from "./lib/markdown-outline";
-import { rehypeMarkdownSourceOffsets } from "./lib/markdown-source-offsets";
+import { getMarkdownOutline } from "./lib/markdown-outline";
 import {
   loadRecentDocuments,
   promoteRecentDocument,
@@ -52,9 +54,7 @@ import {
   type RecentDocument,
 } from "./lib/recent-documents";
 import {
-  normalizeSearchIndex,
   type SearchArea,
-  type SearchSession,
 } from "./lib/text-search";
 import {
   createWorkspaceInteractionState,
@@ -71,6 +71,7 @@ import {
   showMarkdownMessage,
   type OpenedMarkdownFile,
 } from "./services/markdown-files";
+import "./styles/base.css";
 import "./App.css";
 
 const initialMarkdown = `# 읽기 좋은 마크다운 뷰어
@@ -103,162 +104,17 @@ console.log(message);
 ~~~
 `;
 
-const markdownPlugins = [remarkGfm];
-const markdownRehypePlugins = [rehypeMarkdownSourceOffsets];
-type MarkdownHeadingProps = HTMLAttributes<HTMLHeadingElement> & {
-  node?: {
-    position?: {
-      start: {
-        offset?: number;
-      };
-    };
-  };
-};
-
-function createMarkdownHeading(
-  tagName: "h1" | "h2" | "h3" | "h4" | "h5" | "h6",
-) {
-  return function MarkdownHeading({
-    node,
-    ...headingProps
-  }: MarkdownHeadingProps) {
-    const id = getMarkdownHeadingId(node?.position?.start.offset);
-
-    return createElement(tagName, {
-      ...headingProps,
-      id,
-      tabIndex: id ? -1 : undefined,
-    });
-  };
-}
-
-const MarkdownHeading1 = createMarkdownHeading("h1");
-const MarkdownHeading2 = createMarkdownHeading("h2");
-const MarkdownHeading3 = createMarkdownHeading("h3");
-const MarkdownHeading4 = createMarkdownHeading("h4");
-const MarkdownHeading5 = createMarkdownHeading("h5");
-const MarkdownHeading6 = createMarkdownHeading("h6");
-
-const markdownComponents = {
-  h1: MarkdownHeading1,
-  h2: MarkdownHeading2,
-  h3: MarkdownHeading3,
-  h4: MarkdownHeading4,
-  h5: MarkdownHeading5,
-  h6: MarkdownHeading6,
-  pre: ({ node, children, ...preProps }) => {
-    void node;
-    const sourceOffset = (
-      preProps as typeof preProps & { "data-source-offset"?: string | number }
-    )["data-source-offset"];
-
-    if (
-      isValidElement<{
-        className?: string;
-        children?: ReactNode;
-      }>(children) &&
-      children.type === "code"
-    ) {
-      const codeClassName = children.props.className;
-      const language = /(?:^|\s)language-([^\s]+)/.exec(
-        codeClassName ?? "",
-      )?.[1];
-
-      if (language && typeof children.props.children === "string") {
-        return (
-          <SyntaxHighlightedCode
-            code={children.props.children.replace(/\n$/, "")}
-            language={language}
-            codeClassName={codeClassName}
-            preProps={preProps}
-            sourceOffset={sourceOffset}
-          />
-        );
-      }
-    }
-
-    return (
-      <pre {...preProps} tabIndex={0} translate="no">
-        {children}
-      </pre>
-    );
-  },
-  table: ({ node, ...tableProps }) => {
-    void node;
-    const sourceOffset = (
-      tableProps as typeof tableProps & {
-        "data-source-offset"?: string | number;
-      }
-    )["data-source-offset"];
-
-    return (
-      <div
-        className="table-scroll"
-        role="region"
-        aria-label="표"
-        tabIndex={0}
-        data-source-offset={sourceOffset}
-      >
-        <table {...tableProps} />
-      </div>
-    );
-  },
-} satisfies Components;
 const themeStorageKey = "aster:theme:v1";
 const fontStorageKey = "aster:reading-font:v1";
 const lineSpacingStorageKey = "aster:line-spacing:v1";
 const readingZoomStorageKey = "aster:reading-zoom:v1";
 const scrollSyncStorageKey = "aster:scroll-sync:v1";
 
-const themes = [
-  { value: "snow", label: "밝게" },
-  { value: "paper", label: "종이" },
-  { value: "solarized", label: "Solarized" },
-  { value: "sepia", label: "세피아" },
-  { value: "nord", label: "Nord" },
-  { value: "dracula", label: "Dracula" },
-  { value: "gruvbox", label: "Gruvbox" },
-  { value: "night", label: "야간" },
-] as const;
-
-const readingFonts = [
-  { value: "pretendard", label: "Pretendard" },
-  { value: "noto-sans", label: "Noto Sans KR" },
-  { value: "noto-serif", label: "Noto Serif KR" },
-  { value: "system", label: "시스템 고딕" },
-] as const;
-
-const lineSpacings = [
-  { value: "tight", label: "매우 촘촘 1.4" },
-  { value: "compact", label: "촘촘 1.5" },
-  { value: "balanced", label: "기본 1.7" },
-  { value: "relaxed", label: "여유 1.9" },
-] as const;
-
-const readingZoomLevels = [
-  { value: "80" },
-  { value: "90" },
-  { value: "100" },
-  { value: "110" },
-  { value: "120" },
-  { value: "130" },
-  { value: "140" },
-  { value: "150" },
-] as const;
-
 const scrollSyncOptions = [{ value: "off" }, { value: "on" }] as const;
 
-type Theme = (typeof themes)[number]["value"];
-type ReadingFont = (typeof readingFonts)[number]["value"];
-type LineSpacing = (typeof lineSpacings)[number]["value"];
-type ReadingZoom = (typeof readingZoomLevels)[number]["value"];
 type ScrollSyncPreference = (typeof scrollSyncOptions)[number]["value"];
 type ReadingZoomCommand = "in" | "out" | "reset";
 
-type PaneKind = "editor" | "preview";
-type PaneContent = PaneKind | "notes";
-type PaneSide = "left" | "right";
-type NoteSaveStatus = "saved" | "saving" | "error";
 function isEventInsideStageSidebar(target: EventTarget | null) {
   return (
     target instanceof Element &&
@@ -302,493 +158,6 @@ function restoreScrollProgress(
     progress.left * Math.max(0, element.scrollWidth - element.clientWidth);
 }
 
-function SwapPaneIcon() {
-  return (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M3 6h11m-3-3 3 3-3 3M15 12H4m3-3-3 3 3 3" />
-    </svg>
-  );
-}
-
-function PanelLayoutIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <rect x="3.25" y="4" width="13.5" height="12" rx="1.75" />
-      <path d="M10 4v12" />
-    </svg>
-  );
-}
-
-function ResetSplitIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M4 5.25h12v9.5H4zM10 5.25v9.5" />
-      <path d="m6.25 3-2.5 2.25 2.5 2.25M13.75 17l2.5-2.25-2.5-2.25" />
-    </svg>
-  );
-}
-
-function PreviewFocusIcon({ isActive }: { isActive: boolean }) {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      {isActive ? (
-        <path d="M3.5 7h3.5V3.5M16.5 7H13V3.5M3.5 13H7v3.5M16.5 13H13v3.5" />
-      ) : (
-        <path d="M7 3.5H3.5V7M13 3.5h3.5V7M7 16.5H3.5V13M13 16.5h3.5V13" />
-      )}
-    </svg>
-  );
-}
-
-function ScrollSyncIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M3.5 4.25h4v11.5h-4zM12.5 4.25h4v11.5h-4z" />
-      <path d="M10 5.5v9m-2-2 2 2 2-2M8 7.5l2-2 2 2" />
-    </svg>
-  );
-}
-
-function AsterBrandIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4.2 6.8c3.1-1 5.7-.7 7.8.8V18c-2.3-1.4-4.9-1.7-7.8-.8V6.8Z" />
-      <path d="M19.8 6.8c-3.1-1-5.7-.7-7.8.8V18c2.3-1.4 4.9-1.7 7.8-.8V6.8Z" />
-      <g className="brand-aster">
-        <path d="M12 9v5" />
-        <path d="m9.85 10.25 4.3 2.5" />
-        <path d="m9.85 12.75 4.3-2.5" />
-      </g>
-    </svg>
-  );
-}
-
-function ReadingSettingsIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M3.25 5.25h4.1m3.3 0h6.1M3.25 10h8.1m3.3 0h2.1M3.25 14.75h2.1m3.3 0h8.1" />
-      <circle cx="9" cy="5.25" r="1.65" />
-      <circle cx="13" cy="10" r="1.65" />
-      <circle cx="7" cy="14.75" r="1.65" />
-    </svg>
-  );
-}
-
-function OpenFileIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M3.25 6h4.4l1.5 1.75h7.6v7a1 1 0 0 1-1 1H4.25a1 1 0 0 1-1-1V6Z" />
-      <path d="M3.25 8.75h13.5" />
-    </svg>
-  );
-}
-
-function FileChangeIcon({ kind }: { kind: ExternalFileState["kind"] }) {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      {kind === "modified" ? (
-        <>
-          <path d="M10 3.25a6.75 6.75 0 1 0 6.2 4.08" />
-          <path d="M13.25 3.25H16.5V6.5M16.5 3.25l-3.7 3.7" />
-        </>
-      ) : (
-        <>
-          <path d="M10 3.25 17 16H3L10 3.25Z" />
-          <path d="M10 7.4v4.2M10 14.1v.1" />
-        </>
-      )}
-    </svg>
-  );
-}
-
-function DocumentOutlineIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M4 5.25h1.5M8.25 5.25H16M4 10h1.5M8.25 10H16M4 14.75h1.5M8.25 14.75H13.5" />
-    </svg>
-  );
-}
-
-function RecentDocumentsIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M6.25 3.5h8.25v10.75H6.25z" />
-      <path d="M6.25 6H3.5v10.5h8.25v-2.25" />
-    </svg>
-  );
-}
-
-function LineSpacingGlyph() {
-  return (
-    <span className="line-spacing-glyph" aria-hidden="true">
-      <span />
-      <span />
-      <span />
-    </span>
-  );
-}
-
-function SelectChevronIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path d="m4.5 6.25 3.5 3.5 3.5-3.5" />
-    </svg>
-  );
-}
-
-function SelectedOptionIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path d="m3.5 8.25 2.75 2.75 6.25-6.25" />
-    </svg>
-  );
-}
-
-type ReadingFontSelectProps = {
-  value: ReadingFont;
-  onChange: (font: ReadingFont) => void;
-};
-
-function ReadingFontSelect({ value, onChange }: ReadingFontSelectProps) {
-  const selectedIndex = readingFonts.findIndex((font) => font.value === value);
-  const selectedFont = readingFonts[selectedIndex] ?? readingFonts[0];
-  const [isOpen, setIsOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(selectedIndex);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    setActiveIndex(selectedIndex);
-
-    function handleOutsidePointerDown(event: globalThis.PointerEvent) {
-      if (
-        event.target instanceof Node &&
-        !rootRef.current?.contains(event.target)
-      ) {
-        setIsOpen(false);
-      }
-    }
-
-    document.addEventListener("pointerdown", handleOutsidePointerDown);
-    return () =>
-      document.removeEventListener("pointerdown", handleOutsidePointerDown);
-  }, [isOpen, selectedIndex]);
-
-  function openMenu() {
-    setActiveIndex(selectedIndex);
-    setIsOpen(true);
-  }
-
-  function selectFont(nextFont: ReadingFont) {
-    onChange(nextFont);
-    setIsOpen(false);
-    window.requestAnimationFrame(() => triggerRef.current?.focus());
-  }
-
-  function handleTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key === "Escape" && isOpen) {
-      event.preventDefault();
-      event.stopPropagation();
-      setIsOpen(false);
-      return;
-    }
-
-    if (event.key === "Tab" && isOpen) {
-      setIsOpen(false);
-      return;
-    }
-
-    if (event.key === "Enter" || event.key === " ") {
-      if (!isOpen) {
-        return;
-      }
-
-      event.preventDefault();
-      selectFont(readingFonts[activeIndex].value);
-      return;
-    }
-
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-
-      if (!isOpen) {
-        openMenu();
-        return;
-      }
-
-      const direction = event.key === "ArrowDown" ? 1 : -1;
-      setActiveIndex(
-        (currentIndex) =>
-          (currentIndex + direction + readingFonts.length) %
-          readingFonts.length,
-      );
-      return;
-    }
-
-    if (isOpen && (event.key === "Home" || event.key === "End")) {
-      event.preventDefault();
-      setActiveIndex(event.key === "Home" ? 0 : readingFonts.length - 1);
-    }
-  }
-
-  return (
-    <div ref={rootRef} className="font-select">
-      <button
-        ref={triggerRef}
-        type="button"
-        className="font-select-trigger"
-        aria-label="글꼴"
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        aria-controls="reading-font-options"
-        aria-activedescendant={
-          isOpen
-            ? `reading-font-option-${readingFonts[activeIndex].value}`
-            : undefined
-        }
-        onClick={() => (isOpen ? setIsOpen(false) : openMenu())}
-        onKeyDown={handleTriggerKeyDown}
-      >
-        <span>{selectedFont.label}</span>
-        <SelectChevronIcon />
-      </button>
-
-      {isOpen ? (
-        <div
-          id="reading-font-options"
-          className="font-select-options"
-          role="listbox"
-          aria-label="글꼴 선택"
-        >
-          {readingFonts.map((fontOption, index) => (
-            <button
-              id={`reading-font-option-${fontOption.value}`}
-              key={fontOption.value}
-              type="button"
-              role="option"
-              tabIndex={-1}
-              className="font-select-option"
-              data-font-option={fontOption.value}
-              aria-selected={value === fontOption.value}
-              data-active={activeIndex === index ? "true" : undefined}
-              onPointerEnter={() => setActiveIndex(index)}
-              onClick={() => selectFont(fontOption.value)}
-            >
-              <span>{fontOption.label}</span>
-              {value === fontOption.value ? <SelectedOptionIcon /> : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-type PanelLayoutMenuProps = {
-  isOpen: boolean;
-  isScrollSyncEnabled: boolean;
-  isScrollSyncAvailable: boolean;
-  isStacked: boolean;
-  onOpen: () => void;
-  onClose: () => void;
-  onScrollSyncToggle: () => void;
-  onSwapPanes: () => void;
-  onResetSplit: () => void;
-};
-
-function PanelLayoutMenu({
-  isOpen,
-  isScrollSyncEnabled,
-  isScrollSyncAvailable,
-  isStacked,
-  onOpen,
-  onClose,
-  onScrollSyncToggle,
-  onSwapPanes,
-  onResetSplit,
-}: PanelLayoutMenuProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const syncState = !isScrollSyncEnabled
-    ? "off"
-    : isScrollSyncAvailable
-      ? "on"
-      : "paused";
-  const triggerLabel =
-    syncState === "on"
-      ? "패널 배치, 스크롤 동기화 켜짐"
-      : syncState === "paused"
-        ? "패널 배치, 스크롤 동기화 일시 중지"
-        : "패널 배치, 스크롤 동기화 꺼짐";
-
-  function getMenuItems() {
-    return Array.from(
-      menuRef.current?.querySelectorAll<HTMLButtonElement>(
-        '[role^="menuitem"]:not(:disabled)',
-      ) ?? [],
-    );
-  }
-
-  function closeAndRestoreFocus() {
-    onClose();
-    window.requestAnimationFrame(() => triggerRef.current?.focus());
-  }
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const focusFrame = window.requestAnimationFrame(() =>
-      getMenuItems()[0]?.focus(),
-    );
-
-    function handleOutsidePointerDown(event: globalThis.PointerEvent) {
-      if (
-        event.target instanceof Node &&
-        !rootRef.current?.contains(event.target)
-      ) {
-        onClose();
-      }
-    }
-
-    document.addEventListener("pointerdown", handleOutsidePointerDown);
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      document.removeEventListener("pointerdown", handleOutsidePointerDown);
-    };
-  }, [isOpen, onClose]);
-
-  function handleTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key === "ArrowDown" && !isOpen) {
-      event.preventDefault();
-      onOpen();
-    }
-  }
-
-  function handleMenuKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      closeAndRestoreFocus();
-      return;
-    }
-
-    if (event.key === "Tab") {
-      onClose();
-      return;
-    }
-
-    const items = getMenuItems();
-    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
-    let nextIndex: number | null = null;
-
-    if (event.key === "ArrowDown") {
-      nextIndex = (currentIndex + 1 + items.length) % items.length;
-    } else if (event.key === "ArrowUp") {
-      nextIndex = (currentIndex - 1 + items.length) % items.length;
-    } else if (event.key === "Home") {
-      nextIndex = 0;
-    } else if (event.key === "End") {
-      nextIndex = items.length - 1;
-    }
-
-    if (nextIndex !== null) {
-      event.preventDefault();
-      items[nextIndex]?.focus();
-    }
-  }
-
-  function runAndClose(action: () => void) {
-    action();
-    closeAndRestoreFocus();
-  }
-
-  return (
-    <div ref={rootRef} className="panel-layout-control">
-      <button
-        ref={triggerRef}
-        className="pane-layout-button"
-        data-sync-state={syncState}
-        type="button"
-        aria-label={triggerLabel}
-        aria-haspopup="menu"
-        aria-expanded={isOpen}
-        aria-controls="panel-layout-menu"
-        title={triggerLabel}
-        onClick={() => (isOpen ? closeAndRestoreFocus() : onOpen())}
-        onKeyDown={handleTriggerKeyDown}
-      >
-        <PanelLayoutIcon />
-        {isScrollSyncEnabled ? (
-          <span className="panel-layout-sync-indicator" aria-hidden="true" />
-        ) : null}
-      </button>
-
-      {isOpen ? (
-        <div
-          ref={menuRef}
-          id="panel-layout-menu"
-          className="panel-layout-menu"
-          role="menu"
-          aria-label="패널 배치"
-          onKeyDown={handleMenuKeyDown}
-        >
-          <button
-            type="button"
-            className="panel-layout-menu-item"
-            role="menuitemcheckbox"
-            aria-checked={isScrollSyncEnabled}
-            aria-disabled={!isScrollSyncAvailable}
-            disabled={!isScrollSyncAvailable}
-            onClick={() => {
-              if (isScrollSyncAvailable) {
-                onScrollSyncToggle();
-              }
-            }}
-          >
-            <ScrollSyncIcon />
-            <span className="panel-layout-menu-copy">
-              <span>스크롤 동기화</span>
-              {!isScrollSyncAvailable ? (
-                <span>Markdown 화면에서 사용 가능</span>
-              ) : null}
-            </span>
-            <span className="panel-layout-menu-check" aria-hidden="true">
-              {isScrollSyncEnabled ? <SelectedOptionIcon /> : null}
-            </span>
-          </button>
-          <button
-            type="button"
-            className="panel-layout-menu-item"
-            role="menuitem"
-            onClick={() => runAndClose(onSwapPanes)}
-          >
-            <SwapPaneIcon />
-            <span>{isStacked ? "패널 순서 바꾸기" : "좌우 위치 바꾸기"}</span>
-          </button>
-          {!isStacked ? (
-            <button
-              type="button"
-              className="panel-layout-menu-item"
-              role="menuitem"
-              onClick={() => runAndClose(onResetSplit)}
-            >
-              <ResetSplitIcon />
-              <span>패널 너비 50:50으로 초기화</span>
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function loadPreference<T extends string>(
   storageKey: string,
   options: readonly { value: T }[],
@@ -812,66 +181,6 @@ function savePreference(storageKey: string, value: string) {
   }
 }
 
-const maximumMeasuredTextareaPrefixLength = 250_000;
-
-function scrollTextareaMatchIntoView(
-  textarea: HTMLTextAreaElement,
-  value: string,
-  matchStart: number,
-  matchEnd: number,
-) {
-  if (value.length === 0) {
-    return;
-  }
-
-  if (matchStart > maximumMeasuredTextareaPrefixLength) {
-    const scrollableHeight = Math.max(
-      0,
-      textarea.scrollHeight - textarea.clientHeight,
-    );
-    textarea.scrollTop = scrollableHeight * (matchStart / value.length);
-    return;
-  }
-
-  const computedStyle = window.getComputedStyle(textarea);
-  const mirror = document.createElement("div");
-  const marker = document.createElement("span");
-
-  mirror.setAttribute("aria-hidden", "true");
-  Object.assign(mirror.style, {
-    position: "fixed",
-    top: "0",
-    left: "-10000px",
-    width: `${textarea.offsetWidth}px`,
-    minHeight: "0",
-    height: "auto",
-    boxSizing: computedStyle.boxSizing,
-    padding: computedStyle.padding,
-    border: computedStyle.border,
-    font: computedStyle.font,
-    letterSpacing: computedStyle.letterSpacing,
-    lineHeight: computedStyle.lineHeight,
-    tabSize: computedStyle.tabSize,
-    textIndent: computedStyle.textIndent,
-    textTransform: computedStyle.textTransform,
-    whiteSpace: "pre-wrap",
-    overflowWrap: computedStyle.overflowWrap,
-    wordBreak: computedStyle.wordBreak,
-    visibility: "hidden",
-    pointerEvents: "none",
-  });
-  mirror.append(document.createTextNode(value.slice(0, matchStart)));
-  marker.textContent = value.slice(matchStart, matchEnd) || "\u200b";
-  mirror.append(marker);
-  document.body.append(mirror);
-
-  textarea.scrollTop = Math.max(
-    0,
-    marker.offsetTop - textarea.clientHeight / 2 + marker.offsetHeight / 2,
-  );
-  mirror.remove();
-}
-
 function getSteppedReadingZoom(
   currentZoom: ReadingZoom,
   direction: -1 | 1,
@@ -885,6 +194,24 @@ function getSteppedReadingZoom(
   );
 
   return readingZoomLevels[nextIndex].value;
+}
+
+function FileChangeIcon({ kind }: { kind: ExternalFileState["kind"] }) {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      {kind === "modified" ? (
+        <>
+          <path d="M10 3.25a6.75 6.75 0 1 0 6.2 4.08" />
+          <path d="M13.25 3.25H16.5V6.5M16.5 3.25l-3.7 3.7" />
+        </>
+      ) : (
+        <>
+          <path d="M10 3.25 17 16H3L10 3.25Z" />
+          <path d="M10 7.4v4.2M10 14.1v.1" />
+        </>
+      )}
+    </svg>
+  );
 }
 
 type ExternalFileNoticeProps = {
@@ -949,365 +276,6 @@ function ExternalFileNotice({
         <span aria-hidden="true">×</span>
       </button>
     </aside>
-  );
-}
-
-const MarkdownPreview = memo(function MarkdownPreview({
-  content,
-}: {
-  content: string;
-}) {
-  return (
-    <article className="markdown-body">
-      <ReactMarkdown
-        remarkPlugins={markdownPlugins}
-        rehypePlugins={markdownRehypePlugins}
-        components={markdownComponents}
-      >
-        {content}
-      </ReactMarkdown>
-    </article>
-  );
-});
-
-function Pane({
-  side,
-  activePane,
-  markdown,
-  note,
-  noteSaveStatus,
-  previewMarkdown,
-  isPreviewUpdating,
-  isPreviewFocusMode,
-  isHiddenByPreviewFocus,
-  onMarkdownChange,
-  onNoteChange,
-  onSourceModeChange,
-  onPreviewScrollElementChange,
-  searchSession,
-  onSearchOpen,
-  onSearchClose,
-  onSearchChange,
-  onSearchAreaActivate,
-  onSearchInputElementChange,
-  onContentElementChange,
-  onPreviewFocusModeToggle,
-}: {
-  side: PaneSide;
-  activePane: PaneContent;
-  markdown: string;
-  note: string;
-  noteSaveStatus: NoteSaveStatus;
-  previewMarkdown: string;
-  isPreviewUpdating: boolean;
-  isPreviewFocusMode: boolean;
-  isHiddenByPreviewFocus: boolean;
-  onMarkdownChange: (value: string) => void;
-  onNoteChange: (value: string) => void;
-  onSourceModeChange: (mode: "editor" | "notes") => void;
-  onPreviewScrollElementChange: (element: HTMLDivElement | null) => void;
-  searchSession: SearchSession;
-  onSearchOpen: (area: SearchArea) => void;
-  onSearchClose: (area: SearchArea) => void;
-  onSearchChange: (area: SearchArea, patch: Partial<SearchSession>) => void;
-  onSearchAreaActivate: (area: SearchArea) => void;
-  onSearchInputElementChange: (
-    area: SearchArea,
-    element: HTMLInputElement | null,
-  ) => void;
-  onContentElementChange: (
-    area: SearchArea,
-    element: HTMLTextAreaElement | HTMLDivElement | null,
-  ) => void;
-  onPreviewFocusModeToggle: () => void;
-}) {
-  const isEditor = activePane === "editor";
-  const isNotes = activePane === "notes";
-  const isSourcePane = isEditor || isNotes;
-  const hasNote = note.trim().length > 0;
-  const paneLabel = side === "left" ? "왼쪽" : "오른쪽";
-  const paneTitle = isEditor ? "마크다운" : isNotes ? "내 메모" : "미리보기";
-  const searchArea: SearchArea = activePane;
-  const searchAreaLabel = isEditor ? "마크다운" : isNotes ? "메모" : "미리보기";
-  const sourceValue = isEditor ? markdown : isNotes ? note : "";
-  const searchOptions = useMemo(
-    () => ({
-      isCaseSensitive: searchSession.isCaseSensitive,
-      isRegex: searchSession.isRegex,
-    }),
-    [searchSession.isCaseSensitive, searchSession.isRegex],
-  );
-  const sourceSearchResult = useTextSearch(
-    sourceValue,
-    isSourcePane && searchSession.isOpen ? searchSession.query : "",
-    searchOptions,
-  );
-  const [previewElement, setPreviewElement] = useState<HTMLDivElement | null>(null);
-  const previewSearchResult = usePreviewSearch(
-    previewElement,
-    previewMarkdown,
-    searchSession,
-  );
-  const searchResult = isSourcePane ? sourceSearchResult : previewSearchResult;
-  const sourceElementRef = useRef<HTMLTextAreaElement | null>(null);
-  const searchInputElementRef = useRef<HTMLInputElement | null>(null);
-  const handleSourceElementChange = useCallback(
-    (element: HTMLTextAreaElement | null) => {
-      sourceElementRef.current = element;
-      onContentElementChange(searchArea, element);
-    },
-    [onContentElementChange, searchArea],
-  );
-  const handlePreviewElementChange = useCallback(
-    (element: HTMLDivElement | null) => {
-      setPreviewElement(element);
-      onPreviewScrollElementChange(element);
-      onContentElementChange("preview", element);
-    },
-    [onContentElementChange, onPreviewScrollElementChange],
-  );
-  const handleSearchInputElementChange = useCallback(
-    (element: HTMLInputElement | null) => {
-      searchInputElementRef.current = element;
-      onSearchInputElementChange(searchArea, element);
-    },
-    [onSearchInputElementChange, searchArea],
-  );
-  const noteSaveLabel =
-    noteSaveStatus === "saving"
-      ? "저장 중…"
-      : noteSaveStatus === "error"
-        ? "저장하지 못함"
-        : "저장됨";
-
-  useEffect(() => {
-    const textarea = sourceElementRef.current;
-
-    if (
-      !isSourcePane ||
-      !textarea ||
-      !searchSession.isOpen ||
-      searchResult.error ||
-      searchResult.matches.length === 0
-    ) {
-      return;
-    }
-
-    const activeIndex = normalizeSearchIndex(
-      searchSession.currentIndex,
-      searchResult.matches.length,
-    );
-    const match = searchResult.matches[activeIndex];
-    let inputFocusFrame: number | null = null;
-    const selectionFrame = window.requestAnimationFrame(() => {
-      textarea.setSelectionRange(match.start, match.end, "forward");
-      scrollTextareaMatchIntoView(
-        textarea,
-        sourceValue,
-        match.start,
-        match.end,
-      );
-      textarea.focus();
-      inputFocusFrame = window.requestAnimationFrame(() =>
-        searchInputElementRef.current?.focus({ preventScroll: true }),
-      );
-    });
-
-    return () => {
-      window.cancelAnimationFrame(selectionFrame);
-
-      if (inputFocusFrame !== null) {
-        window.cancelAnimationFrame(inputFocusFrame);
-      }
-    };
-  }, [
-    isSourcePane,
-    searchResult.error,
-    searchResult.matches,
-    searchSession.currentIndex,
-    searchSession.isOpen,
-    sourceValue,
-  ]);
-
-  function navigateSearch(direction: -1 | 1) {
-    if (searchResult.matches.length === 0 || searchResult.error) {
-      return;
-    }
-
-    const activeIndex = normalizeSearchIndex(
-      searchSession.currentIndex,
-      searchResult.matches.length,
-    );
-    onSearchChange(searchArea, { currentIndex: activeIndex + direction });
-  }
-
-  return (
-    <section
-      id={`${side}-pane`}
-      className={`pane ${isEditor ? "editor-pane" : isNotes ? "notes-pane" : "preview-pane"}${searchSession.isOpen ? " has-search" : ""}${isHiddenByPreviewFocus ? " is-focus-hidden" : ""}`}
-      aria-label={`${paneLabel} ${paneTitle} 패널`}
-      aria-hidden={isHiddenByPreviewFocus || undefined}
-      inert={isHiddenByPreviewFocus}
-    >
-      <div className="pane-header">
-        {isSourcePane ? (
-          <div
-            className="document-mode-tabs"
-            role="group"
-            aria-label="작성 화면 선택"
-          >
-            <button
-              type="button"
-              className="document-mode-tab"
-              aria-pressed={isEditor}
-              onClick={() => onSourceModeChange("editor")}
-            >
-              마크다운
-            </button>
-            <button
-              type="button"
-              className="document-mode-tab"
-              aria-label={hasNote ? "메모, 작성된 내용 있음" : "메모"}
-              aria-pressed={isNotes}
-              title="메모 (⌘/Ctrl ⇧ M)"
-              onClick={() => onSourceModeChange("notes")}
-            >
-              메모
-              {hasNote ? (
-                <span className="note-presence-dot" aria-hidden="true" />
-              ) : null}
-            </button>
-          </div>
-        ) : (
-          <span className="pane-title">{paneTitle}</span>
-        )}
-        <div className="pane-header-actions">
-          {isNotes ? (
-            <span
-              className={`note-save-status is-${noteSaveStatus}`}
-              aria-live="polite"
-            >
-              {noteSaveLabel}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            className="pane-search-trigger"
-            aria-label={`${searchAreaLabel} 검색`}
-            aria-expanded={searchSession.isOpen}
-            title={`${searchAreaLabel} 검색 (⌘/Ctrl F)`}
-            onClick={() => onSearchOpen(searchArea)}
-          >
-            <SearchIcon />
-          </button>
-          {!isSourcePane ? (
-            <button
-              type="button"
-              className="pane-search-trigger preview-focus-trigger"
-              aria-label={
-                isPreviewFocusMode
-                  ? "미리보기 집중 모드 종료"
-                  : "미리보기 집중 모드"
-              }
-              aria-pressed={isPreviewFocusMode}
-              title={
-                isPreviewFocusMode
-                  ? "미리보기 집중 모드 종료 (Escape)"
-                  : "미리보기 집중 모드"
-              }
-              onClick={onPreviewFocusModeToggle}
-            >
-              <PreviewFocusIcon isActive={isPreviewFocusMode} />
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      {searchSession.isOpen ? (
-        <PaneSearchBar
-          areaLabel={searchAreaLabel}
-          session={searchSession}
-          matchCount={searchResult.matches.length}
-          error={searchResult.error}
-          isTruncated={searchResult.isTruncated}
-          onInputElementChange={handleSearchInputElementChange}
-          onQueryChange={(query) =>
-            onSearchChange(searchArea, { query, currentIndex: 0 })
-          }
-          onCaseSensitiveChange={(isCaseSensitive) =>
-            onSearchChange(searchArea, { isCaseSensitive, currentIndex: 0 })
-          }
-          onRegexChange={(isRegex) =>
-            onSearchChange(searchArea, { isRegex, currentIndex: 0 })
-          }
-          onNavigate={navigateSearch}
-          onClose={() => onSearchClose(searchArea)}
-          onActivate={() => onSearchAreaActivate(searchArea)}
-        />
-      ) : null}
-
-      {isEditor ? (
-        <textarea
-          key="markdown-editor"
-          ref={handleSourceElementChange}
-          id="markdown-editor"
-          name="markdown"
-          className="markdown-editor"
-          value={markdown}
-          onChange={(event) => onMarkdownChange(event.currentTarget.value)}
-          aria-label="마크다운 입력"
-          autoComplete="off"
-          spellCheck="false"
-          onFocus={() => onSearchAreaActivate("editor")}
-          onPointerDown={() => onSearchAreaActivate("editor")}
-        />
-      ) : isNotes ? (
-        <textarea
-          key="document-note"
-          ref={handleSourceElementChange}
-          id="document-note"
-          name="document-note"
-          className="note-editor"
-          value={note}
-          placeholder="이 문서를 읽으며 떠오른 생각이나 확인할 내용을 적어보세요."
-          onChange={(event) => onNoteChange(event.currentTarget.value)}
-          aria-label="이 문서에 대한 개인 메모"
-          autoComplete="off"
-          autoFocus
-          spellCheck="true"
-          onFocus={() => onSearchAreaActivate("notes")}
-          onPointerDown={() => onSearchAreaActivate("notes")}
-        />
-      ) : (
-        <div
-          ref={handlePreviewElementChange}
-          className={`preview-scroll${isPreviewUpdating ? " is-updating" : ""}`}
-          aria-busy={isPreviewUpdating}
-          aria-label="미리보기 내용"
-          tabIndex={0}
-          onFocus={() => onSearchAreaActivate("preview")}
-          onPointerDown={() => onSearchAreaActivate("preview")}
-        >
-          <MarkdownPreview content={previewMarkdown} />
-          {previewSearchResult.overlays.length > 0 ? (
-            <div className="preview-search-overlays" aria-hidden="true">
-              {previewSearchResult.overlays.map((overlay) => (
-                <span
-                  key={overlay.id}
-                  className={`preview-search-overlay${overlay.isCurrent ? " is-current" : ""}`}
-                  style={{
-                    top: overlay.top,
-                    left: overlay.left,
-                    width: overlay.width,
-                    height: overlay.height,
-                  }}
-                />
-              ))}
-            </div>
-          ) : null}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -2423,210 +1391,63 @@ function App() {
       data-line-spacing={lineSpacing}
       style={readingZoomStyle}
     >
-      <header className="app-header">
-        <div className="header-leading">
-          <div className="brand" aria-label="Aster 마크다운 뷰어">
-            <span className="brand-mark" aria-hidden="true">
-              <AsterBrandIcon />
-            </span>
-            <span>Aster</span>
-          </div>
-          <span className="header-group-divider" aria-hidden="true" />
-          <nav className="stage-navigation" aria-label="문서 탐색">
-            <button
-              ref={recentDocumentsButtonRef}
-              className="header-icon-button recent-documents-trigger"
-              type="button"
-              aria-label={
-                isRecentDocumentsOpen ? "최근 문서 닫기" : "최근 문서 열기"
-              }
-              aria-expanded={isRecentDocumentsOpen}
-              aria-controls="document-sidebar"
-              title={
-                isRecentDocumentsOpen ? "최근 문서 닫기" : "최근 문서 열기"
-              }
-              onClick={() => {
-                dispatchWorkspaceInteraction({
-                  type: "toggle-stage-sidebar",
-                  sidebar: "recent",
-                });
-              }}
-            >
-              <RecentDocumentsIcon />
-            </button>
-            <button
-              ref={outlineButtonRef}
-              className="header-icon-button outline-trigger"
-              type="button"
-              aria-label={isOutlineOpen ? "문서 목차 닫기" : "문서 목차 열기"}
-              aria-expanded={isOutlineOpen}
-              aria-controls="document-outline"
-              title={isOutlineOpen ? "문서 목차 닫기" : "문서 목차 열기"}
-              onClick={() => {
-                dispatchWorkspaceInteraction({
-                  type: "toggle-stage-sidebar",
-                  sidebar: "outline",
-                });
-              }}
-            >
-              <DocumentOutlineIcon />
-            </button>
-          </nav>
-        </div>
-        <span className="document-name" title={documentPath ?? documentName}>
-          {documentName}
-        </span>
-        <div className="header-actions">
-          <button
-            className="header-icon-button open-file-trigger"
-            type="button"
-            aria-label="Markdown 파일 열기"
-            title="Markdown 파일 열기 (⌘/Ctrl O)"
-            disabled={isOpeningFile || isReloadingFile}
-            onClick={handleOpenFile}
-          >
-            <OpenFileIcon />
-          </button>
-          <div ref={settingsRef} className="settings-menu">
-            <button
-              ref={settingsButtonRef}
-              className="header-icon-button settings-trigger"
-              type="button"
-              aria-label="읽기 설정"
-              aria-expanded={isSettingsOpen}
-              aria-controls="reading-settings-popover"
-              title="읽기 설정"
-              onClick={() => {
-                dispatchWorkspaceInteraction({ type: "toggle-settings" });
-              }}
-            >
-              <ReadingSettingsIcon />
-            </button>
+      <AppHeader
+        documentName={documentName}
+        documentPath={documentPath}
+        isRecentDocumentsOpen={isRecentDocumentsOpen}
+        isOutlineOpen={isOutlineOpen}
+        isBusy={isOpeningFile || isReloadingFile}
+        isSettingsOpen={isSettingsOpen}
+        recentDocumentsButtonRef={recentDocumentsButtonRef}
+        outlineButtonRef={outlineButtonRef}
+        settingsRef={settingsRef}
+        settingsButtonRef={settingsButtonRef}
+        onRecentDocumentsToggle={() =>
+          dispatchWorkspaceInteraction({
+            type: "toggle-stage-sidebar",
+            sidebar: "recent",
+          })
+        }
+        onOutlineToggle={() =>
+          dispatchWorkspaceInteraction({
+            type: "toggle-stage-sidebar",
+            sidebar: "outline",
+          })
+        }
+        onOpenFile={handleOpenFile}
+        onSettingsToggle={() =>
+          dispatchWorkspaceInteraction({ type: "toggle-settings" })
+        }
+        settings={
+          <ReadingSettings
+            theme={theme}
+            readingFont={readingFont}
+            lineSpacing={lineSpacing}
+            onThemeChange={selectTheme}
+            onReadingFontChange={selectReadingFont}
+            onLineSpacingChange={selectLineSpacing}
+          />
+        }
+      />
 
-            {isSettingsOpen ? (
-              <div
-                id="reading-settings-popover"
-                className="settings-popover"
-                role="dialog"
-                aria-labelledby="reading-settings-title"
-              >
-                <div className="settings-popover-header">
-                  <h2 id="reading-settings-title">읽기 설정</h2>
-                  <span>미리보기 모양</span>
-                </div>
-
-                <div className="settings-group">
-                  <span id="theme-setting-label" className="settings-label">
-                    테마
-                  </span>
-                  <div
-                    className="theme-options"
-                    role="group"
-                    aria-labelledby="theme-setting-label"
-                  >
-                    {themes.map((themeOption) => (
-                      <button
-                        key={themeOption.value}
-                        type="button"
-                        className="theme-option"
-                        data-theme-option={themeOption.value}
-                        aria-label={themeOption.label}
-                        aria-pressed={theme === themeOption.value}
-                        title={themeOption.label}
-                        onClick={() => selectTheme(themeOption.value)}
-                      >
-                        <span className="theme-swatch" aria-hidden="true" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="settings-group">
-                  <span className="settings-label">글꼴</span>
-                  <ReadingFontSelect
-                    value={readingFont}
-                    onChange={selectReadingFont}
-                  />
-                </div>
-
-                <div className="settings-group">
-                  <span
-                    id="line-spacing-setting-label"
-                    className="settings-label"
-                  >
-                    행간
-                  </span>
-                  <div
-                    className="line-spacing-options"
-                    role="group"
-                    aria-labelledby="line-spacing-setting-label"
-                  >
-                    {lineSpacings.map((spacingOption) => (
-                      <button
-                        key={spacingOption.value}
-                        type="button"
-                        className="line-spacing-option"
-                        data-spacing={spacingOption.value}
-                        aria-label={spacingOption.label}
-                        aria-pressed={lineSpacing === spacingOption.value}
-                        title={spacingOption.label}
-                        onClick={() => selectLineSpacing(spacingOption.value)}
-                      >
-                        <LineSpacingGlyph />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </header>
-
-      <div className={`document-stage${stageSidebar ? " has-sidebar" : ""}`}>
-        {isRecentDocumentsOpen ? (
-          <>
-            <DocumentSidebar
-              documents={recentDocuments}
-              currentDocumentPath={documentPath}
-              unavailableDocumentPaths={unavailableRecentDocumentPaths}
-              isModal={!isSidebarInset}
-              isBusy={isOpeningFile || isReloadingFile}
-              isPersistenceLimited={isRecentDocumentPersistenceLimited}
-              onClose={handleDocumentSidebarClose}
-              onOpenFile={handleOpenFile}
-              onSelectDocument={handleRecentDocumentSelect}
-            />
-            <button
-              type="button"
-              className="sidebar-scrim"
-              tabIndex={-1}
-              aria-label="최근 문서 닫기"
-              onClick={handleDocumentSidebarClose}
-            />
-          </>
-        ) : null}
-
-        {isOutlineOpen ? (
-          <>
-            <DocumentOutline
-              items={outlineItems}
-              activeHeadingId={activeHeadingId}
-              documentKey={documentPath ?? "untitled"}
-              isModal={!isSidebarInset}
-              onClose={handleOutlineClose}
-              onNavigate={handleOutlineNavigate}
-            />
-            <button
-              type="button"
-              className="sidebar-scrim"
-              tabIndex={-1}
-              aria-label="목차 닫기"
-              onClick={handleOutlineClose}
-            />
-          </>
-        ) : null}
-
+      <DocumentStage
+        stageSidebar={stageSidebar}
+        isSidebarInset={isSidebarInset}
+        recentDocuments={recentDocuments}
+        documentPath={documentPath}
+        unavailableRecentDocumentPaths={unavailableRecentDocumentPaths}
+        isBusy={isOpeningFile || isReloadingFile}
+        isRecentDocumentPersistenceLimited={
+          isRecentDocumentPersistenceLimited
+        }
+        outlineItems={outlineItems}
+        activeHeadingId={activeHeadingId}
+        onDocumentSidebarClose={handleDocumentSidebarClose}
+        onOpenFile={handleOpenFile}
+        onRecentDocumentSelect={handleRecentDocumentSelect}
+        onOutlineClose={handleOutlineClose}
+        onOutlineNavigate={handleOutlineNavigate}
+      >
         <main
           ref={workspaceRef}
           className={`workspace${isPreviewFocusMode ? " is-preview-focus" : ""}`}
@@ -2637,7 +1458,7 @@ function App() {
             className="split-resize-guide"
             aria-hidden="true"
           />
-          <Pane
+          <WorkspacePane
             side="left"
             activePane={leftPaneContent}
             markdown={markdown}
@@ -2662,43 +1483,26 @@ function App() {
             onContentElementChange={handleContentElementChange}
             onPreviewFocusModeToggle={togglePreviewFocusMode}
           />
-          <div
-            className="pane-divider"
-            aria-hidden={isPreviewFocusMode || undefined}
-            inert={isPreviewFocusMode}
-          >
-            <div
-              ref={dividerRef}
-              className="pane-divider-handle"
-              role="separator"
-              aria-label="패널 너비 조절"
-              aria-orientation="vertical"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={50}
-              tabIndex={0}
-              title="드래그하여 패널 너비 조절 · 더블 클릭하여 초기화"
-              onDoubleClick={() => updateSplit(50)}
-              onKeyDown={handleDividerKeyDown}
-              onPointerDown={handleDividerPointerDown}
-              onPointerMove={handleDividerPointerMove}
-              onPointerUp={handleDividerPointerUp}
-              onPointerCancel={handleDividerPointerCancel}
-              onLostPointerCapture={handleDividerLostPointerCapture}
-            />
-            <PanelLayoutMenu
-              isOpen={isPanelLayoutMenuOpen}
-              isScrollSyncEnabled={isScrollSyncEnabled}
-              isScrollSyncAvailable={isScrollSyncAvailable}
-              isStacked={isWorkspaceStacked}
-              onOpen={openPanelLayoutMenu}
-              onClose={closePanelLayoutMenu}
-              onScrollSyncToggle={toggleScrollSync}
-              onSwapPanes={swapPanes}
-              onResetSplit={() => updateSplit(50)}
-            />
-          </div>
-          <Pane
+          <PaneDivider
+            dividerRef={dividerRef}
+            isPreviewFocusMode={isPreviewFocusMode}
+            isMenuOpen={isPanelLayoutMenuOpen}
+            isScrollSyncEnabled={isScrollSyncEnabled}
+            isScrollSyncAvailable={isScrollSyncAvailable}
+            isStacked={isWorkspaceStacked}
+            onMenuOpen={openPanelLayoutMenu}
+            onMenuClose={closePanelLayoutMenu}
+            onScrollSyncToggle={toggleScrollSync}
+            onSwapPanes={swapPanes}
+            onResetSplit={() => updateSplit(50)}
+            onKeyDown={handleDividerKeyDown}
+            onPointerDown={handleDividerPointerDown}
+            onPointerMove={handleDividerPointerMove}
+            onPointerUp={handleDividerPointerUp}
+            onPointerCancel={handleDividerPointerCancel}
+            onLostPointerCapture={handleDividerLostPointerCapture}
+          />
+          <WorkspacePane
             side="right"
             activePane={rightPaneContent}
             markdown={markdown}
@@ -2733,7 +1537,7 @@ function App() {
             />
           ) : null}
         </main>
-      </div>
+      </DocumentStage>
     </div>
   );
 }
