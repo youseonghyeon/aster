@@ -23,8 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
-# Personal product planning
-docs/product-roadmap.md
+# Local documentation and planning
+docs/
 
 # Local agent harness
 AGENTS.md
