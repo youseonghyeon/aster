@@ -167,7 +167,6 @@ export function WorkspacePane({
   );
   const searchResult = isSourcePane ? sourceSearchResult : previewSearchResult;
   const sourceElementRef = useRef<HTMLTextAreaElement | null>(null);
-  const searchInputElementRef = useRef<HTMLInputElement | null>(null);
   const handleSourceElementChange = useCallback(
     (element: HTMLTextAreaElement | null) => {
       sourceElementRef.current = element;
@@ -185,7 +184,6 @@ export function WorkspacePane({
   );
   const handleSearchInputElementChange = useCallback(
     (element: HTMLInputElement | null) => {
-      searchInputElementRef.current = element;
       onSearchInputElementChange(searchArea, element);
     },
     [onSearchInputElementChange, searchArea],
@@ -215,23 +213,12 @@ export function WorkspacePane({
       searchResult.matches.length,
     );
     const match = searchResult.matches[activeIndex];
-    let inputFocusFrame: number | null = null;
     const selectionFrame = window.requestAnimationFrame(() => {
       textarea.setSelectionRange(match.start, match.end, "forward");
       scrollTextareaMatchIntoView(textarea, sourceValue, match.start, match.end);
-      textarea.focus();
-      inputFocusFrame = window.requestAnimationFrame(() =>
-        searchInputElementRef.current?.focus({ preventScroll: true }),
-      );
     });
 
-    return () => {
-      window.cancelAnimationFrame(selectionFrame);
-
-      if (inputFocusFrame !== null) {
-        window.cancelAnimationFrame(inputFocusFrame);
-      }
-    };
+    return () => window.cancelAnimationFrame(selectionFrame);
   }, [
     isSourcePane,
     searchResult.error,

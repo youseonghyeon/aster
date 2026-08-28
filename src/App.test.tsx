@@ -21,9 +21,36 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 vi.mock("./components/SyntaxHighlightedCode", () => ({
   SyntaxHighlightedCode: ({ code }: { code: string }) => <pre>{code}</pre>,
 }));
+vi.mock("./hooks/useTextSearch", async () => {
+  const { findTextMatches } = await import("./lib/text-search");
+  const { useMemo } = await import("react");
+
+  return {
+    useTextSearch: (
+      value: string,
+      query: string,
+      options: { isCaseSensitive: boolean; isRegex: boolean },
+    ) =>
+      useMemo(
+        () => findTextMatches(value, query, options),
+        [options.isCaseSensitive, options.isRegex, query, value],
+      ),
+  };
+});
 
 function outlineHeading() {
   return screen.queryByRole("heading", { name: "문서 목차" });
+}
+
+function nextAnimationFrame() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
+async function flushSearchFrames() {
+  await nextAnimationFrame();
+  await nextAnimationFrame();
 }
 
 describe("workspace regression contracts", () => {
@@ -109,6 +136,117 @@ describe("workspace regression contracts", () => {
     outlineCloseButton?.focus();
     await user.keyboard("{Escape}");
     expect(outlineHeading()).not.toBeInTheDocument();
+  });
+
+  it("keeps the Markdown search input focused while Enter navigates results", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const editor = screen.getByRole("textbox", { name: "마크다운 입력" });
+
+    await user.click(screen.getByRole("button", { name: "마크다운 검색" }));
+    const searchInput = screen.getByRole("searchbox", {
+      name: "마크다운에서 검색",
+    });
+    await user.type(searchInput, "문서");
+    await flushSearchFrames();
+
+    const editorFocusListener = vi.fn();
+    editor.addEventListener("focus", editorFocusListener);
+    await user.keyboard("{Enter}");
+    await flushSearchFrames();
+
+    expect(editorFocusListener).not.toHaveBeenCalled();
+    expect(searchInput).toHaveFocus();
+  });
+
+  it("keeps the current Markdown result position when Escape closes search", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", {
+      name: "마크다운 입력",
+    });
+    editor.scrollTop = 120;
+
+    await user.click(screen.getByRole("button", { name: "마크다운 검색" }));
+    const searchInput = screen.getByRole("searchbox", {
+      name: "마크다운에서 검색",
+    });
+    await user.type(searchInput, "문서");
+    await flushSearchFrames();
+    editor.scrollTop = 720;
+    const selection = {
+      start: editor.selectionStart,
+      end: editor.selectionEnd,
+    };
+
+    await user.keyboard("{Escape}");
+    await flushSearchFrames();
+
+    expect(
+      screen.queryByRole("search", { name: "마크다운 검색" }),
+    ).not.toBeInTheDocument();
+    expect(editor.scrollTop).toBe(720);
+    expect(editor.selectionStart).toBe(selection.start);
+    expect(editor.selectionEnd).toBe(selection.end);
+  });
+
+  it("still restores the pre-search Markdown position after preview focus mode", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await flushSearchFrames();
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", {
+      name: "마크다운 입력",
+    });
+    editor.setSelectionRange(2, 7, "forward");
+    editor.scrollTop = 135;
+
+    await user.click(screen.getByRole("button", { name: "마크다운 검색" }));
+    await user.type(
+      screen.getByRole("searchbox", { name: "마크다운에서 검색" }),
+      "문서",
+    );
+    await flushSearchFrames();
+    editor.scrollTop = 720;
+
+    await user.click(screen.getByRole("button", { name: "미리보기 집중 모드" }));
+    await user.click(
+      screen.getByRole("button", { name: "미리보기 집중 모드 종료" }),
+    );
+    await flushSearchFrames();
+
+    expect(editor.scrollTop).toBe(135);
+    expect(editor.selectionStart).toBe(2);
+    expect(editor.selectionEnd).toBe(7);
+  });
+
+  it("keeps preview Escape restoration behavior unchanged", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const preview = screen.getByLabelText<HTMLDivElement>("미리보기 내용");
+    const nested = preview.querySelector<HTMLElement>(
+      ".markdown-body pre, .markdown-body .table-scroll",
+    );
+    expect(nested).not.toBeNull();
+    if (!nested) {
+      throw new Error("미리보기 중첩 스크롤 요소가 필요합니다");
+    }
+    preview.scrollTop = 85;
+    preview.scrollLeft = 12;
+    nested.scrollTop = 9;
+    nested.scrollLeft = 34;
+
+    await user.click(screen.getByRole("button", { name: "미리보기 검색" }));
+    preview.scrollTop = 710;
+    preview.scrollLeft = 220;
+    nested.scrollTop = 410;
+    nested.scrollLeft = 330;
+    await user.keyboard("{Escape}");
+    await flushSearchFrames();
+
+    expect(preview.scrollTop).toBe(85);
+    expect(preview.scrollLeft).toBe(12);
+    expect(nested.scrollTop).toBe(9);
+    expect(nested.scrollLeft).toBe(34);
   });
 
   it("preserves edited Markdown when document switching is cancelled", async () => {

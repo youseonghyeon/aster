@@ -169,26 +169,28 @@ export function useWorkspaceSearch(onOpen: () => void) {
       window.requestAnimationFrame(() => {
         const contentElement = contentElementsRef.current[area];
 
-        if (contentElement instanceof HTMLTextAreaElement && snapshot) {
-          restoreTextareaSnapshot(contentElement, snapshot);
-        } else if (contentElement && snapshot) {
-          contentElement.scrollTop = snapshot.scrollTop;
-          contentElement.scrollLeft = snapshot.scrollLeft;
-        }
-
-        const nestedElements =
-          contentElement instanceof HTMLDivElement
-            ? contentElement.querySelectorAll<HTMLElement>(
-                ".markdown-body pre, .markdown-body .table-scroll",
-              )
-            : [];
-        snapshot?.nestedScrollPositions?.forEach((position, index) => {
-          const element = nestedElements[index];
-          if (element) {
-            element.scrollTop = position.scrollTop;
-            element.scrollLeft = position.scrollLeft;
+        if (area !== "editor") {
+          if (contentElement instanceof HTMLTextAreaElement && snapshot) {
+            restoreTextareaSnapshot(contentElement, snapshot);
+          } else if (contentElement && snapshot) {
+            contentElement.scrollTop = snapshot.scrollTop;
+            contentElement.scrollLeft = snapshot.scrollLeft;
           }
-        });
+
+          const nestedElements =
+            contentElement instanceof HTMLDivElement
+              ? contentElement.querySelectorAll<HTMLElement>(
+                  ".markdown-body pre, .markdown-body .table-scroll",
+                )
+              : [];
+          snapshot?.nestedScrollPositions?.forEach((position, index) => {
+            const element = nestedElements[index];
+            if (element) {
+              element.scrollTop = position.scrollTop;
+              element.scrollLeft = position.scrollLeft;
+            }
+          });
+        }
 
         const paneElement = contentElement?.closest(".pane");
         const isSnapshotElementInArea = Boolean(
