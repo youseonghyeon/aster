@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import type { Ref } from "react";
 import type { ExternalFileState } from "./useExternalFileStatus";
 
 function FileChangeIcon({ kind }: { kind: ExternalFileState["kind"] }) {
@@ -22,7 +22,7 @@ function FileChangeIcon({ kind }: { kind: ExternalFileState["kind"] }) {
 type ExternalFileNoticeProps = {
   state: ExternalFileState;
   isReloading: boolean;
-  noticeRef: RefObject<HTMLElement | null>;
+  noticeRef: Ref<HTMLElement>;
   onReload: () => void;
   onDismiss: () => void;
 };

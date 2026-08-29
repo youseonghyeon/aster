@@ -7,22 +7,21 @@ import {
   useState,
   type UIEvent,
 } from "react";
-import { usePreviewSearch } from "../hooks/usePreviewSearch";
-import { useTextSearch } from "../hooks/useTextSearch";
+import { usePreviewSearch } from "../../hooks/usePreviewSearch";
+import { useTextSearch } from "../../hooks/useTextSearch";
 import {
   normalizeSearchIndex,
   type SearchArea,
   type SearchSession,
-} from "../lib/text-search";
-import { MarkdownPreview } from "./MarkdownPreview";
-import { PaneSearchBar, SearchIcon } from "./PaneSearchBar";
+} from "../../lib/text-search";
+import { MarkdownPreview } from "../../components/MarkdownPreview";
+import { PaneSearchBar, SearchIcon } from "../../components/PaneSearchBar";
 import {
   SourceSearchHighlights,
   type SourceSearchHighlightsHandle,
-} from "./SourceSearchHighlights";
+} from "../../components/SourceSearchHighlights";
+import type { PaneContent } from "./workspace-types";
 
-export type PaneKind = "editor" | "preview";
-export type PaneContent = PaneKind | "notes";
 export type NoteSaveStatus = "saved" | "saving" | "error";
 
 type WorkspacePaneProps = {

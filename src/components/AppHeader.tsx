@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from "react";
+import type { ReactNode, Ref } from "react";
 
 type AppHeaderProps = {
   documentName: string;
@@ -7,10 +7,10 @@ type AppHeaderProps = {
   isOutlineOpen: boolean;
   isBusy: boolean;
   isSettingsOpen: boolean;
-  recentDocumentsButtonRef: RefObject<HTMLButtonElement | null>;
-  outlineButtonRef: RefObject<HTMLButtonElement | null>;
-  settingsRef: RefObject<HTMLDivElement | null>;
-  settingsButtonRef: RefObject<HTMLButtonElement | null>;
+  recentDocumentsButtonRef: Ref<HTMLButtonElement>;
+  outlineButtonRef: Ref<HTMLButtonElement>;
+  settingsRef: Ref<HTMLDivElement>;
+  settingsButtonRef: Ref<HTMLButtonElement>;
   onRecentDocumentsToggle: () => void;
   onOutlineToggle: () => void;
   onOpenFile: () => void;

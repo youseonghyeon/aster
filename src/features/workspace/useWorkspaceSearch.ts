@@ -5,7 +5,7 @@ import {
   type SearchSession,
 } from "../../lib/text-search";
 
-type SearchSessions = Record<SearchArea, SearchSession>;
+export type SearchSessions = Record<SearchArea, SearchSession>;
 
 export type SearchSnapshot = {
   activeElement: HTMLElement | null;

@@ -1,4 +1,11 @@
-import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type KeyboardEvent,
+  type PointerEvent,
+  type RefObject,
+} from "react";
 import {
   clampSplitPercent,
   getKeyboardSplitPercent,
@@ -37,7 +44,7 @@ export function usePaneSplit({
   const appliedSplitPercentRef = useRef(50);
   const splitDragRef = useRef<SplitDragState | null>(null);
 
-  function applySplit(requestedPercent: number) {
+  const applySplit = useCallback((requestedPercent: number) => {
     const workspace = workspaceRef.current;
 
     if (!workspace) {
@@ -57,12 +64,12 @@ export function usePaneSplit({
       "aria-valuenow",
       Math.round(appliedPercent).toString(),
     );
-  }
+  }, [dividerRef, workspaceRef]);
 
-  function updateSplit(nextPercent: number) {
+  const updateSplit = useCallback((nextPercent: number) => {
     requestedSplitPercentRef.current = nextPercent;
     applySplit(nextPercent);
-  }
+  }, [applySplit]);
 
   function getDragRequestedPercent(state: SplitDragState, clientX: number) {
     return getPointerSplitPercent(
@@ -80,7 +87,7 @@ export function usePaneSplit({
     );
   }
 
-  function renderSplitGuide(state: SplitDragState) {
+  const renderSplitGuide = useCallback((state: SplitDragState) => {
     const guide = splitGuideRef.current;
 
     if (!guide) {
@@ -92,9 +99,9 @@ export function usePaneSplit({
       : state.startAppliedPercent;
     const guidePosition = (guidePercent / 100) * state.boundsWidth;
     guide.style.transform = `translate3d(${guidePosition}px, 0, 0)`;
-  }
+  }, [splitGuideRef]);
 
-  function scheduleSplitGuide(state: SplitDragState) {
+  const scheduleSplitGuide = useCallback((state: SplitDragState) => {
     if (state.frameId !== null) {
       return;
     }
@@ -106,9 +113,9 @@ export function usePaneSplit({
         renderSplitGuide(state);
       }
     });
-  }
+  }, [renderSplitGuide]);
 
-  function cleanUpSplitDrag(state: SplitDragState) {
+  const cleanUpSplitDrag = useCallback((state: SplitDragState) => {
     if (state.frameId !== null) {
       window.cancelAnimationFrame(state.frameId);
       state.frameId = null;
@@ -131,9 +138,9 @@ export function usePaneSplit({
       "is-split-guide-visible",
     );
     splitGuideRef.current?.style.removeProperty("transform");
-  }
+  }, [splitGuideRef, workspaceRef]);
 
-  function cancelSplitDrag(pointerId?: number) {
+  const cancelSplitDrag = useCallback((pointerId?: number) => {
     const state = splitDragRef.current;
 
     if (!state || (pointerId !== undefined && state.pointerId !== pointerId)) {
@@ -142,9 +149,9 @@ export function usePaneSplit({
 
     requestedSplitPercentRef.current = state.startRequestedPercent;
     cleanUpSplitDrag(state);
-  }
+  }, [cleanUpSplitDrag]);
 
-  function handleDividerPointerDown(event: PointerEvent<HTMLDivElement>) {
+  const handleDividerPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     if (!event.isPrimary || event.button !== 0 || splitDragRef.current) {
       return;
     }
@@ -179,9 +186,9 @@ export function usePaneSplit({
     splitDragRef.current = state;
     workspace.classList.add("is-resizing", "is-split-guide-visible");
     renderSplitGuide(state);
-  }
+  }, [renderSplitGuide, workspaceRef]);
 
-  function handleDividerPointerMove(event: PointerEvent<HTMLDivElement>) {
+  const handleDividerPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const state = splitDragRef.current;
 
     if (
@@ -196,9 +203,9 @@ export function usePaneSplit({
     state.didMove = true;
     state.latestPercent = getDragSplitPercent(state, event.clientX);
     scheduleSplitGuide(state);
-  }
+  }, [scheduleSplitGuide]);
 
-  function handleDividerPointerUp(event: PointerEvent<HTMLDivElement>) {
+  const handleDividerPointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const state = splitDragRef.current;
 
     if (!state || state.pointerId !== event.pointerId) {
@@ -216,19 +223,17 @@ export function usePaneSplit({
     } else {
       requestedSplitPercentRef.current = state.startRequestedPercent;
     }
-  }
+  }, [cleanUpSplitDrag, updateSplit]);
 
-  function handleDividerPointerCancel(event: PointerEvent<HTMLDivElement>) {
+  const handleDividerPointerCancel = useCallback((event: PointerEvent<HTMLDivElement>) => {
     cancelSplitDrag(event.pointerId);
-  }
+  }, [cancelSplitDrag]);
 
-  function handleDividerLostPointerCapture(
-    event: PointerEvent<HTMLDivElement>,
-  ) {
+  const handleDividerLostPointerCapture = useCallback((event: PointerEvent<HTMLDivElement>) => {
     cancelSplitDrag(event.pointerId);
-  }
+  }, [cancelSplitDrag]);
 
-  function handleDividerKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+  const handleDividerKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
     cancelSplitDrag();
 
     const nextPercent = getKeyboardSplitPercent(
@@ -243,13 +248,13 @@ export function usePaneSplit({
 
     event.preventDefault();
     updateSplit(nextPercent);
-  }
+  }, [cancelSplitDrag, updateSplit]);
 
-  function swapSplit() {
+  const swapSplit = useCallback(() => {
     if (window.matchMedia("(min-width: 721px)").matches) {
       updateSplit(getSwappedSplitPercent(requestedSplitPercentRef.current));
     }
-  }
+  }, [updateSplit]);
 
   useEffect(() => {
     const workspace = workspaceRef.current;
@@ -265,7 +270,7 @@ export function usePaneSplit({
 
     resizeObserver.observe(workspace);
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [applySplit, cancelSplitDrag, workspaceRef]);
 
   useEffect(() => {
     function handleWindowBlur() {
@@ -285,13 +290,13 @@ export function usePaneSplit({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       cancelSplitDrag();
     };
-  }, []);
+  }, [cancelSplitDrag]);
 
   useEffect(() => {
     if (isPreviewFocusMode) {
       cancelSplitDrag();
     }
-  }, [isPreviewFocusMode]);
+  }, [cancelSplitDrag, isPreviewFocusMode]);
 
   return {
     updateSplit,

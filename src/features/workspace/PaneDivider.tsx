@@ -4,11 +4,11 @@ import {
   type KeyboardEvent,
   type KeyboardEventHandler,
   type PointerEventHandler,
-  type RefObject,
+  type Ref,
 } from "react";
 
-type PaneDividerProps = {
-  dividerRef: RefObject<HTMLDivElement | null>;
+export type PaneDividerProps = {
+  dividerRef: Ref<HTMLDivElement>;
   isPreviewFocusMode: boolean;
   isMenuOpen: boolean;
   isScrollSyncEnabled: boolean;
