@@ -118,6 +118,12 @@ export function WorkspacePane({
   );
   const searchResult = isSourcePane ? sourceSearchResult : previewSearchResult;
   const sourceElementRef = useRef<HTMLTextAreaElement | null>(null);
+  const previousSourceContextRef = useRef({
+    area: searchArea,
+    value: sourceValue,
+  });
+  const previousSearchNavigationRef = useRef("");
+  const suppressSourceSearchNavigationRef = useRef(false);
   const sourceSearchHighlightsRef =
     useRef<SourceSearchHighlightsHandle | null>(null);
   const sourceScrollFrameRef = useRef<number | null>(null);
@@ -127,6 +133,23 @@ export function WorkspacePane({
     searchSession.query.length > 0 &&
     !searchResult.error &&
     searchResult.matches.length > 0;
+  const searchNavigationKey = `${searchArea}:${searchSession.isOpen}:${searchSession.query}:${searchSession.isCaseSensitive}:${searchSession.isRegex}:${searchSession.currentIndex}`;
+  if (previousSearchNavigationRef.current !== searchNavigationKey) {
+    previousSearchNavigationRef.current = searchNavigationKey;
+    suppressSourceSearchNavigationRef.current = false;
+  }
+  const previousSourceContext = previousSourceContextRef.current;
+  if (
+    isSourcePane &&
+    searchSession.isOpen &&
+    previousSourceContext.area === searchArea &&
+    previousSourceContext.value !== sourceValue
+  ) {
+    suppressSourceSearchNavigationRef.current = true;
+  } else if (!isSourcePane || !searchSession.isOpen) {
+    suppressSourceSearchNavigationRef.current = false;
+  }
+  previousSourceContextRef.current = { area: searchArea, value: sourceValue };
   const handleSourceElementChange = useCallback(
     (element: HTMLTextAreaElement | null) => {
       sourceElementRef.current = element;
@@ -199,6 +222,10 @@ export function WorkspacePane({
     );
     const match = searchResult.matches[activeIndex];
     sourceSearchHighlightsRef.current?.syncToTextarea(textarea);
+    if (suppressSourceSearchNavigationRef.current) {
+      suppressSourceSearchNavigationRef.current = false;
+      return;
+    }
     const selectionFrame = window.requestAnimationFrame(() => {
       textarea.setSelectionRange(match.start, match.end, "forward");
       sourceSearchHighlightsRef.current?.scrollCurrentMatchIntoView(textarea);

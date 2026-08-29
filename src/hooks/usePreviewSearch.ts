@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { normalizeSearchIndex, type SearchSession } from "../lib/text-search";
 import { useTextSearch } from "./useTextSearch";
 
@@ -357,6 +357,9 @@ export function usePreviewSearch(
   const [renderRevision, setRenderRevision] = useState(0);
   const [scrollRevision, setScrollRevision] = useState(0);
   const [overlays, setOverlays] = useState<PreviewSearchOverlay[]>([]);
+  const previousContentRevisionRef = useRef(contentRevision);
+  const previousNavigationKeyRef = useRef("");
+  const suppressContentNavigationRef = useRef(false);
   const options = useMemo(
     () => ({
       isCaseSensitive: session.isCaseSensitive,
@@ -369,6 +372,20 @@ export function usePreviewSearch(
     session.isOpen ? session.query : "",
     options,
   );
+  const navigationKey = `${session.isOpen}:${session.query}:${session.isCaseSensitive}:${session.isRegex}:${session.currentIndex}`;
+  if (previousNavigationKeyRef.current !== navigationKey) {
+    previousNavigationKeyRef.current = navigationKey;
+    suppressContentNavigationRef.current = false;
+  }
+  if (
+    session.isOpen &&
+    previousContentRevisionRef.current !== contentRevision
+  ) {
+    suppressContentNavigationRef.current = true;
+  } else if (!session.isOpen) {
+    suppressContentNavigationRef.current = false;
+  }
+  previousContentRevisionRef.current = contentRevision;
 
   useEffect(() => {
     if (!container || !session.isOpen) {
@@ -448,6 +465,10 @@ export function usePreviewSearch(
     );
 
     if (currentRange) {
+      if (suppressContentNavigationRef.current) {
+        suppressContentNavigationRef.current = false;
+        return;
+      }
       scrollPreviewRangeIntoView(currentRange, container);
     }
   }, [

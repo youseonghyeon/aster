@@ -16,6 +16,7 @@ type UseWorkspaceEventBridgeOptions = {
   externalFileNoticeReturnFocusRef: RefObject<HTMLElement | null>;
   contentElementsRef: RefObject<WorkspaceContentElements>;
   lastSearchAreaRef: RefObject<SearchArea>;
+  isPreviewUpdating: boolean;
   resetSearchSessions: () => void;
   closeStageSidebar: () => void;
 };
@@ -27,6 +28,7 @@ export function useWorkspaceEventBridge({
   externalFileNoticeReturnFocusRef,
   contentElementsRef,
   lastSearchAreaRef,
+  isPreviewUpdating,
   resetSearchSessions,
   closeStageSidebar,
 }: UseWorkspaceEventBridgeOptions) {
@@ -41,6 +43,7 @@ export function useWorkspaceEventBridge({
   useLayoutEffect(() => {
     if (
       appliedExternalCommitToken === null ||
+      isPreviewUpdating ||
       externalCommitTokenRef.current !== appliedExternalCommitToken ||
       !externalSnapshotsRef.current
     ) {
@@ -74,7 +77,7 @@ export function useWorkspaceEventBridge({
     }
     externalSnapshotsRef.current = null;
     externalCommitTokenRef.current = null;
-  }, [appliedExternalCommitToken, contentElementsRef]);
+  }, [appliedExternalCommitToken, contentElementsRef, isPreviewUpdating]);
 
   useEffect(() => {
     function closeRecentAndRestoreFocus() {

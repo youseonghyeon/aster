@@ -16,7 +16,10 @@ import {
   type DocumentOperationKind,
   type DocumentSessionAction,
 } from "./document-session-state";
-import { isDocumentDirty } from "./document-transactions";
+import {
+  isDocumentDirty,
+  isSameDocumentContext,
+} from "./document-transactions";
 import { initialMarkdown } from "./initial-document";
 import {
   chooseExternalConflictDecision,
@@ -277,8 +280,10 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
     void loadDraft(initial.draftIdentity)
       .then(async (draft) => {
         if (!mountedRef.current || !draft || draft.content === initialMarkdown) return;
+        if (!isSameDocumentContext(stateRef.current.document, initial, true)) return;
         const decision = await chooseRecoveryDecision(initial.name, false);
         if (!mountedRef.current) return;
+        if (!isSameDocumentContext(stateRef.current.document, initial, true)) return;
         if (decision === "restore") {
           dispatch({ type: "restore-draft", markdown: draft.content, conflicted: false });
         } else {
@@ -335,17 +340,27 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
   useEffect(() => {
     let disposed = false;
     const listeners: Array<() => void> = [];
-    void Promise.all([
-      listen("open-markdown-requested", () => void openFromPickerRef.current("native")),
-      listen("save-markdown-requested", () => void saveDocumentRef.current()),
-    ])
-      .then((unlisteners) => {
-        if (disposed) unlisteners.forEach((unlisten) => unlisten());
-        else listeners.push(...unlisteners);
-      })
-      .catch((error) => {
-        if (!disposed) console.error("파일 메뉴 이벤트를 연결하지 못했습니다.", error);
-      });
+    const register = (
+      eventName: string,
+      listener: () => void,
+    ) => {
+      void listen(eventName, listener)
+        .then((unlisten) => {
+          if (disposed) unlisten();
+          else listeners.push(unlisten);
+        })
+        .catch((error) => {
+          if (!disposed) {
+            console.error(`${eventName} 이벤트를 연결하지 못했습니다.`, error);
+          }
+        });
+    };
+    register("open-markdown-requested", () =>
+      void openFromPickerRef.current("native"),
+    );
+    register("save-markdown-requested", () =>
+      void saveDocumentRef.current(),
+    );
     return () => {
       disposed = true;
       listeners.forEach((unlisten) => unlisten());

@@ -111,11 +111,18 @@ export function useExternalFileStatus({
         watchedEpoch === observationEpochRef.current &&
         document.visibilityState === "visible"
       ) {
+        if (nextCheckTimer !== undefined) {
+          window.clearTimeout(nextCheckTimer);
+        }
         nextCheckTimer = window.setTimeout(checkFileStatus, 2000);
       }
     }
 
     function scheduleNativeCheck() {
+      if (nextCheckTimer !== undefined) {
+        window.clearTimeout(nextCheckTimer);
+        nextCheckTimer = undefined;
+      }
       if (nativeCheckTimer !== undefined) {
         window.clearTimeout(nativeCheckTimer);
       }

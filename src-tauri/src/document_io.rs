@@ -170,8 +170,21 @@ pub(crate) fn save_markdown_file_to_disk(
     }
 
     sync_directory(parent);
-    read_markdown_file_from_disk(target.to_string_lossy().into_owned())
-        .map(|document| SaveMarkdownResult::Saved { document })
+    let (content, format) = decode_markdown(&encoded)?;
+    let name = target
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("문서.md")
+        .to_owned();
+    Ok(SaveMarkdownResult::Saved {
+        document: MarkdownDocument {
+            path: target.to_string_lossy().into_owned(),
+            name,
+            content,
+            revision: revision_for_bytes(&encoded),
+            format,
+        },
+    })
 }
 
 pub(crate) fn validate_existing_markdown_file(

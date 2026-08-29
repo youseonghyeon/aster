@@ -133,7 +133,10 @@ export function useDocumentNavigation({
       const draft = await loadDraft(targetIdentity);
       if (!draft || !mountedRef.current) return null;
       const name = requestedPath.split(/[\\/]/).pop() ?? "복구된 문서.md";
-      if ((await chooseRecoveryDecision(name, true)) !== "restore") return null;
+      if ((await chooseRecoveryDecision(name, true)) !== "restore") {
+        await discardDraft(targetIdentity).catch(console.error);
+        return null;
+      }
       const leave = await ensureCanLeave("switch");
       if (!leave.allowed || !mountedRef.current || !(await flushCurrentNote())) {
         return "cancelled";
@@ -209,6 +212,7 @@ export function useDocumentNavigation({
 
       const leave = await ensureCanLeave("switch");
       if (!leave.allowed || !mountedRef.current) return "cancelled";
+      const approvedDocument = stateRef.current.document;
       let openedFile = preflight;
       if (leave.didDecide) {
         try {
@@ -241,6 +245,15 @@ export function useDocumentNavigation({
         console.error("복구 초안을 확인하지 못했습니다:", error);
       }
       if (!mountedRef.current) return "cancelled";
+      if (
+        !isSameDocumentContext(
+          stateRef.current.document,
+          approvedDocument,
+          true,
+        )
+      ) {
+        return "cancelled";
+      }
 
       const current = stateRef.current;
       const recentDocuments = promoteRecentDocument(

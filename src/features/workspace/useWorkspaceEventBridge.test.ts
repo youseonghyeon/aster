@@ -19,6 +19,7 @@ function createOptions() {
       } as WorkspaceContentElements,
     },
     lastSearchAreaRef: { current: "editor" as const },
+    isPreviewUpdating: false,
     resetSearchSessions: vi.fn(),
     closeStageSidebar: vi.fn(),
   };
@@ -105,6 +106,36 @@ describe("useWorkspaceEventBridge", () => {
     expect(editor.selectionEnd).toBe(7);
     expect(editor.scrollTop).toBe(42);
     expect(editor.scrollLeft).toBe(8);
+    editor.remove();
+  });
+
+  it("waits for deferred preview content before restoring external positions", () => {
+    const options = createOptions();
+    const editor = document.createElement("textarea");
+    editor.value = "0123456789";
+    document.body.append(editor);
+    editor.setSelectionRange(2, 6);
+    editor.scrollTop = 38;
+    options.contentElementsRef.current.editor = editor;
+    const { rerender } = renderHook(
+      ({ isPreviewUpdating }) =>
+        useWorkspaceEventBridge({ ...options, isPreviewUpdating }),
+      { initialProps: { isPreviewUpdating: true } },
+    );
+
+    act(() => {
+      options.events.emit("external-content-will-apply", { commitToken: 4 });
+      editor.setSelectionRange(0, 0);
+      editor.scrollTop = 0;
+      options.events.emit("external-content-applied", { commitToken: 4 });
+    });
+    expect(editor.selectionStart).toBe(0);
+    expect(editor.scrollTop).toBe(0);
+
+    rerender({ isPreviewUpdating: false });
+    expect(editor.selectionStart).toBe(2);
+    expect(editor.selectionEnd).toBe(6);
+    expect(editor.scrollTop).toBe(38);
     editor.remove();
   });
 });

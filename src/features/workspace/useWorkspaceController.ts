@@ -284,6 +284,7 @@ export function useWorkspaceController({
     externalFileNoticeReturnFocusRef,
     contentElementsRef,
     lastSearchAreaRef,
+    isPreviewUpdating,
     resetSearchSessions,
     closeStageSidebar,
   });
