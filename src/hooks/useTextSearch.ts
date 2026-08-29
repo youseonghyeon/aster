@@ -17,12 +17,19 @@ type SearchWorkerResponse = {
   result: TextSearchResult;
 };
 
+type CompletedSearch = TextSearchOptions & {
+  value: string;
+  query: string;
+  result: TextSearchResult;
+};
+
 export function useTextSearch(
   value: string,
   query: string,
   options: TextSearchOptions,
 ): TextSearchResult {
-  const [result, setResult] = useState<TextSearchResult>(emptyResult);
+  const [completedSearch, setCompletedSearch] =
+    useState<CompletedSearch | null>(null);
   const requestIdRef = useRef(0);
 
   useEffect(() => {
@@ -30,11 +37,8 @@ export function useTextSearch(
     const requestId = requestIdRef.current;
 
     if (query.length === 0) {
-      setResult(emptyResult);
       return;
     }
-
-    setResult(emptyResult);
 
     const worker = new Worker(
       new URL("../workers/text-search.worker.ts", import.meta.url),
@@ -44,10 +48,15 @@ export function useTextSearch(
       worker.terminate();
 
       if (requestIdRef.current === requestId) {
-        setResult({
-          matches: [],
-          error: "검색 시간이 오래 걸립니다. 검색어를 더 구체적으로 입력하세요",
-          isTruncated: false,
+        setCompletedSearch({
+          value,
+          query,
+          ...options,
+          result: {
+            matches: [],
+            error: "검색 시간이 오래 걸립니다. 검색어를 더 구체적으로 입력하세요",
+            isTruncated: false,
+          },
         });
       }
     }, searchTimeoutMilliseconds);
@@ -60,7 +69,12 @@ export function useTextSearch(
         }
 
         window.clearTimeout(timeout);
-        setResult(event.data.result);
+        setCompletedSearch({
+          value,
+          query,
+          ...options,
+          result: event.data.result,
+        });
         worker.terminate();
       },
     );
@@ -68,10 +82,15 @@ export function useTextSearch(
       window.clearTimeout(timeout);
 
       if (requestIdRef.current === requestId) {
-        setResult({
-          matches: [],
-          error: "검색을 완료하지 못했습니다. 다시 시도하세요",
-          isTruncated: false,
+        setCompletedSearch({
+          value,
+          query,
+          ...options,
+          result: {
+            matches: [],
+            error: "검색을 완료하지 못했습니다. 다시 시도하세요",
+            isTruncated: false,
+          },
         });
       }
 
@@ -90,5 +109,10 @@ export function useTextSearch(
     };
   }, [options.isCaseSensitive, options.isRegex, query, value]);
 
-  return result;
+  return completedSearch?.value === value &&
+    completedSearch.query === query &&
+    completedSearch.isCaseSensitive === options.isCaseSensitive &&
+    completedSearch.isRegex === options.isRegex
+    ? completedSearch.result
+    : emptyResult;
 }

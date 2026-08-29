@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type UIEvent,
+} from "react";
 import { usePreviewSearch } from "../hooks/usePreviewSearch";
 import { useTextSearch } from "../hooks/useTextSearch";
 import {
@@ -8,6 +16,10 @@ import {
 } from "../lib/text-search";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { PaneSearchBar, SearchIcon } from "./PaneSearchBar";
+import {
+  SourceSearchHighlights,
+  type SourceSearchHighlightsHandle,
+} from "./SourceSearchHighlights";
 
 export type PaneKind = "editor" | "preview";
 export type PaneContent = PaneKind | "notes";
@@ -42,66 +54,6 @@ type WorkspacePaneProps = {
   ) => void;
   onPreviewFocusModeToggle: () => void;
 };
-
-const maximumMeasuredTextareaPrefixLength = 250_000;
-
-function scrollTextareaMatchIntoView(
-  textarea: HTMLTextAreaElement,
-  value: string,
-  matchStart: number,
-  matchEnd: number,
-) {
-  if (value.length === 0) {
-    return;
-  }
-
-  if (matchStart > maximumMeasuredTextareaPrefixLength) {
-    const scrollableHeight = Math.max(
-      0,
-      textarea.scrollHeight - textarea.clientHeight,
-    );
-    textarea.scrollTop = scrollableHeight * (matchStart / value.length);
-    return;
-  }
-
-  const computedStyle = window.getComputedStyle(textarea);
-  const mirror = document.createElement("div");
-  const marker = document.createElement("span");
-
-  mirror.setAttribute("aria-hidden", "true");
-  Object.assign(mirror.style, {
-    position: "fixed",
-    top: "0",
-    left: "-10000px",
-    width: `${textarea.offsetWidth}px`,
-    minHeight: "0",
-    height: "auto",
-    boxSizing: computedStyle.boxSizing,
-    padding: computedStyle.padding,
-    border: computedStyle.border,
-    font: computedStyle.font,
-    letterSpacing: computedStyle.letterSpacing,
-    lineHeight: computedStyle.lineHeight,
-    tabSize: computedStyle.tabSize,
-    textIndent: computedStyle.textIndent,
-    textTransform: computedStyle.textTransform,
-    whiteSpace: "pre-wrap",
-    overflowWrap: computedStyle.overflowWrap,
-    wordBreak: computedStyle.wordBreak,
-    visibility: "hidden",
-    pointerEvents: "none",
-  });
-  mirror.append(document.createTextNode(value.slice(0, matchStart)));
-  marker.textContent = value.slice(matchStart, matchEnd) || "\u200b";
-  mirror.append(marker);
-  document.body.append(mirror);
-
-  textarea.scrollTop = Math.max(
-    0,
-    marker.offsetTop - textarea.clientHeight / 2 + marker.offsetHeight / 2,
-  );
-  mirror.remove();
-}
 
 function PreviewFocusIcon({ isActive }: { isActive: boolean }) {
   return (
@@ -167,6 +119,15 @@ export function WorkspacePane({
   );
   const searchResult = isSourcePane ? sourceSearchResult : previewSearchResult;
   const sourceElementRef = useRef<HTMLTextAreaElement | null>(null);
+  const sourceSearchHighlightsRef =
+    useRef<SourceSearchHighlightsHandle | null>(null);
+  const sourceScrollFrameRef = useRef<number | null>(null);
+  const hasSourceSearchHighlights =
+    isSourcePane &&
+    searchSession.isOpen &&
+    searchSession.query.length > 0 &&
+    !searchResult.error &&
+    searchResult.matches.length > 0;
   const handleSourceElementChange = useCallback(
     (element: HTMLTextAreaElement | null) => {
       sourceElementRef.current = element;
@@ -188,6 +149,31 @@ export function WorkspacePane({
     },
     [onSearchInputElementChange, searchArea],
   );
+  const handleSourceScroll = useCallback(
+    (_event: UIEvent<HTMLTextAreaElement>) => {
+      if (sourceScrollFrameRef.current !== null) {
+        return;
+      }
+
+      sourceScrollFrameRef.current = window.requestAnimationFrame(() => {
+        sourceScrollFrameRef.current = null;
+        const textarea = sourceElementRef.current;
+        if (textarea) {
+          sourceSearchHighlightsRef.current?.syncScrollToTextarea(textarea);
+        }
+      });
+    },
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      if (sourceScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(sourceScrollFrameRef.current);
+      }
+    },
+    [],
+  );
   const noteSaveLabel =
     noteSaveStatus === "saving"
       ? "저장 중…"
@@ -195,7 +181,7 @@ export function WorkspacePane({
         ? "저장하지 못함"
         : "저장됨";
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const textarea = sourceElementRef.current;
 
     if (
@@ -213,9 +199,10 @@ export function WorkspacePane({
       searchResult.matches.length,
     );
     const match = searchResult.matches[activeIndex];
+    sourceSearchHighlightsRef.current?.syncToTextarea(textarea);
     const selectionFrame = window.requestAnimationFrame(() => {
       textarea.setSelectionRange(match.start, match.end, "forward");
-      scrollTextareaMatchIntoView(textarea, sourceValue, match.start, match.end);
+      sourceSearchHighlightsRef.current?.scrollCurrentMatchIntoView(textarea);
     });
 
     return () => window.cancelAnimationFrame(selectionFrame);
@@ -227,6 +214,24 @@ export function WorkspacePane({
     searchSession.isOpen,
     sourceValue,
   ]);
+
+  useLayoutEffect(() => {
+    const textarea = sourceElementRef.current;
+
+    if (!hasSourceSearchHighlights || !textarea) {
+      return;
+    }
+
+    const syncHighlights = () =>
+      sourceSearchHighlightsRef.current?.syncToTextarea(textarea);
+    syncHighlights();
+    const resizeObserver = new ResizeObserver(syncHighlights);
+    resizeObserver.observe(textarea);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [hasSourceSearchHighlights, searchArea]);
 
   function navigateSearch(direction: -1 | 1) {
     if (searchResult.matches.length === 0 || searchResult.error) {
@@ -322,38 +327,55 @@ export function WorkspacePane({
         />
       ) : null}
 
-      {isEditor ? (
-        <textarea
-          key="markdown-editor"
-          ref={handleSourceElementChange}
-          id="markdown-editor"
-          name="markdown"
-          className="markdown-editor"
-          value={markdown}
-          onChange={(event) => onMarkdownChange(event.currentTarget.value)}
-          aria-label="마크다운 입력"
-          autoComplete="off"
-          spellCheck="false"
-          onFocus={() => onSearchAreaActivate("editor")}
-          onPointerDown={() => onSearchAreaActivate("editor")}
-        />
-      ) : isNotes ? (
-        <textarea
-          key="document-note"
-          ref={handleSourceElementChange}
-          id="document-note"
-          name="document-note"
-          className="note-editor"
-          value={note}
-          placeholder="이 문서를 읽으며 떠오른 생각이나 확인할 내용을 적어보세요."
-          onChange={(event) => onNoteChange(event.currentTarget.value)}
-          aria-label="이 문서에 대한 개인 메모"
-          autoComplete="off"
-          autoFocus
-          spellCheck="true"
-          onFocus={() => onSearchAreaActivate("notes")}
-          onPointerDown={() => onSearchAreaActivate("notes")}
-        />
+      {isSourcePane ? (
+        <div
+          className={`source-editor-stack ${isEditor ? "is-markdown" : "is-notes"}`}
+        >
+          {hasSourceSearchHighlights ? (
+            <SourceSearchHighlights
+              ref={sourceSearchHighlightsRef}
+              area={isEditor ? "editor" : "notes"}
+              value={sourceValue}
+              matches={searchResult.matches}
+              currentIndex={searchSession.currentIndex}
+            />
+          ) : null}
+          {isEditor ? (
+            <textarea
+              key="markdown-editor"
+              ref={handleSourceElementChange}
+              id="markdown-editor"
+              name="markdown"
+              className="markdown-editor"
+              value={markdown}
+              onChange={(event) => onMarkdownChange(event.currentTarget.value)}
+              onScroll={handleSourceScroll}
+              aria-label="마크다운 입력"
+              autoComplete="off"
+              spellCheck="false"
+              onFocus={() => onSearchAreaActivate("editor")}
+              onPointerDown={() => onSearchAreaActivate("editor")}
+            />
+          ) : (
+            <textarea
+              key="document-note"
+              ref={handleSourceElementChange}
+              id="document-note"
+              name="document-note"
+              className="note-editor"
+              value={note}
+              placeholder="이 문서를 읽으며 떠오른 생각이나 확인할 내용을 적어보세요."
+              onChange={(event) => onNoteChange(event.currentTarget.value)}
+              onScroll={handleSourceScroll}
+              aria-label="이 문서에 대한 개인 메모"
+              autoComplete="off"
+              autoFocus
+              spellCheck="true"
+              onFocus={() => onSearchAreaActivate("notes")}
+              onPointerDown={() => onSearchAreaActivate("notes")}
+            />
+          )}
+        </div>
       ) : (
         <div
           ref={handlePreviewElementChange}

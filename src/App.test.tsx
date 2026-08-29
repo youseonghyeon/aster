@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { confirm, message, open } from "@tauri-apps/plugin-dialog";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -159,6 +159,77 @@ describe("workspace regression contracts", () => {
     expect(searchInput).toHaveFocus();
   });
 
+  it("highlights Markdown matches and advances the current result", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "마크다운 검색" }));
+    const searchInput = screen.getByRole("searchbox", {
+      name: "마크다운에서 검색",
+    });
+    await user.type(searchInput, "마크다운");
+    await flushSearchFrames();
+
+    const layer = document.querySelector(
+      "[data-source-search-highlights='editor']",
+    );
+    expect(layer).not.toBeNull();
+    const matches = Array.from(
+      layer?.querySelectorAll<HTMLElement>("[data-source-search-match]") ?? [],
+    );
+    expect(matches.length).toBeGreaterThan(1);
+    const initialCurrent = layer?.querySelector(".is-current");
+    expect(initialCurrent).toBe(matches[0]);
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", {
+      name: "마크다운 입력",
+    });
+    editor.scrollTop = 48;
+    editor.scrollLeft = 7;
+    fireEvent.scroll(editor);
+    await flushSearchFrames();
+    expect(
+      layer?.querySelector<HTMLElement>(".source-search-highlights-content"),
+    ).toHaveStyle({ transform: "translate3d(-7px, -48px, 0)" });
+
+    await user.keyboard("{Enter}");
+    await flushSearchFrames();
+
+    expect(layer?.querySelector(".is-current")).toBe(matches[1]);
+    expect(searchInput).toHaveFocus();
+  });
+
+  it("highlights note matches without moving focus from note search", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "메모" }));
+    const noteEditor = screen.getByRole("textbox", {
+      name: "이 문서에 대한 개인 메모",
+    });
+    await user.type(noteEditor, "메모 사이 메모");
+    await user.click(screen.getByRole("button", { name: "메모 검색" }));
+    const searchInput = screen.getByRole("searchbox", {
+      name: "메모에서 검색",
+    });
+    await user.type(searchInput, "메모");
+    await flushSearchFrames();
+
+    const layer = document.querySelector(
+      "[data-source-search-highlights='notes']",
+    );
+    const matches = layer?.querySelectorAll("[data-source-search-match]");
+    expect(matches).toHaveLength(2);
+    expect(layer?.querySelectorAll(".is-current")).toHaveLength(1);
+
+    const noteFocusListener = vi.fn();
+    noteEditor.addEventListener("focus", noteFocusListener);
+    await user.keyboard("{Enter}");
+    await flushSearchFrames();
+
+    expect(noteFocusListener).not.toHaveBeenCalled();
+    expect(searchInput).toHaveFocus();
+  });
+
   it("keeps the current Markdown result position when Escape closes search", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -188,6 +259,45 @@ describe("workspace regression contracts", () => {
     expect(editor.scrollTop).toBe(720);
     expect(editor.selectionStart).toBe(selection.start);
     expect(editor.selectionEnd).toBe(selection.end);
+    expect(
+      screen.getByRole("textbox", { name: "마크다운 입력" }),
+    ).toBe(editor);
+    expect(
+      document.querySelector("[data-source-search-highlights='editor']"),
+    ).toBeNull();
+  });
+
+  it("restores the pre-search note position when Escape closes search", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "메모" }));
+    await flushSearchFrames();
+    const noteEditor = screen.getByRole<HTMLTextAreaElement>("textbox", {
+      name: "이 문서에 대한 개인 메모",
+    });
+    await user.type(noteEditor, "메모 사이 메모");
+    noteEditor.setSelectionRange(1, 3, "forward");
+    noteEditor.scrollTop = 125;
+
+    await user.click(screen.getByRole("button", { name: "메모 검색" }));
+    await user.type(
+      screen.getByRole("searchbox", { name: "메모에서 검색" }),
+      "메모",
+    );
+    await flushSearchFrames();
+    noteEditor.scrollTop = 640;
+    await user.keyboard("{Escape}");
+    await flushSearchFrames();
+
+    expect(noteEditor.scrollTop).toBe(125);
+    expect(noteEditor.selectionStart).toBe(1);
+    expect(noteEditor.selectionEnd).toBe(3);
+    expect(
+      screen.getByRole("textbox", { name: "이 문서에 대한 개인 메모" }),
+    ).toBe(noteEditor);
+    expect(
+      document.querySelector("[data-source-search-highlights='notes']"),
+    ).toBeNull();
   });
 
   it("still restores the pre-search Markdown position after preview focus mode", async () => {
@@ -217,6 +327,37 @@ describe("workspace regression contracts", () => {
     expect(editor.scrollTop).toBe(135);
     expect(editor.selectionStart).toBe(2);
     expect(editor.selectionEnd).toBe(7);
+  });
+
+  it("still restores the pre-search note position after preview focus mode", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "메모" }));
+    await flushSearchFrames();
+    const noteEditor = screen.getByRole<HTMLTextAreaElement>("textbox", {
+      name: "이 문서에 대한 개인 메모",
+    });
+    await user.type(noteEditor, "메모 사이 메모");
+    noteEditor.setSelectionRange(1, 3, "forward");
+    noteEditor.scrollTop = 145;
+
+    await user.click(screen.getByRole("button", { name: "메모 검색" }));
+    await user.type(
+      screen.getByRole("searchbox", { name: "메모에서 검색" }),
+      "메모",
+    );
+    await flushSearchFrames();
+    noteEditor.scrollTop = 680;
+
+    await user.click(screen.getByRole("button", { name: "미리보기 집중 모드" }));
+    await user.click(
+      screen.getByRole("button", { name: "미리보기 집중 모드 종료" }),
+    );
+    await flushSearchFrames();
+
+    expect(noteEditor.scrollTop).toBe(145);
+    expect(noteEditor.selectionStart).toBe(1);
+    expect(noteEditor.selectionEnd).toBe(3);
   });
 
   it("keeps the current preview result position when Escape closes search", async () => {

@@ -1500,10 +1500,114 @@
   color: var(--inline-code-text);
 }
 
+.source-editor-stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  --source-editor-padding: 30px 32px 80px;
+  --source-editor-letter-spacing: normal;
+  --source-editor-text-indent: 0;
+  --source-editor-direction: ltr;
+  --source-editor-white-space: pre-wrap;
+}
+
+.source-editor-stack.is-markdown {
+  --source-editor-font-family: "SFMono-Regular", Consolas, "Liberation Mono",
+    monospace;
+  --source-editor-font-size: 14px;
+  --source-editor-line-height: 1.72;
+  --source-editor-tab-size: 2;
+  --source-editor-overflow-wrap: break-word;
+  --source-editor-word-break: normal;
+}
+
+.source-editor-stack.is-notes {
+  --source-editor-font-family: var(--reading-font);
+  --source-editor-font-size: 15px;
+  --source-editor-line-height: 1.75;
+  --source-editor-tab-size: 8;
+  --source-editor-overflow-wrap: anywhere;
+  --source-editor-word-break: keep-all;
+}
+
+.source-editor-stack > textarea,
+.source-search-highlights-content {
+  box-sizing: border-box;
+  padding: var(--source-editor-padding);
+  direction: var(--source-editor-direction);
+  font-family: var(--source-editor-font-family);
+  font-size: var(--source-editor-font-size);
+  letter-spacing: var(--source-editor-letter-spacing);
+  line-height: var(--source-editor-line-height);
+  overflow-wrap: var(--source-editor-overflow-wrap);
+  tab-size: var(--source-editor-tab-size);
+  text-indent: var(--source-editor-text-indent);
+  white-space: var(--source-editor-white-space);
+  word-break: var(--source-editor-word-break);
+}
+
+.source-editor-stack > textarea {
+  position: relative;
+  z-index: 1;
+}
+
+.source-search-highlights {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.source-search-highlights-content {
+  color: transparent;
+  transform-origin: top left;
+}
+
+.source-search-highlight {
+  color: transparent;
+  background: color-mix(in srgb, var(--accent-soft) 38%, transparent);
+  border-radius: 2px;
+}
+
+.source-search-highlight.is-current {
+  background: color-mix(in srgb, var(--accent-line) 72%, transparent);
+  box-shadow: inset 0 -2px var(--accent-hover);
+}
+
+.source-search-highlight.is-zero-width {
+  position: absolute;
+  width: 0;
+  height: 1em;
+  background: transparent;
+}
+
+.source-search-highlight.is-zero-width::after {
+  position: absolute;
+  top: 0.12em;
+  bottom: 0.12em;
+  left: 0;
+  width: 1px;
+  background: var(--accent-soft);
+  content: "";
+}
+
+.source-search-highlight.is-zero-width.is-current::after {
+  width: 2px;
+  background: var(--accent-hover);
+}
+
+.source-search-highlight-sentinel {
+  color: transparent;
+}
+
 .markdown-editor {
   width: 100%;
   height: 100%;
-  padding: 30px 32px 80px;
   overflow: auto;
   color: var(--text-editor);
   background: transparent;
@@ -1511,10 +1615,6 @@
   outline: none;
   resize: none;
   caret-color: var(--accent);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 14px;
-  line-height: 1.72;
-  tab-size: 2;
 }
 
 .markdown-editor:focus-visible {
@@ -1528,7 +1628,6 @@
 .note-editor {
   width: 100%;
   height: 100%;
-  padding: 30px 32px 80px;
   overflow: auto;
   color: var(--text-editor);
   background: transparent;
@@ -1536,11 +1635,6 @@
   outline: none;
   resize: none;
   caret-color: var(--accent);
-  font-family: var(--reading-font);
-  font-size: 15px;
-  line-height: 1.75;
-  overflow-wrap: anywhere;
-  word-break: keep-all;
 }
 
 .note-editor:focus-visible {
