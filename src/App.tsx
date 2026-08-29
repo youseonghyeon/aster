@@ -37,7 +37,7 @@ import { useWorkspaceSearch } from "./hooks/useWorkspaceSearch";
 import {
   useExternalFileStatus,
   type ExternalFileState,
-} from "./hooks/useExternalFileStatus";
+} from "./features/documents/useExternalFileStatus";
 import {
   getDocumentNoteStorageKey,
   hasUnsavedMarkdown,
@@ -45,14 +45,14 @@ import {
   loadDocumentNote,
   saveDocumentNote,
   untitledDocumentNoteStorageKey,
-} from "./lib/document-session";
+} from "./features/documents/document-session";
 import { getMarkdownOutline } from "./lib/markdown-outline";
 import {
   loadRecentDocuments,
   promoteRecentDocument,
   saveRecentDocuments,
   type RecentDocument,
-} from "./lib/recent-documents";
+} from "./features/documents/recent-documents";
 import {
   type SearchArea,
 } from "./lib/text-search";
@@ -70,7 +70,7 @@ import {
   readMarkdownFile,
   showMarkdownMessage,
   type OpenedMarkdownFile,
-} from "./services/markdown-files";
+} from "./features/documents/markdown-files";
 import "./styles/base.css";
 import "./App.css";
 

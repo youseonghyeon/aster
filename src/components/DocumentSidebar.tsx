@@ -1,5 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
-import type { RecentDocument } from "../lib/recent-documents";
+import type { RecentDocument } from "../features/documents/recent-documents";
 import "./DocumentSidebar.css";
 
 type DocumentSidebarProps = {

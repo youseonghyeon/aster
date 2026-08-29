@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getMarkdownFileStatus,
   type MarkdownFileStatus,
-} from "../services/markdown-files";
+} from "./markdown-files";
 
 export type ExternalFileState =
   | { kind: "modified"; revision: string; observationKey: string }

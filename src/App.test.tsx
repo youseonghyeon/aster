@@ -6,8 +6,8 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { untitledDocumentNoteStorageKey } from "./lib/document-session";
-import { recentDocumentsStorageKey } from "./lib/recent-documents";
+import { untitledDocumentNoteStorageKey } from "./features/documents/document-session";
+import { recentDocumentsStorageKey } from "./features/documents/recent-documents";
 import { setViewportWidth } from "./test/setup";
 
 vi.mock("@tauri-apps/api/core", () => ({
