@@ -88,11 +88,14 @@ function App() {
         closeLabel={
           state.stageSidebar === "outline" ? "목차 닫기" : "문서 탐색 닫기"
         }
+        isSidebarInset={state.isSidebarInset}
+        sidebarWidth={folderBrowser.sidebarWidth}
         onClose={
           state.stageSidebar === "outline"
             ? actions.closeOutline
             : actions.closeDocumentSidebar
         }
+        onSidebarWidthChange={folderBrowser.actions.setSidebarWidth}
       >
         <main
           ref={elements.workspace}

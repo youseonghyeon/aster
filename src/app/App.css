@@ -1009,6 +1009,10 @@
   cursor: default;
 }
 
+.stage-sidebar-resizer {
+  display: none;
+}
+
 .workspace {
   --left-pane-width: calc(50% - 4.5px);
 
@@ -1986,7 +1990,7 @@
 
 @media (min-width: 1280px) {
   .document-stage.has-sidebar {
-    grid-template-columns: 264px minmax(0, 1fr);
+    grid-template-columns: var(--stage-sidebar-width, 280px) minmax(0, 1fr);
   }
 
   .document-stage.has-sidebar .workspace {
@@ -1995,6 +1999,41 @@
 
   .sidebar-scrim {
     display: none;
+  }
+
+  .stage-sidebar-resizer {
+    position: absolute;
+    z-index: 23;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--stage-sidebar-width, 280px) - 4px);
+    display: block;
+    width: 8px;
+    padding: 0;
+    touch-action: none;
+    cursor: col-resize;
+    outline: none;
+  }
+
+  .stage-sidebar-resizer::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 2px;
+    content: "";
+    background: transparent;
+    transition: background 120ms ease;
+  }
+
+  .stage-sidebar-resizer:hover::after,
+  .stage-sidebar-resizer:focus-visible::after {
+    background: var(--accent);
+  }
+
+  body.is-resizing-stage-sidebar {
+    cursor: col-resize;
+    user-select: none;
   }
 }
 

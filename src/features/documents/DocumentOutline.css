@@ -217,7 +217,7 @@
     position: relative;
     z-index: auto;
     inset: auto;
-    width: 264px;
+    width: var(--stage-sidebar-width, 280px);
     grid-column: 1;
     grid-row: 1;
     box-shadow: none;

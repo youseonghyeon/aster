@@ -15,6 +15,7 @@ import {
   type FolderRoot,
 } from "./folder-gateway";
 import {
+  clampFolderSidebarWidth,
   loadFolderBrowserPreferences,
   saveFolderBrowserPreferences,
   type FolderBrowserPreferences,
@@ -235,8 +236,9 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
 
   const setSidebarWidth = useCallback(
     (width: number) => {
-      setSidebarWidthState(width);
-      persist({ sidebarWidth: width });
+      const nextWidth = clampFolderSidebarWidth(width);
+      setSidebarWidthState(nextWidth);
+      persist({ sidebarWidth: nextWidth });
     },
     [persist],
   );
