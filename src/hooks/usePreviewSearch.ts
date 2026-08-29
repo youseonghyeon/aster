@@ -4,6 +4,8 @@ import { useTextSearch } from "./useTextSearch";
 
 const matchHighlightName = "aster-preview-search-match";
 const currentHighlightName = "aster-preview-search-current";
+const searchExcludedSelector =
+  "style, script, defs, title, desc, [hidden], [aria-hidden='true'], [display='none'], [visibility='hidden'], [visibility='collapse'], [data-preview-search-ignore]";
 
 type TextSegment = {
   node: Text;
@@ -54,16 +56,55 @@ function canUseCustomHighlights(): boolean {
   );
 }
 
-function createPreviewTextIndex(container: HTMLDivElement): PreviewTextIndex {
+export function createPreviewTextIndex(
+  container: HTMLDivElement,
+): PreviewTextIndex {
   const root = container.querySelector<HTMLElement>(".markdown-body");
 
   if (!root) {
     return { text: "", segments: [] };
   }
 
+  const visibilityCache = new WeakMap<Element, boolean>();
+  const isHiddenFromSearch = (element: Element | null) => {
+    let current = element;
+
+    while (current && current !== container) {
+      let isHidden = visibilityCache.get(current);
+
+      if (isHidden === undefined) {
+        const style = window.getComputedStyle(current);
+        isHidden =
+          current.matches(searchExcludedSelector) ||
+          style.display === "none" ||
+          style.visibility === "hidden" ||
+          style.visibility === "collapse";
+        visibilityCache.set(current, isHidden);
+      }
+
+      if (isHidden) return true;
+      current = current.parentElement;
+    }
+
+    return false;
+  };
+
   const walker = document.createTreeWalker(
     root,
     NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        if (node instanceof Element && isHiddenFromSearch(node)) {
+          return NodeFilter.FILTER_REJECT;
+        }
+
+        if (node instanceof Text && isHiddenFromSearch(node.parentElement)) {
+          return NodeFilter.FILTER_REJECT;
+        }
+
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    },
   );
   const segments: TextSegment[] = [];
   const textParts: string[] = [];
@@ -359,9 +400,9 @@ export function usePreviewSearch(
   const [renderRevision, setRenderRevision] = useState(0);
   const [scrollRevision, setScrollRevision] = useState(0);
   const [overlays, setOverlays] = useState<PreviewSearchOverlay[]>([]);
-  const previousContentRevisionRef = useRef(contentRevision);
-  const previousNavigationKeyRef = useRef("");
-  const suppressContentNavigationRef = useRef(false);
+  const lastHandledNavigationKeyRef = useRef("");
+  const currentNavigationKeyRef = useRef("");
+  const suppressedRenderNavigationKeyRef = useRef("");
   const options = useMemo(
     () => ({
       isCaseSensitive: session.isCaseSensitive,
@@ -375,19 +416,7 @@ export function usePreviewSearch(
     options,
   );
   const navigationKey = `${session.isOpen}:${session.query}:${session.isCaseSensitive}:${session.isRegex}:${session.currentIndex}`;
-  if (previousNavigationKeyRef.current !== navigationKey) {
-    previousNavigationKeyRef.current = navigationKey;
-    suppressContentNavigationRef.current = false;
-  }
-  if (
-    session.isOpen &&
-    previousContentRevisionRef.current !== contentRevision
-  ) {
-    suppressContentNavigationRef.current = true;
-  } else if (!session.isOpen) {
-    suppressContentNavigationRef.current = false;
-  }
-  previousContentRevisionRef.current = contentRevision;
+  currentNavigationKeyRef.current = navigationKey;
 
   useEffect(() => {
     if (!container || !session.isOpen) {
@@ -401,7 +430,11 @@ export function usePreviewSearch(
     }
 
     let scheduledFrame: number | null = null;
-    const scheduleReindex = () => {
+    const scheduleReindex = (suppressNavigation: boolean) => {
+      if (suppressNavigation) {
+        suppressedRenderNavigationKeyRef.current =
+          currentNavigationKeyRef.current;
+      }
       if (scheduledFrame !== null) {
         return;
       }
@@ -411,8 +444,8 @@ export function usePreviewSearch(
         setRenderRevision((revision) => revision + 1);
       });
     };
-    const mutationObserver = new MutationObserver(scheduleReindex);
-    const resizeObserver = new ResizeObserver(scheduleReindex);
+    const mutationObserver = new MutationObserver(() => scheduleReindex(true));
+    const resizeObserver = new ResizeObserver(() => scheduleReindex(false));
     const handleScroll = () => {
       if (!canUseCustomHighlights()) {
         setScrollRevision((revision) => revision + 1);
@@ -447,15 +480,29 @@ export function usePreviewSearch(
   }, [container, contentRevision, renderRevision, session.isOpen]);
 
   useLayoutEffect(() => {
-    if (
-      !container ||
-      !session.isOpen ||
-      indexedContentRevision !== contentRevision ||
-      result.error ||
-      result.matches.length === 0
-    ) {
+    if (!container) {
       return;
     }
+
+    if (!session.isOpen) {
+      lastHandledNavigationKeyRef.current = navigationKey;
+      return;
+    }
+
+    if (indexedContentRevision !== contentRevision) return;
+
+    if (lastHandledNavigationKeyRef.current === navigationKey) {
+      return;
+    }
+
+    if (result.isPending) return;
+
+    lastHandledNavigationKeyRef.current = navigationKey;
+    if (suppressedRenderNavigationKeyRef.current === navigationKey) {
+      suppressedRenderNavigationKeyRef.current = "";
+      return;
+    }
+    if (result.error || result.matches.length === 0) return;
 
     const activeIndex = normalizeSearchIndex(
       session.currentIndex,
@@ -469,10 +516,6 @@ export function usePreviewSearch(
     );
 
     if (currentRange) {
-      if (suppressContentNavigationRef.current) {
-        suppressContentNavigationRef.current = false;
-        return;
-      }
       scrollPreviewRangeIntoView(currentRange, container);
     }
   }, [
@@ -480,10 +523,12 @@ export function usePreviewSearch(
     contentRevision,
     indexedContentRevision,
     result.error,
+    result.isPending,
     result.matches,
     session.currentIndex,
     session.isOpen,
     textIndex,
+    navigationKey,
   ]);
 
   useLayoutEffect(() => {

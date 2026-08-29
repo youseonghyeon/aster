@@ -9,6 +9,7 @@ import type {
   SourceArea,
   WorkspaceContentElements,
 } from "./workspace-types";
+import { getPreviewScrollRegions } from "../../lib/preview-scroll-regions";
 
 type UsePreviewFocusModeOptions = {
   contentElementsRef: RefObject<WorkspaceContentElements>;
@@ -43,12 +44,7 @@ export function usePreviewFocusMode({
     if (!(previewElement instanceof HTMLDivElement)) return null;
     return {
       outer: getScrollProgress(previewElement),
-      nested: Array.from(
-        previewElement.querySelectorAll<HTMLElement>(
-          ".markdown-body pre, .markdown-body .table-scroll",
-        ),
-        getScrollProgress,
-      ),
+      nested: getPreviewScrollRegions(previewElement).map(getScrollProgress),
     } satisfies PreviewScrollProgress;
   }, [contentElementsRef]);
 
@@ -57,9 +53,7 @@ export function usePreviewFocusMode({
       const previewElement = contentElementsRef.current.preview;
       if (!(previewElement instanceof HTMLDivElement) || !progress) return;
       restoreScrollProgress(previewElement, progress.outer);
-      const nestedElements = previewElement.querySelectorAll<HTMLElement>(
-        ".markdown-body pre, .markdown-body .table-scroll",
-      );
+      const nestedElements = getPreviewScrollRegions(previewElement);
       progress.nested.forEach((nestedProgress, index) => {
         const element = nestedElements[index];
         if (element) restoreScrollProgress(element, nestedProgress);

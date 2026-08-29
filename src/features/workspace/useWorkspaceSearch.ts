@@ -4,6 +4,7 @@ import {
   type SearchArea,
   type SearchSession,
 } from "../../lib/text-search";
+import { getPreviewScrollRegions } from "../../lib/preview-scroll-regions";
 
 export type SearchSessions = Record<SearchArea, SearchSession>;
 
@@ -71,15 +72,10 @@ export function captureSearchSnapshot(
     scrollLeft: contentElement?.scrollLeft ?? 0,
     nestedScrollPositions:
       area === "preview" && contentElement instanceof HTMLDivElement
-        ? Array.from(
-            contentElement.querySelectorAll<HTMLElement>(
-              ".markdown-body pre, .markdown-body .table-scroll",
-            ),
-            (element) => ({
+        ? getPreviewScrollRegions(contentElement).map((element) => ({
               scrollTop: element.scrollTop,
               scrollLeft: element.scrollLeft,
-            }),
-          )
+            }))
         : undefined,
   };
 }
@@ -179,9 +175,7 @@ export function useWorkspaceSearch(onOpen: () => void) {
 
           const nestedElements =
             contentElement instanceof HTMLDivElement
-              ? contentElement.querySelectorAll<HTMLElement>(
-                  ".markdown-body pre, .markdown-body .table-scroll",
-                )
+              ? getPreviewScrollRegions(contentElement)
               : [];
           snapshot?.nestedScrollPositions?.forEach((position, index) => {
             const element = nestedElements[index];

@@ -113,6 +113,7 @@ function App() {
             note={documents.note.value}
             noteSaveStatus={documents.note.saveStatus}
             previewMarkdown={state.previewMarkdown}
+            previewAppearanceKey={`${reading.theme}:${reading.readingFont}:${reading.readingZoom}`}
             isPreviewUpdating={state.isPreviewUpdating}
             isPreviewFocusMode={state.isPreviewFocusMode}
             isHiddenByPreviewFocus={
@@ -157,6 +158,7 @@ function App() {
             note={documents.note.value}
             noteSaveStatus={documents.note.saveStatus}
             previewMarkdown={state.previewMarkdown}
+            previewAppearanceKey={`${reading.theme}:${reading.readingFont}:${reading.readingZoom}`}
             isPreviewUpdating={state.isPreviewUpdating}
             isPreviewFocusMode={state.isPreviewFocusMode}
             isHiddenByPreviewFocus={

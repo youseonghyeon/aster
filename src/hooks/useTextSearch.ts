@@ -12,6 +12,10 @@ const emptyResult: TextSearchResult = {
 
 const searchTimeoutMilliseconds = 2_000;
 
+export type TextSearchState = TextSearchResult & {
+  isPending: boolean;
+};
+
 type SearchWorkerResponse = {
   id: number;
   result: TextSearchResult;
@@ -27,7 +31,7 @@ export function useTextSearch(
   value: string,
   query: string,
   options: TextSearchOptions,
-): TextSearchResult {
+): TextSearchState {
   const [completedSearch, setCompletedSearch] =
     useState<CompletedSearch | null>(null);
   const requestIdRef = useRef(0);
@@ -113,6 +117,6 @@ export function useTextSearch(
     completedSearch.query === query &&
     completedSearch.isCaseSensitive === options.isCaseSensitive &&
     completedSearch.isRegex === options.isRegex
-    ? completedSearch.result
-    : emptyResult;
+    ? { ...completedSearch.result, isPending: false }
+    : { ...emptyResult, isPending: query.length > 0 };
 }

@@ -5,6 +5,10 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 
 ## [Unreleased]
 
+### Added
+
+- Mermaid fenced code block을 현재 읽기 테마에 맞는 안전한 다이어그램으로 표시하는 미리보기
+
 ## [1.3.0] - 2026-08-30
 
 ### Added

@@ -31,14 +31,18 @@ describe("workspace search snapshots", () => {
   it("captures nested preview scroll positions", () => {
     const preview = document.createElement("div");
     preview.innerHTML =
-      '<div class="markdown-body"><pre></pre><div class="table-scroll"></div></div>';
-    const nested = preview.querySelectorAll<HTMLElement>("pre, .table-scroll");
+      '<div class="markdown-body"><pre></pre><div class="table-scroll"></div><div class="mermaid-diagram-scroll"><pre class="mermaid-diagram-source"></pre></div></div>';
+    const nested = preview.querySelectorAll<HTMLElement>(
+      "pre:not(.mermaid-diagram-source), .table-scroll, .mermaid-diagram-scroll",
+    );
     nested[0].scrollLeft = 9;
     nested[1].scrollTop = 13;
+    nested[2].scrollLeft = 27;
 
     expect(captureSearchSnapshot("preview", preview).nestedScrollPositions).toEqual([
       { scrollTop: 0, scrollLeft: 9 },
       { scrollTop: 13, scrollLeft: 0 },
+      { scrollTop: 0, scrollLeft: 27 },
     ]);
   });
 });

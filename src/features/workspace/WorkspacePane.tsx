@@ -31,6 +31,7 @@ type WorkspacePaneProps = {
   note: string;
   noteSaveStatus: NoteSaveStatus;
   previewMarkdown: string;
+  previewAppearanceKey: string;
   isPreviewUpdating: boolean;
   isPreviewFocusMode: boolean;
   isHiddenByPreviewFocus: boolean;
@@ -73,6 +74,7 @@ export function WorkspacePane({
   note,
   noteSaveStatus,
   previewMarkdown,
+  previewAppearanceKey,
   isPreviewUpdating,
   isPreviewFocusMode,
   isHiddenByPreviewFocus,
@@ -412,7 +414,10 @@ export function WorkspacePane({
           onFocus={() => onSearchAreaActivate("preview")}
           onPointerDown={() => onSearchAreaActivate("preview")}
         >
-          <MarkdownPreview content={previewMarkdown} />
+          <MarkdownPreview
+            content={previewMarkdown}
+            appearanceKey={previewAppearanceKey}
+          />
           {previewSearchResult.overlays.length > 0 ? (
             <div className="preview-search-overlays" aria-hidden="true">
               {previewSearchResult.overlays.map((overlay) => (

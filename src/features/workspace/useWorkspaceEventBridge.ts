@@ -3,6 +3,7 @@ import type { AppEventChannel } from "../../shared/app-events";
 import type { SearchArea } from "../../lib/text-search";
 import type { StageSidebar } from "./workspace-interactions";
 import type { WorkspaceContentElements } from "./workspace-types";
+import { getPreviewScrollRegions } from "../../lib/preview-scroll-regions";
 import {
   captureSearchSnapshot,
   restoreTextareaSnapshot,
@@ -61,9 +62,7 @@ export function useWorkspaceEventBridge({
       } else {
         element.scrollTop = snapshot.scrollTop;
         element.scrollLeft = snapshot.scrollLeft;
-        const nested = element.querySelectorAll<HTMLElement>(
-          ".markdown-body pre, .markdown-body .table-scroll",
-        );
+        const nested = getPreviewScrollRegions(element);
         snapshot.nestedScrollPositions?.forEach((position, index) => {
           if (nested[index]) {
             nested[index].scrollTop = position.scrollTop;

@@ -1,12 +1,22 @@
-import { createElement, isValidElement, memo, type HTMLAttributes, type ReactNode } from "react";
+import {
+  createContext,
+  createElement,
+  isValidElement,
+  memo,
+  useContext,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getMarkdownHeadingId } from "../lib/markdown-outline";
 import { rehypeMarkdownSourceOffsets } from "../lib/markdown-source-offsets";
+import { MermaidDiagram } from "./MermaidDiagram";
 import { SyntaxHighlightedCode } from "./SyntaxHighlightedCode";
 
 const markdownPlugins = [remarkGfm];
 const markdownRehypePlugins = [rehypeMarkdownSourceOffsets];
+const MarkdownAppearanceContext = createContext("");
 
 type MarkdownHeadingProps = HTMLAttributes<HTMLHeadingElement> & {
   node?: {
@@ -49,7 +59,8 @@ const markdownComponents = {
   h4: MarkdownHeading4,
   h5: MarkdownHeading5,
   h6: MarkdownHeading6,
-  pre: ({ node, children, ...preProps }) => {
+  pre: function MarkdownCodeBlock({ node, children, ...preProps }) {
+    const appearanceKey = useContext(MarkdownAppearanceContext);
     void node;
     const sourceOffset = (
       preProps as typeof preProps & { "data-source-offset"?: string | number }
@@ -68,9 +79,21 @@ const markdownComponents = {
       )?.[1];
 
       if (language && typeof children.props.children === "string") {
+        const code = children.props.children.replace(/\n$/, "");
+
+        if (language.toLowerCase() === "mermaid") {
+          return (
+            <MermaidDiagram
+              source={code}
+              sourceOffset={sourceOffset}
+              appearanceKey={appearanceKey}
+            />
+          );
+        }
+
         return (
           <SyntaxHighlightedCode
-            code={children.props.children.replace(/\n$/, "")}
+            code={code}
             language={language}
             codeClassName={codeClassName}
             preProps={preProps}
@@ -110,18 +133,22 @@ const markdownComponents = {
 
 export const MarkdownPreview = memo(function MarkdownPreview({
   content,
+  appearanceKey,
 }: {
   content: string;
+  appearanceKey: string;
 }) {
   return (
-    <article className="markdown-body">
-      <ReactMarkdown
-        remarkPlugins={markdownPlugins}
-        rehypePlugins={markdownRehypePlugins}
-        components={markdownComponents}
-      >
-        {content}
-      </ReactMarkdown>
-    </article>
+    <MarkdownAppearanceContext value={appearanceKey}>
+      <article className="markdown-body">
+        <ReactMarkdown
+          remarkPlugins={markdownPlugins}
+          rehypePlugins={markdownRehypePlugins}
+          components={markdownComponents}
+        >
+          {content}
+        </ReactMarkdown>
+      </article>
+    </MarkdownAppearanceContext>
   );
 });
