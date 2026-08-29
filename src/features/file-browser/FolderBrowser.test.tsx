@@ -59,6 +59,7 @@ describe("FolderBrowser", () => {
     expect(
       await screen.findByRole("treeitem", { name: "README.md, 현재 문서" }),
     ).toHaveFocus();
+    expect(screen.getByRole("tabpanel")).toHaveClass("has-visible-tree");
 
     const emptyState = {
       ...state,
@@ -70,6 +71,7 @@ describe("FolderBrowser", () => {
     rerender(<FolderBrowser {...props} state={emptyState} />);
 
     expect(screen.getByRole("button", { name: "새로고침" })).toHaveFocus();
+    expect(screen.getByRole("tabpanel")).not.toHaveClass("has-visible-tree");
     expect(screen.getByText("표시할 파일이 없습니다")).toBeInTheDocument();
   });
 
@@ -95,7 +97,11 @@ describe("FolderBrowser", () => {
     rerender(<FolderBrowser {...props} state={errorState} />);
 
     expect(readme).toHaveFocus();
-    expect(screen.getByRole("alert")).toHaveTextContent(
+    const panel = screen.getByRole("tabpanel");
+    const alert = screen.getByRole("alert");
+    expect(panel).toHaveClass("has-visible-tree");
+    expect(panel.lastElementChild).toBe(alert);
+    expect(alert).toHaveTextContent(
       "파일 목록을 새로고침하지 못했습니다: 권한이 없습니다",
     );
   });

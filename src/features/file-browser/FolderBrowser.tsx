@@ -227,7 +227,7 @@ export function FolderBrowser({
 
       <div
         id="document-browser-panel"
-        className="folder-browser-content"
+        className={`folder-browser-content${hasVisibleTree ? " has-visible-tree" : ""}`}
         role="tabpanel"
         aria-labelledby="document-files-tab"
         aria-busy={isLoadingRoot || Boolean(isRootListingBusy)}
