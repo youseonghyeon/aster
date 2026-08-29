@@ -103,6 +103,17 @@ describe("source architecture boundaries", () => {
     ).toEqual([]);
   });
 
+  it("keeps the document session hook as a bounded coordinator", () => {
+    const sessionSource =
+      sourceFiles["../features/documents/useDocumentSession.ts"];
+
+    expect(sessionSource).toBeDefined();
+    expect(sessionSource.split("\n").length).toBeLessThanOrEqual(450);
+    expect(sessionSource).not.toMatch(
+      /\b(?:chooseMarkdownSavePath|saveMarkdownFile|promoteRecentDocument|saveRecentDocuments)\b/,
+    );
+  });
+
   it("includes dynamic imports in boundary analysis", () => {
     expect(
       importSpecifiers('const module = import("../features/reading/module")'),

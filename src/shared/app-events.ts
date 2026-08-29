@@ -18,6 +18,8 @@ export type AppEventMap = {
   };
   "external-notice-will-show": undefined;
   "external-notice-dismissed": undefined;
+  "external-content-will-apply": { commitToken: number };
+  "external-content-applied": { commitToken: number };
   "recent-sidebar-opened": undefined;
 };
 

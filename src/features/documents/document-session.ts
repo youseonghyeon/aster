@@ -1,5 +1,6 @@
 export const untitledDocumentNoteStorageKey =
   "aster:document-note:untitled:v1";
+const untitledDraftIdentityStorageKey = "aster:untitled-draft-identity:v1";
 
 export type DocumentContext = {
   generation: number;
@@ -11,6 +12,21 @@ export function getDocumentNoteStorageKey(filePath: string | null): string {
   return filePath
     ? `aster:document-note:file:v1:${filePath}`
     : untitledDocumentNoteStorageKey;
+}
+
+export function getDocumentDraftIdentity(filePath: string | null): string {
+  if (filePath) {
+    return `file:${filePath}`;
+  }
+  try {
+    const stored = localStorage.getItem(untitledDraftIdentityStorageKey);
+    if (stored) return stored;
+    const identity = `untitled:${crypto.randomUUID()}`;
+    localStorage.setItem(untitledDraftIdentityStorageKey, identity);
+    return identity;
+  } catch {
+    return "untitled:default";
+  }
 }
 
 export function loadDocumentNote(storageKey: string): string {

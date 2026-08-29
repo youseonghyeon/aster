@@ -3,9 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAppEventChannel } from "../../shared/app-events";
 import {
   chooseMarkdownFilePath,
-  confirmDocumentSwitchDiscard,
+  chooseMarkdownSavePath,
+  chooseLeaveDocumentDecision,
+  chooseExternalConflictDecision,
   confirmReloadDiscard,
   readMarkdownFile,
+  saveMarkdownFile,
   showMarkdownMessage,
 } from "./markdown-files";
 import { useDocumentSession } from "./useDocumentSession";
@@ -14,20 +17,32 @@ vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async () => () => undefined),
 }));
 
+const mockedExternalStatus = vi.hoisted(() => ({
+  state: null as null | {
+    kind: "modified";
+    revision: string;
+    observationKey: string;
+  },
+}));
+
 vi.mock("./markdown-files", () => ({
   chooseMarkdownFilePath: vi.fn(),
-  confirmDocumentSwitchDiscard: vi.fn(),
+  chooseMarkdownSavePath: vi.fn(),
+  chooseLeaveDocumentDecision: vi.fn(),
+  chooseExternalConflictDecision: vi.fn(),
+  chooseRecoveryDecision: vi.fn(),
   confirmReloadDiscard: vi.fn(),
   getMarkdownFileStatus: vi.fn(),
   isDesktopRuntime: vi.fn(() => false),
   readMarkdownFile: vi.fn(),
+  saveMarkdownFile: vi.fn(),
   showMarkdownMessage: vi.fn(),
 }));
 
 vi.mock("./useExternalFileStatus", () => ({
   useExternalFileStatus: () => ({
-    externalFileState: null,
-    visibleExternalFileState: null,
+    externalFileState: mockedExternalStatus.state,
+    visibleExternalFileState: mockedExternalStatus.state,
     setExternalFileState: vi.fn(),
     setDismissedExternalObservationKey: vi.fn(),
     resetExternalFileStatus: vi.fn(),
@@ -39,6 +54,7 @@ const firstFile = {
   name: "first.md",
   content: "# 첫 문서",
   revision: "first-revision",
+  format: { hasBom: false, lineEnding: "lf" as const },
 };
 
 function deferred<T>() {
@@ -52,12 +68,16 @@ function deferred<T>() {
 describe("document session controller", () => {
   beforeEach(() => {
     vi.mocked(chooseMarkdownFilePath).mockReset();
-    vi.mocked(confirmDocumentSwitchDiscard).mockReset();
+    vi.mocked(chooseMarkdownSavePath).mockReset();
+    vi.mocked(chooseLeaveDocumentDecision).mockReset();
+    vi.mocked(chooseExternalConflictDecision).mockReset();
     vi.mocked(confirmReloadDiscard).mockReset();
+    vi.mocked(saveMarkdownFile).mockReset();
     vi.mocked(readMarkdownFile).mockReset();
     vi.mocked(showMarkdownMessage).mockReset();
     vi.mocked(showMarkdownMessage).mockResolvedValue(undefined);
     localStorage.clear();
+    mockedExternalStatus.state = null;
   });
 
   it("emits exactly one settled event for cancelled and busy picker outcomes", async () => {
@@ -209,9 +229,10 @@ describe("document session controller", () => {
         name: "second.md",
         content: "# 둘째 문서",
         revision: "second-revision",
+        format: { hasBom: false, lineEnding: "lf" },
       });
-    vi.mocked(confirmDocumentSwitchDiscard).mockReturnValue(
-      confirmation.promise,
+    vi.mocked(chooseLeaveDocumentDecision).mockImplementation(async () =>
+      (await confirmation.promise) ? "discard" : "cancel",
     );
     const { result, unmount } = renderHook(() => useDocumentSession({ events }));
     await act(async () => {
@@ -256,5 +277,255 @@ describe("document session controller", () => {
     await expect(reloading).resolves.toBe("cancelled");
 
     expect(readMarkdownFile).toHaveBeenCalledOnce();
+  });
+
+  it("saves an edited document against the revision it opened", async () => {
+    vi.mocked(readMarkdownFile).mockResolvedValue(firstFile);
+    vi.mocked(saveMarkdownFile).mockResolvedValue({
+      kind: "saved",
+      document: { ...firstFile, content: "# 저장할 내용", revision: "saved-revision" },
+    });
+    const { result } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+    await act(async () => {
+      await result.current.openDocument(firstFile.path);
+    });
+    act(() => result.current.editMarkdown("# 저장할 내용"));
+
+    await act(async () => {
+      expect(await result.current.saveDocument()).toBe(true);
+    });
+
+    expect(saveMarkdownFile).toHaveBeenCalledWith({
+      path: firstFile.path,
+      content: "# 저장할 내용",
+      expectedRevision: "first-revision",
+      format: firstFile.format,
+    });
+    expect(result.current.document.saveStatus).toBe("saved");
+  });
+
+  it("keeps edits made while a save is in flight unsaved", async () => {
+    const saving = deferred<{
+      kind: "saved";
+      document: typeof firstFile;
+    }>();
+    vi.mocked(readMarkdownFile).mockResolvedValue(firstFile);
+    vi.mocked(saveMarkdownFile).mockReturnValue(saving.promise);
+    const { result } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+    await act(async () => {
+      await result.current.openDocument(firstFile.path);
+    });
+    act(() => result.current.editMarkdown("# 저장 snapshot"));
+    let saveResult: Promise<boolean> | undefined;
+    act(() => {
+      saveResult = result.current.saveDocument();
+    });
+    act(() => result.current.editMarkdown("# 저장 중 새 편집"));
+    saving.resolve({
+      kind: "saved",
+      document: {
+        ...firstFile,
+        content: "# 저장 snapshot",
+        revision: "saved-revision",
+      },
+    });
+
+    await act(async () => {
+      expect(await saveResult).toBe(false);
+    });
+    expect(result.current.document.markdown).toBe("# 저장 중 새 편집");
+    expect(result.current.document.saveStatus).toBe("modified");
+  });
+
+  it("does not leave when a new edit arrives during the save chosen for switching", async () => {
+    const secondFile = {
+      ...firstFile,
+      path: "/docs/second.md",
+      name: "second.md",
+      content: "# 둘째 문서",
+      revision: "second-revision",
+    };
+    const saving = deferred<{
+      kind: "saved";
+      document: typeof firstFile;
+    }>();
+    vi.mocked(readMarkdownFile)
+      .mockResolvedValueOnce(firstFile)
+      .mockResolvedValueOnce(secondFile);
+    vi.mocked(chooseLeaveDocumentDecision).mockResolvedValue("save");
+    vi.mocked(saveMarkdownFile).mockReturnValue(saving.promise);
+    const { result } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+    await act(async () => {
+      await result.current.openDocument(firstFile.path);
+    });
+    act(() => result.current.editMarkdown("# 전환 전 저장 내용"));
+    let switching: Promise<string> | undefined;
+    act(() => {
+      switching = result.current.openDocument(secondFile.path);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => result.current.editMarkdown("# 저장 중 최신 변경"));
+    saving.resolve({
+      kind: "saved",
+      document: {
+        ...firstFile,
+        content: "# 전환 전 저장 내용",
+        revision: "saved-revision",
+      },
+    });
+
+    await act(async () => {
+      expect(await switching).toBe("cancelled");
+    });
+    expect(result.current.document.path).toBe(firstFile.path);
+    expect(result.current.document.markdown).toBe("# 저장 중 최신 변경");
+    expect(result.current.document.saveStatus).toBe("modified");
+  });
+
+  it("stops after a confirmed overwrite conflicts a second time", async () => {
+    vi.mocked(readMarkdownFile).mockResolvedValue(firstFile);
+    vi.mocked(chooseExternalConflictDecision).mockResolvedValue("overwrite");
+    vi.mocked(saveMarkdownFile)
+      .mockResolvedValueOnce({ kind: "conflict", revision: "second-revision" })
+      .mockResolvedValueOnce({ kind: "conflict", revision: "third-revision" });
+    const { result } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+    await act(async () => {
+      await result.current.openDocument(firstFile.path);
+    });
+    act(() => result.current.editMarkdown("# 내부 변경"));
+
+    await act(async () => {
+      expect(await result.current.saveDocument()).toBe(false);
+    });
+
+    expect(saveMarkdownFile).toHaveBeenNthCalledWith(1, {
+      path: firstFile.path,
+      content: "# 내부 변경",
+      expectedRevision: "first-revision",
+      format: firstFile.format,
+    });
+    expect(saveMarkdownFile).toHaveBeenNthCalledWith(2, {
+      path: firstFile.path,
+      content: "# 내부 변경",
+      expectedRevision: "second-revision",
+      format: firstFile.format,
+    });
+    expect(showMarkdownMessage).toHaveBeenCalledWith(
+      expect.stringContaining("다시 변경되었습니다"),
+      { title: "저장 충돌", kind: "error" },
+    );
+    expect(result.current.document.saveStatus).toBe("conflict");
+  });
+
+  it("opens the existing target when a new document save conflict chooses external", async () => {
+    const target = {
+      ...firstFile,
+      path: "/docs/existing.md",
+      name: "existing.md",
+      content: "# 기존 파일",
+      revision: "existing-revision",
+    };
+    vi.mocked(chooseMarkdownSavePath).mockResolvedValue(target.path);
+    vi.mocked(chooseExternalConflictDecision).mockResolvedValue("external");
+    vi.mocked(saveMarkdownFile).mockResolvedValue({
+      kind: "conflict",
+      revision: target.revision,
+    });
+    vi.mocked(readMarkdownFile).mockResolvedValue(target);
+    const { result } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+    act(() => result.current.editMarkdown("# 저장하려던 새 문서"));
+
+    await act(async () => {
+      expect(await result.current.saveDocument()).toBe(true);
+    });
+
+    expect(result.current.document).toMatchObject({
+      path: target.path,
+      name: target.name,
+      markdown: target.content,
+      saveStatus: "saved",
+    });
+  });
+
+  it("applies a clean external change without emitting a document reset", async () => {
+    const events = createAppEventChannel();
+    const committed = vi.fn();
+    const willApply = vi.fn();
+    const applied = vi.fn();
+    events.subscribe("document-committed", committed);
+    events.subscribe("external-content-will-apply", willApply);
+    events.subscribe("external-content-applied", applied);
+    vi.mocked(readMarkdownFile)
+      .mockResolvedValueOnce(firstFile)
+      .mockResolvedValueOnce({
+        ...firstFile,
+        content: "# 외부 변경",
+        revision: "external-revision",
+      });
+    const { result, rerender } = renderHook(() => useDocumentSession({ events }));
+    await act(async () => {
+      await result.current.openDocument(firstFile.path);
+    });
+    committed.mockClear();
+    mockedExternalStatus.state = {
+      kind: "modified",
+      revision: "external-revision",
+      observationKey: "modified:external-revision",
+    };
+
+    rerender();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.document.markdown).toBe("# 외부 변경");
+    expect(committed).not.toHaveBeenCalled();
+    expect(willApply).toHaveBeenCalledOnce();
+    expect(applied).toHaveBeenCalledOnce();
+  });
+
+  it("asks before replacing dirty Markdown with an external change", async () => {
+    vi.mocked(readMarkdownFile)
+      .mockResolvedValueOnce(firstFile)
+      .mockResolvedValueOnce({
+        ...firstFile,
+        content: "# 외부 변경",
+        revision: "external-revision",
+      });
+    vi.mocked(chooseExternalConflictDecision).mockResolvedValue("external");
+    const { result, rerender } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+    await act(async () => {
+      await result.current.openDocument(firstFile.path);
+    });
+    act(() => result.current.editMarkdown("# 내부 변경"));
+    mockedExternalStatus.state = {
+      kind: "modified",
+      revision: "external-revision",
+      observationKey: "modified:external-revision",
+    };
+
+    rerender();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(chooseExternalConflictDecision).toHaveBeenCalledWith("first.md");
+    expect(result.current.document.markdown).toBe("# 외부 변경");
   });
 });

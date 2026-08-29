@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createAppEventChannel } from "../../shared/app-events";
 import { useWorkspaceEventBridge } from "./useWorkspaceEventBridge";
 import type { StageSidebar } from "./workspace-interactions";
+import type { WorkspaceContentElements } from "./workspace-types";
 
 function createOptions() {
   return {
@@ -11,7 +12,11 @@ function createOptions() {
     recentDocumentsButtonRef: { current: null },
     externalFileNoticeReturnFocusRef: { current: null },
     contentElementsRef: {
-      current: { editor: null, notes: null, preview: null },
+      current: {
+        editor: null,
+        notes: null,
+        preview: null,
+      } as WorkspaceContentElements,
     },
     lastSearchAreaRef: { current: "editor" as const },
     resetSearchSessions: vi.fn(),
@@ -72,5 +77,34 @@ describe("useWorkspaceEventBridge", () => {
 
     expect(options.resetSearchSessions).not.toHaveBeenCalled();
     expect(options.closeStageSidebar).not.toHaveBeenCalled();
+  });
+
+  it("restores editor focus, selection, and scroll after external content commits", () => {
+    const options = createOptions();
+    const editor = document.createElement("textarea");
+    editor.value = "0123456789";
+    document.body.append(editor);
+    editor.focus();
+    editor.setSelectionRange(3, 7, "forward");
+    editor.scrollTop = 42;
+    editor.scrollLeft = 8;
+    options.contentElementsRef.current.editor = editor;
+    renderHook(() => useWorkspaceEventBridge(options));
+
+    act(() => {
+      options.events.emit("external-content-will-apply", { commitToken: 1 });
+      editor.value = "abcdefghij";
+      editor.setSelectionRange(0, 0);
+      editor.scrollTop = 0;
+      editor.scrollLeft = 0;
+      options.events.emit("external-content-applied", { commitToken: 1 });
+    });
+
+    expect(document.activeElement).toBe(editor);
+    expect(editor.selectionStart).toBe(3);
+    expect(editor.selectionEnd).toBe(7);
+    expect(editor.scrollTop).toBe(42);
+    expect(editor.scrollLeft).toBe(8);
+    editor.remove();
   });
 });

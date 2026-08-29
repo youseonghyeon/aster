@@ -27,6 +27,21 @@ impl Default for CloseGuardState {
     }
 }
 
+impl CloseGuardState {
+    fn begin_request(&self) -> Result<Option<u64>, String> {
+        let mut pending = self
+            .pending_request_id
+            .lock()
+            .map_err(|_| "종료 요청 상태를 사용할 수 없습니다.".to_owned())?;
+        if pending.is_some() {
+            return Ok(None);
+        }
+        let request_id = self.next_request_id.fetch_add(1, Ordering::Relaxed) + 1;
+        *pending = Some(request_id);
+        Ok(Some(request_id))
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ResolveCloseRequest {
@@ -49,15 +64,9 @@ pub(crate) fn handle_window_event(window: &Window, event: &WindowEvent) {
     }
 
     api.prevent_close();
-    let Ok(mut pending) = state.pending_request_id.lock() else {
-        return;
-    };
-    if pending.is_some() {
-        return;
+    if let Ok(Some(request_id)) = state.begin_request() {
+        let _ = window.emit("app-close-requested", request_id);
     }
-    let request_id = state.next_request_id.fetch_add(1, Ordering::Relaxed) + 1;
-    *pending = Some(request_id);
-    let _ = window.emit("app-close-requested", request_id);
 }
 
 pub(crate) fn resolve_close_request(
@@ -106,5 +115,14 @@ mod tests {
         assert!(!state.ready.load(Ordering::Acquire));
         assert!(!state.allow_once.load(Ordering::Acquire));
         assert_eq!(*state.pending_request_id.lock().unwrap(), None);
+    }
+
+    #[test]
+    fn coalesces_repeated_close_requests_until_the_pending_one_resolves() {
+        let state = CloseGuardState::default();
+        assert_eq!(state.begin_request().unwrap(), Some(1));
+        assert_eq!(state.begin_request().unwrap(), None);
+        *state.pending_request_id.lock().unwrap() = None;
+        assert_eq!(state.begin_request().unwrap(), Some(2));
     }
 }

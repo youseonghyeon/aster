@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import {
   getMarkdownFileStatus,
+  isDesktopRuntime,
+  unwatchMarkdownFile,
+  watchMarkdownFile,
+  type MarkdownFileChangedEvent,
   type MarkdownFileStatus,
 } from "./markdown-files";
 
@@ -82,6 +87,9 @@ export function useExternalFileStatus({
     let isChecking = false;
     let unavailableObservationCount = 0;
     let nextCheckTimer: number | undefined;
+    let nativeCheckTimer: number | undefined;
+    let watchToken: number | undefined;
+    let stopNativeListener: (() => void) | undefined;
 
     function showExternalFileState(nextState: ExternalFileState) {
       if (
@@ -105,6 +113,16 @@ export function useExternalFileStatus({
       ) {
         nextCheckTimer = window.setTimeout(checkFileStatus, 2000);
       }
+    }
+
+    function scheduleNativeCheck() {
+      if (nativeCheckTimer !== undefined) {
+        window.clearTimeout(nativeCheckTimer);
+      }
+      nativeCheckTimer = window.setTimeout(() => {
+        nativeCheckTimer = undefined;
+        void checkFileStatus();
+      }, 80);
     }
 
     async function checkFileStatus() {
@@ -173,10 +191,48 @@ export function useExternalFileStatus({
     }
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
+    if (isDesktopRuntime()) {
+      void listen<MarkdownFileChangedEvent>(
+        "markdown-file-changed",
+        ({ payload }) => {
+          if (
+            payload.token === watchToken &&
+            payload.path === watchedDocumentPath
+          ) {
+            scheduleNativeCheck();
+          }
+        },
+      )
+        .then((unlisten) => {
+          if (isDisposed) unlisten();
+          else stopNativeListener = unlisten;
+          return watchMarkdownFile(watchedDocumentPath);
+        })
+        .then((registration) => {
+          if (isDisposed) {
+            void unwatchMarkdownFile(registration.token);
+          } else {
+            watchToken = registration.token;
+          }
+        })
+        .catch((error) => {
+          if (!isDisposed) {
+            console.error("실시간 파일 감시를 시작할 수 없습니다:", error);
+          }
+        });
+    }
+
     return () => {
       isDisposed = true;
       if (nextCheckTimer !== undefined) {
         window.clearTimeout(nextCheckTimer);
+      }
+      if (nativeCheckTimer !== undefined) {
+        window.clearTimeout(nativeCheckTimer);
+      }
+      stopNativeListener?.();
+      if (watchToken !== undefined) {
+        void unwatchMarkdownFile(watchToken);
       }
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };

@@ -1,13 +1,33 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getMarkdownFileStatus } from "./markdown-files";
+import { listen } from "@tauri-apps/api/event";
+import {
+  getMarkdownFileStatus,
+  unwatchMarkdownFile,
+  watchMarkdownFile,
+} from "./markdown-files";
 import {
   getExternalFileObservation,
   useExternalFileStatus,
 } from "./useExternalFileStatus";
 
+const runtime = vi.hoisted(() => ({ desktop: false }));
+let nativeChangeListener:
+  | ((event: { payload: { token: number; path: string } }) => void)
+  | undefined;
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async (_event, listener) => {
+    nativeChangeListener = listener;
+    return () => undefined;
+  }),
+}));
+
 vi.mock("./markdown-files", () => ({
   getMarkdownFileStatus: vi.fn(),
+  isDesktopRuntime: vi.fn(() => runtime.desktop),
+  watchMarkdownFile: vi.fn(),
+  unwatchMarkdownFile: vi.fn(async () => undefined),
 }));
 
 function deferred<T>() {
@@ -19,7 +39,14 @@ function deferred<T>() {
 }
 
 describe("external file observations", () => {
-  beforeEach(() => vi.mocked(getMarkdownFileStatus).mockReset());
+  beforeEach(() => {
+    runtime.desktop = false;
+    nativeChangeListener = undefined;
+    vi.mocked(listen).mockClear();
+    vi.mocked(getMarkdownFileStatus).mockReset();
+    vi.mocked(watchMarkdownFile).mockReset();
+    vi.mocked(unwatchMarkdownFile).mockClear();
+  });
 
   it("clears a notice when the loaded revision is still current", () => {
     expect(
@@ -138,5 +165,46 @@ describe("external file observations", () => {
     });
 
     expect(result.current.visibleExternalFileState).toEqual(unavailableState);
+  });
+
+  it("accepts native events only from the active path and watch token", async () => {
+    runtime.desktop = true;
+    vi.mocked(getMarkdownFileStatus).mockResolvedValue({
+      kind: "available",
+      revision: "current-revision",
+    });
+    vi.mocked(watchMarkdownFile).mockResolvedValue({
+      token: 17,
+      path: "/docs/current.md",
+    });
+    const { unmount } = renderHook(() =>
+      useExternalFileStatus({
+        documentPath: "/docs/current.md",
+        loadedRevision: "current-revision",
+        onBeforeNotice: vi.fn(),
+      }),
+    );
+    await waitFor(() => expect(watchMarkdownFile).toHaveBeenCalledOnce());
+    await waitFor(() => expect(getMarkdownFileStatus).toHaveBeenCalledOnce());
+
+    act(() => {
+      nativeChangeListener?.({
+        payload: { token: 16, path: "/docs/current.md" },
+      });
+      nativeChangeListener?.({
+        payload: { token: 17, path: "/docs/other.md" },
+      });
+    });
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+    expect(getMarkdownFileStatus).toHaveBeenCalledOnce();
+
+    act(() => {
+      nativeChangeListener?.({
+        payload: { token: 17, path: "/docs/current.md" },
+      });
+    });
+    await waitFor(() => expect(getMarkdownFileStatus).toHaveBeenCalledTimes(2));
+    unmount();
+    expect(unwatchMarkdownFile).toHaveBeenCalledWith(17);
   });
 });
