@@ -82,6 +82,21 @@ describe("useWorkspaceEventBridge", () => {
     expect(options.closeStageSidebar).not.toHaveBeenCalled();
   });
 
+  it("closes an inset file browser when the current document is activated", () => {
+    const options = createOptions("files", true);
+    renderHook(() => useWorkspaceEventBridge(options));
+
+    act(() => {
+      options.events.emit("document-open-settled", {
+        source: "folder",
+        outcome: "current",
+      });
+    });
+
+    expect(options.stageSidebarRef.current).toBeNull();
+    expect(options.closeStageSidebar).toHaveBeenCalledOnce();
+  });
+
   it("closes a modal file browser after opening a document", () => {
     const options = createOptions("files", false);
     renderHook(() => useWorkspaceEventBridge(options));

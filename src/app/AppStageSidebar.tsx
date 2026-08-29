@@ -2,6 +2,7 @@ import { DocumentOutline } from "../features/documents/DocumentOutline";
 import { DocumentSidebar } from "../features/documents/DocumentSidebar";
 import type { useDocumentSession } from "../features/documents/useDocumentSession";
 import { FolderBrowser } from "../features/file-browser/FolderBrowser";
+import { readFolderMarkdown } from "../features/file-browser/folder-gateway";
 import type { useFolderBrowser } from "../features/file-browser/useFolderBrowser";
 import type { useWorkspaceController } from "../features/workspace/useWorkspaceController";
 
@@ -37,7 +38,12 @@ export function AppStageSidebar({
         onRefresh={() => void folderBrowser.actions.refresh()}
         onSelectEntry={folderBrowser.actions.selectEntry}
         onToggleDirectory={folderBrowser.actions.toggleDirectory}
-        onOpenMarkdown={(path) => void documents.openDocument(path, "folder")}
+        onRetryDirectory={folderBrowser.actions.retryDirectory}
+        onOpenMarkdown={(rootToken, entry) =>
+          void documents.openDocument(entry.path, "folder", () =>
+            readFolderMarkdown(rootToken, entry.relativePath),
+          )
+        }
         onOpenImage={(entry) => void folderBrowser.actions.openImage(entry)}
       />
     );

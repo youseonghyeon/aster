@@ -141,6 +141,13 @@ export function DocumentSidebar({
     }
   }
 
+  function showFilesView() {
+    onFilesView();
+    window.requestAnimationFrame(() =>
+      document.getElementById("document-files-tab")?.focus(),
+    );
+  }
+
   return (
     <aside
       ref={sidebarRef}
@@ -168,16 +175,46 @@ export function DocumentSidebar({
         </button>
       </header>
 
-      <div className="document-browser-tabs" role="tablist" aria-label="문서 탐색 보기">
-        <button type="button" role="tab" aria-selected="false" onClick={onFilesView}>
+      <div
+        className="document-browser-tabs"
+        role="tablist"
+        aria-label="문서 탐색 보기"
+      >
+        <button
+          id="document-files-tab"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="document-files-panel"
+          tabIndex={-1}
+          onClick={showFilesView}
+        >
           파일
         </button>
-        <button type="button" role="tab" aria-selected="true">
+        <button
+          id="document-recent-tab"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          aria-controls="document-recent-panel"
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft" || event.key === "Home") {
+              event.preventDefault();
+              showFilesView();
+            }
+          }}
+        >
           최근
         </button>
       </div>
 
-      <div className="recent-document-content">
+      <div
+        id="document-recent-panel"
+        className="recent-document-content"
+        role="tabpanel"
+        aria-labelledby="document-recent-tab"
+      >
         {documents.length > 0 ? (
           <nav aria-label="최근에 연 Markdown 문서">
             <ol className="recent-document-list">

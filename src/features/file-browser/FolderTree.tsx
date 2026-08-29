@@ -9,9 +9,13 @@ import type { FolderEntry } from "./folder-gateway";
 import type { FolderTreeState } from "./folder-tree-state";
 
 export type VisibleFolderEntry = FolderEntry & { level: number };
+const folderTreePageSize = 300;
+const maximumVisibleTreeEntries = 6_000;
+const maximumVisualIndentLevel = 9;
 
 export function flattenVisibleFolderEntries(
   state: FolderTreeState,
+  maximumEntries = Number.POSITIVE_INFINITY,
 ): VisibleFolderEntry[] {
   const visible: VisibleFolderEntry[] = [];
 
@@ -19,6 +23,7 @@ export function flattenVisibleFolderEntries(
     const listing = state.directories[directory];
     if (!listing || listing.status === "error") return;
     for (const entry of listing.entries) {
+      if (visible.length >= maximumEntries) return;
       visible.push({ ...entry, level });
       if (
         entry.kind === "directory" &&
@@ -81,7 +86,8 @@ type FolderTreeProps = {
   isDocumentBusy: boolean;
   onSelect: (path: string) => void;
   onToggleDirectory: (entry: FolderEntry) => void;
-  onOpenMarkdown: (path: string) => void;
+  onRetryDirectory: (directory: string) => void;
+  onOpenMarkdown: (entry: FolderEntry) => void;
   onOpenImage: (entry: FolderEntry) => void;
 };
 
@@ -91,16 +97,27 @@ export function FolderTree({
   isDocumentBusy,
   onSelect,
   onToggleDirectory,
+  onRetryDirectory,
   onOpenMarkdown,
   onOpenImage,
 }: FolderTreeProps) {
-  const visibleEntries = useMemo(
-    () => flattenVisibleFolderEntries(state),
+  const allVisibleEntries = useMemo(
+    () => flattenVisibleFolderEntries(state, maximumVisibleTreeEntries + 1),
     [state],
   );
+  const isTreeCapped = allVisibleEntries.length > maximumVisibleTreeEntries;
+  const visibleEntries = useMemo(
+    () => allVisibleEntries.slice(0, maximumVisibleTreeEntries),
+    [allVisibleEntries],
+  );
+  const [visibleLimit, setVisibleLimit] = useState(folderTreePageSize);
+  const renderedEntries = useMemo(
+    () => visibleEntries.slice(0, visibleLimit),
+    [visibleEntries, visibleLimit],
+  );
   const entryByPath = useMemo(
-    () => new Map(visibleEntries.map((entry) => [entry.relativePath, entry])),
-    [visibleEntries],
+    () => new Map(renderedEntries.map((entry) => [entry.relativePath, entry])),
+    [renderedEntries],
   );
   const [activePath, setActivePath] = useState<string | null>(null);
   const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -111,12 +128,20 @@ export function FolderTree({
     const next =
       (state.selectedPath && entryByPath.has(state.selectedPath)
         ? state.selectedPath
-        : visibleEntries.find((entry) => entry.path === currentDocumentPath)
+        : renderedEntries.find((entry) => entry.path === currentDocumentPath)
             ?.relativePath) ??
-      visibleEntries[0]?.relativePath ??
+      renderedEntries[0]?.relativePath ??
       null;
     setActivePath(next);
-  }, [activePath, currentDocumentPath, entryByPath, state.selectedPath, visibleEntries]);
+  }, [
+    activePath,
+    currentDocumentPath,
+    entryByPath,
+    renderedEntries,
+    state.selectedPath,
+  ]);
+
+  useEffect(() => setVisibleLimit(folderTreePageSize), [state.root?.token]);
 
   function focusEntry(path: string) {
     setActivePath(path);
@@ -125,9 +150,18 @@ export function FolderTree({
   }
 
   function activateEntry(entry: FolderEntry) {
-    if (entry.kind === "directory") onToggleDirectory(entry);
-    else if (!isDocumentBusy && entry.kind === "markdown") {
-      onOpenMarkdown(entry.path);
+    if (entry.kind === "directory") {
+      const directory = state.directories[entry.relativePath];
+      if (
+        state.expandedPaths.has(entry.relativePath) &&
+        directory?.status === "error"
+      ) {
+        onRetryDirectory(entry.relativePath);
+      } else {
+        onToggleDirectory(entry);
+      }
+    } else if (!isDocumentBusy && entry.kind === "markdown") {
+      onOpenMarkdown(entry);
     } else if (!isDocumentBusy) {
       onOpenImage(entry);
     }
@@ -137,21 +171,23 @@ export function FolderTree({
     event: KeyboardEvent<HTMLButtonElement>,
     entry: VisibleFolderEntry,
   ) {
-    const index = visibleEntries.findIndex(
+    const index = renderedEntries.findIndex(
       (candidate) => candidate.relativePath === entry.relativePath,
     );
     let target: VisibleFolderEntry | undefined;
-    if (event.key === "ArrowDown") target = visibleEntries[index + 1];
-    else if (event.key === "ArrowUp") target = visibleEntries[index - 1];
-    else if (event.key === "Home") target = visibleEntries[0];
-    else if (event.key === "End") target = visibleEntries[visibleEntries.length - 1];
+    if (event.key === "ArrowDown") target = renderedEntries[index + 1];
+    else if (event.key === "ArrowUp") target = renderedEntries[index - 1];
+    else if (event.key === "Home") target = renderedEntries[0];
+    else if (event.key === "End") {
+      target = renderedEntries[renderedEntries.length - 1];
+    }
     else if (event.key === "ArrowRight" && entry.kind === "directory") {
       if (!state.expandedPaths.has(entry.relativePath)) {
         event.preventDefault();
         onToggleDirectory(entry);
         return;
       }
-      const child = visibleEntries[index + 1];
+      const child = renderedEntries[index + 1];
       if (child?.level === entry.level + 1) target = child;
     } else if (event.key === "ArrowLeft") {
       if (
@@ -181,7 +217,10 @@ export function FolderTree({
       window.clearTimeout(typeaheadRef.current.timer);
       typeaheadRef.current.value += event.key.toLocaleLowerCase();
       const query = typeaheadRef.current.value;
-      target = [...visibleEntries.slice(index + 1), ...visibleEntries.slice(0, index + 1)].find(
+      target = [
+        ...renderedEntries.slice(index + 1),
+        ...renderedEntries.slice(0, index + 1),
+      ].find(
         (candidate) => candidate.name.toLocaleLowerCase().startsWith(query),
       );
       typeaheadRef.current.timer = window.setTimeout(() => {
@@ -197,26 +236,27 @@ export function FolderTree({
   if (visibleEntries.length === 0) return null;
 
   return (
-    <div className="folder-tree" role="tree" aria-label="폴더 파일">
-      {visibleEntries.map((entry) => {
-        const isDirectory = entry.kind === "directory";
-        const isExpanded =
-          isDirectory && state.expandedPaths.has(entry.relativePath);
-        const directory = isDirectory
-          ? state.directories[entry.relativePath]
-          : undefined;
-        const isSelected = state.selectedPath === entry.relativePath;
-        const isCurrent = entry.path === currentDocumentPath;
-        const statusLabel =
-          directory?.status === "loading"
-            ? ", 불러오는 중"
-            : directory?.status === "error"
-              ? ", 읽기 오류"
-              : directory?.truncated
-                ? ", 일부 항목만 표시"
-                : "";
-        return (
-          <button
+    <div className="folder-tree-frame">
+      <div className="folder-tree" role="tree" aria-label="폴더 파일">
+        {renderedEntries.map((entry) => {
+          const isDirectory = entry.kind === "directory";
+          const isExpanded =
+            isDirectory && state.expandedPaths.has(entry.relativePath);
+          const directory = isDirectory
+            ? state.directories[entry.relativePath]
+            : undefined;
+          const isSelected = state.selectedPath === entry.relativePath;
+          const isCurrent = entry.path === currentDocumentPath;
+          const statusLabel =
+            directory?.status === "loading"
+              ? ", 불러오는 중"
+              : directory?.status === "error"
+                ? `, 읽기 오류: ${directory.error}. Enter로 다시 시도`
+                : directory?.truncated
+                  ? ", 일부 항목만 표시"
+                  : "";
+          return (
+            <button
             key={entry.relativePath}
             ref={(element) => {
               if (element) buttonRefs.current.set(entry.relativePath, element);
@@ -225,14 +265,20 @@ export function FolderTree({
             type="button"
             role="treeitem"
             className={`folder-tree-item is-${entry.kind}`}
-            style={{ paddingInlineStart: `${8 + (entry.level - 1) * 16}px` }}
+            style={{
+              paddingInlineStart: `${8 + Math.min(entry.level - 1, maximumVisualIndentLevel - 1) * 16}px`,
+            }}
             tabIndex={activePath === entry.relativePath ? 0 : -1}
             aria-level={entry.level}
             aria-expanded={isDirectory ? isExpanded : undefined}
             aria-selected={isSelected}
             aria-current={isCurrent ? "page" : undefined}
             aria-label={`${entry.name}${isCurrent ? ", 현재 문서" : ""}${statusLabel}`}
-            title={entry.path}
+            title={
+              directory?.error
+                ? `${entry.path}\n${directory.error}`
+                : entry.path
+            }
             onFocus={() => setActivePath(entry.relativePath)}
             onClick={() => {
               setActivePath(entry.relativePath);
@@ -251,13 +297,35 @@ export function FolderTree({
             {directory?.status === "loading" ? (
               <span className="folder-tree-state" aria-hidden="true">…</span>
             ) : directory?.status === "error" ? (
-              <span className="folder-tree-state is-error" aria-hidden="true">!</span>
+              <span className="folder-tree-state is-error" aria-hidden="true">
+                다시 시도
+              </span>
             ) : directory?.truncated ? (
               <span className="folder-tree-state" aria-hidden="true">+</span>
             ) : null}
-          </button>
-        );
-      })}
+            </button>
+          );
+        })}
+      </div>
+      {visibleEntries.length > renderedEntries.length ? (
+        <button
+          type="button"
+          className="folder-tree-more"
+          onClick={() => setVisibleLimit((limit) => limit + folderTreePageSize)}
+        >
+          다음{
+            " "
+          }{Math.min(folderTreePageSize, visibleEntries.length - renderedEntries.length)}개 표시
+        </button>
+      ) : null}
+      {isTreeCapped ? (
+        <p className="folder-browser-limit" role="status">
+          열린 가지가 많아 처음{
+            " "
+          }{maximumVisibleTreeEntries.toLocaleString("ko-KR")}개만 표시합니다.
+          사용하지 않는 폴더를 접어 주세요.
+        </p>
+      ) : null}
     </div>
   );
 }

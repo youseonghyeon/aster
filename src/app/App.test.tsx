@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { confirm, message, open, save } from "@tauri-apps/plugin-dialog";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -108,6 +108,23 @@ describe("workspace regression contracts", () => {
     expect(screen.queryByRole("heading", { name: "최근 문서" })).not.toBeInTheDocument();
   });
 
+  it("switches document browser tabs with arrow keys", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "문서 탐색 열기" }));
+    const filesTab = screen.getByRole("tab", { name: "파일" });
+    filesTab.focus();
+
+    await user.keyboard("{ArrowRight}");
+    await nextAnimationFrame();
+    const recentTab = screen.getByRole("tab", { name: "최근" });
+    expect(recentTab).toHaveFocus();
+
+    await user.keyboard("{ArrowLeft}");
+    await nextAnimationFrame();
+    expect(screen.getByRole("tab", { name: "파일" })).toHaveFocus();
+  });
+
   it("keeps modal sidebar and settings mutually exclusive", async () => {
     setViewportWidth(1200);
     const user = userEvent.setup();
@@ -119,6 +136,19 @@ describe("workspace regression contracts", () => {
 
     expect(outlineHeading()).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "읽기 설정" })).toBeInTheDocument();
+  });
+
+  it("moves focus into the document browser when it becomes modal", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "문서 탐색 열기" }));
+    const editor = screen.getByRole("textbox", { name: "마크다운 입력" });
+    editor.focus();
+
+    act(() => setViewportWidth(1200));
+
+    expect(screen.getByRole("dialog", { name: "문서 탐색" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "폴더 선택" })).toHaveFocus();
   });
 
   it("closes search, preview focus, and inset outline in layer order", async () => {
@@ -683,7 +713,7 @@ describe("workspace regression contracts", () => {
           ],
         };
       }
-      if (command === "read_markdown_file") {
+      if (command === "read_folder_markdown") {
         return {
           path: "/docs/guide.md",
           name: "guide.md",
@@ -703,13 +733,17 @@ describe("workspace regression contracts", () => {
 
     await user.click(guide);
     expect(
-      vi.mocked(invoke).mock.calls.filter(([command]) => command === "read_markdown_file"),
+      vi.mocked(invoke).mock.calls.filter(([command]) => command === "read_folder_markdown"),
     ).toHaveLength(0);
 
     await user.dblClick(guide);
     await waitFor(() =>
       expect(screen.getByRole("heading", { name: "폴더 문서" })).toBeInTheDocument(),
     );
+    expect(invoke).toHaveBeenCalledWith("read_folder_markdown", {
+      rootToken: 4,
+      relativePath: "guide.md",
+    });
     expect(screen.getByRole("heading", { name: "docs" })).toBeInTheDocument();
   });
 

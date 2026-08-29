@@ -193,10 +193,12 @@ export function useDocumentNavigation({
     async (
       requestedPath: string,
       markUnavailableOnFailure: boolean,
+      readRequestedFile: () => Promise<OpenedMarkdownFile> = () =>
+        readMarkdownFile(requestedPath),
     ): Promise<DocumentOpenOutcome> => {
       let preflight: OpenedMarkdownFile;
       try {
-        preflight = await readMarkdownFile(requestedPath);
+        preflight = await readRequestedFile();
       } catch (error) {
         if (markUnavailableOnFailure) await markRecentPathAvailability(requestedPath);
         try {
@@ -216,7 +218,7 @@ export function useDocumentNavigation({
       let openedFile = preflight;
       if (leave.didDecide) {
         try {
-          openedFile = await readMarkdownFile(requestedPath);
+          openedFile = await readRequestedFile();
         } catch (error) {
           await showError(error, "파일을 열 수 없습니다");
           return "failed";
@@ -359,6 +361,7 @@ export function useDocumentNavigation({
     async (
       path: string,
       source: Extract<DocumentOpenSource, "folder" | "recent"> = "recent",
+      readRequestedFile?: () => Promise<OpenedMarkdownFile>,
     ) => {
       if (path === stateRef.current.document.path) {
         emitOpenSettled(source, "current");
@@ -371,7 +374,7 @@ export function useDocumentNavigation({
       }
       let outcome: DocumentOpenOutcome = "failed";
       try {
-        outcome = await switchToDocument(path, true);
+        outcome = await switchToDocument(path, true, readRequestedFile);
       } finally {
         finishOperation(operation);
         emitOpenSettled(source, outcome);

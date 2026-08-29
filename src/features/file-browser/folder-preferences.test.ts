@@ -41,4 +41,16 @@ describe("folder browser preferences", () => {
       false,
     );
   });
+
+  it("bounds restored expansion work", () => {
+    localStorage.setItem(
+      folderBrowserStorageKey,
+      JSON.stringify({
+        rootPath: "/docs",
+        expandedPaths: Array.from({ length: 40 }, (_, index) => `folder-${index}`),
+      }),
+    );
+
+    expect(loadFolderBrowserPreferences().expandedPaths).toHaveLength(24);
+  });
 });

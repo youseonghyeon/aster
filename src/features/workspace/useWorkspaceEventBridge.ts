@@ -107,6 +107,7 @@ export function useWorkspaceEventBridge({
           return;
         }
         const shouldClose =
+          outcome === "current" ||
           source === "recent" ||
           !isSidebarInsetRef.current ||
           sidebar === "recent";

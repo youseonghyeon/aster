@@ -86,6 +86,18 @@ async fn open_folder_image(
 }
 
 #[tauri::command]
+async fn read_folder_markdown(
+    state: State<'_, FolderTreeState>,
+    root_token: u64,
+    relative_path: String,
+) -> Result<MarkdownDocument, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || state.read_markdown(root_token, relative_path))
+        .await
+        .map_err(|error| format!("Markdown 읽기 작업을 완료하지 못했습니다: {error}"))?
+}
+
+#[tauri::command]
 fn watch_markdown_file(
     app: AppHandle,
     state: State<'_, FileWatchState>,
@@ -242,6 +254,7 @@ pub fn run() {
             list_folder_children,
             close_folder,
             open_folder_image,
+            read_folder_markdown,
             watch_markdown_file,
             unwatch_markdown_file,
             save_recovery_draft,

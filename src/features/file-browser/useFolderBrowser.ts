@@ -102,17 +102,25 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
       dispatch({ type: "root-loading", requestId });
       try {
         const root = await openFolderRoot(path);
-        if (requestId !== rootRequestRef.current) return;
+        if (requestId !== rootRequestRef.current) {
+          await closeFolderRoot(root.token).catch(() => undefined);
+          return;
+        }
+        const previousRootToken = stateRef.current.root?.token;
         const expandedPaths =
           restoreSavedExpansion && preferencesRef.current.rootPath === root.path
             ? preferencesRef.current.expandedPaths
             : [];
         dispatch({ type: "root-ready", requestId, root, expandedPaths });
         persist({ rootPath: root.path, expandedPaths });
-        await Promise.all([
-          loadDirectory(root, ""),
-          ...expandedPaths.map((directory) => loadDirectory(root, directory)),
-        ]);
+        if (previousRootToken !== undefined && previousRootToken !== root.token) {
+          await closeFolderRoot(previousRootToken).catch(() => undefined);
+        }
+        await loadDirectory(root, "");
+        for (const directory of expandedPaths) {
+          if (requestId !== rootRequestRef.current) break;
+          await loadDirectory(root, directory);
+        }
       } catch (error) {
         if (requestId !== rootRequestRef.current) return;
         dispatch({
@@ -148,11 +156,9 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
     const root = stateRef.current.root;
     if (!root) return;
     const directories = ["", ...stateRef.current.expandedPaths];
-    await Promise.all(
-      Array.from(new Set(directories)).map((directory) =>
-        loadDirectory(root, directory),
-      ),
-    );
+    for (const directory of new Set(directories)) {
+      await loadDirectory(root, directory);
+    }
   }, [loadDirectory]);
 
   useEffect(() => {
@@ -193,10 +199,7 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
       const expandedPaths = Array.from(stateRef.current.expandedPaths);
       persist({ expandedPaths });
       if (!wasExpanded && stateRef.current.root) {
-        const directory = stateRef.current.directories[entry.relativePath];
-        if (!directory || directory.status === "idle" || directory.status === "error") {
-          void loadDirectory(stateRef.current.root, entry.relativePath);
-        }
+        void loadDirectory(stateRef.current.root, entry.relativePath);
       }
     },
     [dispatch, loadDirectory, persist],

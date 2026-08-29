@@ -2006,9 +2006,9 @@
     z-index: 23;
     top: 0;
     bottom: 0;
-    left: calc(var(--stage-sidebar-width, 280px) - 4px);
+    left: calc(var(--stage-sidebar-width, 280px) - 12px);
     display: block;
-    width: 8px;
+    width: 24px;
     padding: 0;
     touch-action: none;
     cursor: col-resize;
@@ -2019,7 +2019,7 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 3px;
+    left: 11px;
     width: 2px;
     content: "";
     background: transparent;

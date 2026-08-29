@@ -18,7 +18,8 @@ type FolderBrowserProps = {
   onRefresh: () => void;
   onSelectEntry: (path: string) => void;
   onToggleDirectory: (entry: FolderEntry) => void;
-  onOpenMarkdown: (path: string) => void;
+  onRetryDirectory: (directory: string) => void;
+  onOpenMarkdown: (rootToken: number, entry: FolderEntry) => void;
   onOpenImage: (entry: FolderEntry) => void;
 };
 
@@ -61,11 +62,13 @@ export function FolderBrowser({
   onRefresh,
   onSelectEntry,
   onToggleDirectory,
+  onRetryDirectory,
   onOpenMarkdown,
   onOpenImage,
 }: FolderBrowserProps) {
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousIsModalRef = useRef(isModal);
 
   useEffect(() => {
     const focusTarget = sidebarRef.current?.querySelector<HTMLElement>(
@@ -73,6 +76,17 @@ export function FolderBrowser({
     );
     (focusTarget ?? closeButtonRef.current)?.focus();
   }, []);
+
+  useEffect(() => {
+    const becameModal = isModal && !previousIsModalRef.current;
+    previousIsModalRef.current = isModal;
+    if (becameModal && !sidebarRef.current?.contains(document.activeElement)) {
+      const focusTarget = sidebarRef.current?.querySelector<HTMLElement>(
+        '[role="treeitem"], [data-primary-action="true"]',
+      );
+      (focusTarget ?? closeButtonRef.current)?.focus();
+    }
+  }, [isModal]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (!isModal || event.key !== "Tab") return;
@@ -93,10 +107,24 @@ export function FolderBrowser({
     }
   }
 
+  function showRecentView() {
+    onRecentView();
+    window.requestAnimationFrame(() =>
+      document.getElementById("document-recent-tab")?.focus(),
+    );
+  }
+
   const rootListing = state.directories[""];
   const isLoadingRoot = state.rootStatus === "loading" && !state.root;
   const isEmpty =
-    state.root && rootListing?.status === "loaded" && rootListing.entries.length === 0;
+    state.root &&
+    rootListing?.status === "loaded" &&
+    rootListing.entries.length === 0;
+  const isLoadingListing =
+    state.root &&
+    (!rootListing ||
+      rootListing.status === "idle" ||
+      rootListing.status === "loading");
 
   return (
     <aside
@@ -125,12 +153,47 @@ export function FolderBrowser({
         </button>
       </header>
 
-      <div className="document-browser-tabs" role="tablist" aria-label="문서 탐색 보기">
-        <button type="button" role="tab" aria-selected="true">파일</button>
-        <button type="button" role="tab" aria-selected="false" onClick={onRecentView}>최근</button>
+      <div
+        className="document-browser-tabs"
+        role="tablist"
+        aria-label="문서 탐색 보기"
+      >
+        <button
+          id="document-files-tab"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          aria-controls="document-files-panel"
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowRight" || event.key === "End") {
+              event.preventDefault();
+              showRecentView();
+            }
+          }}
+        >
+          파일
+        </button>
+        <button
+          id="document-recent-tab"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="document-recent-panel"
+          tabIndex={-1}
+          onClick={showRecentView}
+        >
+          최근
+        </button>
       </div>
 
-      <div className="folder-browser-content">
+      <div
+        id="document-files-panel"
+        className="folder-browser-content"
+        role="tabpanel"
+        aria-labelledby="document-files-tab"
+        aria-busy={isLoadingRoot || Boolean(isLoadingListing)}
+      >
         {isLoadingRoot ? (
           <div className="folder-browser-message" role="status">
             <strong>폴더를 확인하고 있습니다</strong>
@@ -141,15 +204,28 @@ export function FolderBrowser({
             <FolderIcon />
             <strong>탐색할 폴더를 선택하세요</strong>
             <span>Markdown 문서와 관련 이미지만 조용하게 모아 보여줍니다.</span>
-            <button type="button" data-primary-action="true" onClick={onChooseRoot}>
+            <button
+              type="button"
+              data-primary-action="true"
+              onClick={onChooseRoot}
+            >
               폴더 선택
             </button>
+          </div>
+        ) : isLoadingListing ? (
+          <div className="folder-browser-message" role="status">
+            <strong>파일 목록을 불러오고 있습니다</strong>
+            <span>이 폴더의 Markdown과 이미지를 확인하는 중입니다.</span>
           </div>
         ) : rootListing?.status === "error" ? (
           <div className="folder-browser-message" role="alert">
             <strong>폴더를 읽지 못했습니다</strong>
             <span>{rootListing.error}</span>
-            <button type="button" data-primary-action="true" onClick={onRefresh}>
+            <button
+              type="button"
+              data-primary-action="true"
+              onClick={onRefresh}
+            >
               다시 시도
             </button>
           </div>
@@ -166,7 +242,10 @@ export function FolderBrowser({
             isDocumentBusy={isDocumentBusy}
             onSelect={onSelectEntry}
             onToggleDirectory={onToggleDirectory}
-            onOpenMarkdown={onOpenMarkdown}
+            onRetryDirectory={onRetryDirectory}
+            onOpenMarkdown={(entry) =>
+              state.root && onOpenMarkdown(state.root.token, entry)
+            }
             onOpenImage={onOpenImage}
           />
         )}
@@ -191,7 +270,14 @@ export function FolderBrowser({
         {state.root ? (
           <div className="folder-browser-root" title={state.root.path}>
             <span>{state.root.path}</span>
-            <button type="button" aria-label="폴더 연결 해제" title="폴더 연결 해제" onClick={onClearRoot}>×</button>
+            <button
+              type="button"
+              aria-label="폴더 연결 해제"
+              title="폴더 연결 해제"
+              onClick={onClearRoot}
+            >
+              ×
+            </button>
           </div>
         ) : null}
         {state.root ? (

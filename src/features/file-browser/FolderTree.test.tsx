@@ -64,6 +64,7 @@ function renderTree(state = treeState()) {
     isDocumentBusy: false,
     onSelect: vi.fn(),
     onToggleDirectory: vi.fn(),
+    onRetryDirectory: vi.fn(),
     onOpenMarkdown: vi.fn(),
     onOpenImage: vi.fn(),
   };
@@ -98,7 +99,9 @@ describe("FolderTree", () => {
     expect(props.onOpenMarkdown).not.toHaveBeenCalled();
 
     await user.dblClick(readme);
-    expect(props.onOpenMarkdown).toHaveBeenCalledWith("/docs/README.md");
+    expect(props.onOpenMarkdown).toHaveBeenCalledWith(
+      expect.objectContaining({ relativePath: "README.md" }),
+    );
   });
 
   it("supports arrow navigation, expansion, and explicit Enter activation", async () => {
@@ -110,7 +113,9 @@ describe("FolderTree", () => {
     await user.keyboard("{ArrowDown}");
     expect(screen.getByRole("treeitem", { name: "start.md" })).toHaveFocus();
     await user.keyboard("{Enter}");
-    expect(props.onOpenMarkdown).toHaveBeenCalledWith("/docs/guide/start.md");
+    expect(props.onOpenMarkdown).toHaveBeenCalledWith(
+      expect.objectContaining({ relativePath: "guide/start.md" }),
+    );
 
     guide.focus();
     await user.keyboard("{ArrowLeft}");
@@ -129,5 +134,42 @@ describe("FolderTree", () => {
       expect.objectContaining({ relativePath: "cover.png" }),
     );
     expect(props.onOpenMarkdown).not.toHaveBeenCalled();
+  });
+
+  it("retries an expanded directory after a child listing error", async () => {
+    const state = treeState();
+    state.directories.guide = {
+      ...state.directories.guide,
+      status: "error",
+      error: "권한이 없습니다",
+    };
+    const user = userEvent.setup();
+    const props = renderTree(state);
+    const guide = screen.getByRole("treeitem", {
+      name: /guide, 읽기 오류: 권한이 없습니다/,
+    });
+
+    guide.focus();
+    await user.keyboard("{Enter}");
+
+    expect(props.onRetryDirectory).toHaveBeenCalledWith("guide");
+    expect(props.onToggleDirectory).not.toHaveBeenCalled();
+  });
+
+  it("renders large directories in bounded pages", async () => {
+    const state = treeState();
+    state.expandedPaths = new Set();
+    state.directories[""].entries = Array.from({ length: 301 }, (_, index) => ({
+      name: `문서-${index}.md`,
+      relativePath: `문서-${index}.md`,
+      path: `/docs/문서-${index}.md`,
+      kind: "markdown" as const,
+    }));
+    const user = userEvent.setup();
+    renderTree(state);
+
+    expect(screen.getAllByRole("treeitem")).toHaveLength(300);
+    await user.click(screen.getByRole("button", { name: "다음 1개 표시" }));
+    expect(screen.getAllByRole("treeitem")).toHaveLength(301);
   });
 });

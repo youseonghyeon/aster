@@ -26,6 +26,7 @@
 
 .document-sidebar-header > div {
   display: grid;
+  min-width: 0;
   gap: 3px;
 }
 
@@ -37,11 +38,14 @@
 }
 
 .document-sidebar-header h2 {
+  overflow: hidden;
   margin: 0;
   color: var(--text-heading);
   font-size: 14px;
   font-weight: 720;
   letter-spacing: -0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .document-sidebar-close {
@@ -55,6 +59,7 @@
   border: 1px solid transparent;
   border-radius: 7px;
   cursor: pointer;
+  flex: 0 0 auto;
 }
 
 .document-sidebar-close:hover,

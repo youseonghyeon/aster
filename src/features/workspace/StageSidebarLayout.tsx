@@ -47,6 +47,12 @@ export function StageSidebarLayout({
     [],
   );
 
+  useEffect(() => {
+    if (sidebar && isSidebarInset) return;
+    isDraggingRef.current = false;
+    document.body.classList.remove("is-resizing-stage-sidebar");
+  }, [isSidebarInset, sidebar]);
+
   function applyTransientWidth(width: number) {
     const nextWidth = clampSidebarWidth(width);
     dragWidthRef.current = nextWidth;
@@ -121,6 +127,7 @@ export function StageSidebarLayout({
           onPointerMove={handleResizePointerMove}
           onPointerUp={finishResize}
           onPointerCancel={finishResize}
+          onLostPointerCapture={finishResize}
         />
       ) : null}
       {sidebar ? (

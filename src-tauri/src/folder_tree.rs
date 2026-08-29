@@ -1,5 +1,7 @@
+use crate::document_io::{self, MarkdownDocument};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     fs,
     path::{Component, Path, PathBuf},
     sync::{
@@ -19,7 +21,7 @@ pub(crate) struct FolderTreeState {
 #[derive(Default)]
 struct FolderTreeInner {
     next_token: AtomicU64,
-    session: Mutex<Option<FolderSession>>,
+    sessions: Mutex<HashMap<u64, PathBuf>>,
 }
 
 #[derive(Clone)]
@@ -90,15 +92,11 @@ impl FolderTreeState {
             .next_token
             .fetch_add(1, Ordering::Relaxed)
             .saturating_add(1);
-        *self
-            .inner
-            .session
+        self.inner
+            .sessions
             .lock()
-            .map_err(|_| "폴더 탐색 상태를 사용할 수 없습니다.".to_owned())? =
-            Some(FolderSession {
-                token,
-                root: root.clone(),
-            });
+            .map_err(|_| "폴더 탐색 상태를 사용할 수 없습니다.".to_owned())?
+            .insert(token, root.clone());
         Ok(FolderRoot {
             token,
             path: root.to_string_lossy().into_owned(),
@@ -107,17 +105,15 @@ impl FolderTreeState {
     }
 
     pub(crate) fn close_folder(&self, root_token: Option<u64>) -> Result<(), String> {
-        let mut session = self
+        let mut sessions = self
             .inner
-            .session
+            .sessions
             .lock()
             .map_err(|_| "폴더 탐색 상태를 사용할 수 없습니다.".to_owned())?;
-        if root_token.is_none()
-            || session
-                .as_ref()
-                .is_some_and(|open| Some(open.token) == root_token)
-        {
-            *session = None;
+        if let Some(token) = root_token {
+            sessions.remove(&token);
+        } else {
+            sessions.clear();
         }
         Ok(())
     }
@@ -212,16 +208,41 @@ impl FolderTreeState {
         Ok(canonical)
     }
 
+    pub(crate) fn read_markdown(
+        &self,
+        root_token: u64,
+        relative_path: String,
+    ) -> Result<MarkdownDocument, String> {
+        let session = self.current_session(root_token)?;
+        let relative = validate_relative_file(&relative_path)?;
+        let path = session.root.join(relative);
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|error| format!("Markdown 파일 정보를 읽을 수 없습니다: {error}"))?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err("선택한 Markdown 파일을 열 수 없습니다.".into());
+        }
+        let canonical = path
+            .canonicalize()
+            .map_err(|error| format!("Markdown 경로를 확인할 수 없습니다: {error}"))?;
+        if !canonical.starts_with(&session.root)
+            || supported_file_kind(&canonical) != Some(FolderEntryKind::Markdown)
+        {
+            return Err("선택한 Markdown 파일이 현재 폴더 안에 있지 않습니다.".into());
+        }
+        document_io::read_markdown_file_from_disk(canonical.to_string_lossy().into_owned())
+    }
+
     fn current_session(&self, token: u64) -> Result<FolderSession, String> {
-        let session = self
+        let sessions = self
             .inner
-            .session
+            .sessions
             .lock()
             .map_err(|_| "폴더 탐색 상태를 사용할 수 없습니다.".to_owned())?;
-        match session.as_ref() {
-            Some(session) if session.token == token => Ok(session.clone()),
-            _ => Err("폴더 탐색 세션이 변경되었습니다. 다시 시도해 주세요.".into()),
-        }
+        sessions
+            .get(&token)
+            .cloned()
+            .map(|root| FolderSession { token, root })
+            .ok_or_else(|| "폴더 탐색 세션이 변경되었습니다. 다시 시도해 주세요.".into())
     }
 }
 
@@ -369,7 +390,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_escape_absolute_and_stale_session_paths() {
+    fn rejects_escape_absolute_and_closed_session_paths() {
         let first = TempDir::new().unwrap();
         let second = TempDir::new().unwrap();
         let (state, first_root) = open_test_root(&first);
@@ -387,7 +408,7 @@ mod tests {
             })
             .is_err());
 
-        state
+        let second_root = state
             .open_folder(second.path().to_string_lossy().into_owned())
             .unwrap();
         assert!(state
@@ -395,7 +416,20 @@ mod tests {
                 root_token: first_root.token,
                 relative_path: String::new(),
             })
+            .is_ok());
+        state.close_folder(Some(first_root.token)).unwrap();
+        assert!(state
+            .list_children(ListFolderChildrenRequest {
+                root_token: first_root.token,
+                relative_path: String::new(),
+            })
             .is_err());
+        assert!(state
+            .list_children(ListFolderChildrenRequest {
+                root_token: second_root.token,
+                relative_path: String::new(),
+            })
+            .is_ok());
     }
 
     #[cfg(unix)]
@@ -421,6 +455,24 @@ mod tests {
                 root_token: root.token,
                 relative_path: "linked".into(),
             })
+            .is_err());
+
+        let markdown = directory.path().join("replaced.md");
+        fs::write(&markdown, "# Before").unwrap();
+        let listing = state
+            .list_children(ListFolderChildrenRequest {
+                root_token: root.token,
+                relative_path: String::new(),
+            })
+            .unwrap();
+        assert!(listing
+            .entries
+            .iter()
+            .any(|entry| entry.relative_path == "replaced.md"));
+        fs::remove_file(&markdown).unwrap();
+        symlink(outside.path().join("outside.md"), &markdown).unwrap();
+        assert!(state
+            .read_markdown(root.token, "replaced.md".into())
             .is_err());
     }
 }

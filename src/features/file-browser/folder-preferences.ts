@@ -11,7 +11,7 @@ export const folderBrowserStorageKey = "aster.folder-browser:v1";
 export const defaultFolderSidebarWidth = 280;
 export const minFolderSidebarWidth = 220;
 export const maxFolderSidebarWidth = 420;
-const maxExpandedPaths = 100;
+const maxExpandedPaths = 24;
 
 export const defaultFolderBrowserPreferences: FolderBrowserPreferences = {
   rootPath: null,

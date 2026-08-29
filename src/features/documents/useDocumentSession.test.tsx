@@ -145,6 +145,38 @@ describe("document session controller", () => {
     ]);
   });
 
+  it("uses the folder-scoped reader again after leave confirmation", async () => {
+    const events = createAppEventChannel();
+    const secondFile = {
+      ...firstFile,
+      path: "/docs/second.md",
+      name: "second.md",
+      content: "# 두 번째 문서",
+      revision: "second-revision",
+    };
+    vi.mocked(readMarkdownFile).mockResolvedValue(firstFile);
+    vi.mocked(chooseLeaveDocumentDecision).mockResolvedValue("discard");
+    const scopedReader = vi.fn().mockResolvedValue(secondFile);
+    const { result } = renderHook(() => useDocumentSession({ events }));
+    await act(async () => {
+      await result.current.openDocument(firstFile.path);
+    });
+    act(() => result.current.editMarkdown("# 수정 중"));
+
+    await act(async () => {
+      expect(
+        await result.current.openDocument(
+          secondFile.path,
+          "folder",
+          scopedReader,
+        ),
+      ).toBe("opened");
+    });
+
+    expect(scopedReader).toHaveBeenCalledTimes(2);
+    expect(result.current.document.path).toBe(secondFile.path);
+  });
+
   it("accepts an edit made during reload confirmation into the approved version", async () => {
     const events = createAppEventChannel();
     const confirmation = deferred<boolean>();

@@ -23,6 +23,14 @@ export type FolderListing = {
   truncated: boolean;
 };
 
+export type FolderMarkdownDocument = {
+  path: string;
+  name: string;
+  content: string;
+  revision: string;
+  format: { hasBom: boolean; lineEnding: "lf" | "crlf" };
+};
+
 export async function chooseFolderPath(): Promise<string | null> {
   const selected = await open({
     title: "Markdown 폴더 선택",
@@ -54,4 +62,14 @@ export function openFolderImage(
   relativePath: string,
 ): Promise<void> {
   return invoke<void>("open_folder_image", { rootToken, relativePath });
+}
+
+export function readFolderMarkdown(
+  rootToken: number,
+  relativePath: string,
+): Promise<FolderMarkdownDocument> {
+  return invoke<FolderMarkdownDocument>("read_folder_markdown", {
+    rootToken,
+    relativePath,
+  });
 }
