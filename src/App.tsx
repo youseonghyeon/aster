@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type RefObject,
 } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { AppHeader } from "./components/AppHeader";
@@ -26,7 +25,6 @@ import {
 } from "./components/ReadingSettings";
 import {
   WorkspacePane,
-  type NoteSaveStatus,
   type PaneContent,
   type PaneKind,
 } from "./components/WorkspacePane";
@@ -34,25 +32,10 @@ import { useActiveHeading } from "./hooks/useActiveHeading";
 import { usePaneSplit } from "./hooks/usePaneSplit";
 import { useScrollSync } from "./hooks/useScrollSync";
 import { useWorkspaceSearch } from "./hooks/useWorkspaceSearch";
-import {
-  useExternalFileStatus,
-  type ExternalFileState,
-} from "./features/documents/useExternalFileStatus";
-import {
-  getDocumentNoteStorageKey,
-  hasUnsavedMarkdown,
-  isDocumentContextCurrent,
-  loadDocumentNote,
-  saveDocumentNote,
-  untitledDocumentNoteStorageKey,
-} from "./features/documents/document-session";
+import type { RecentDocument } from "./features/documents/recent-documents";
+import { ExternalFileNotice } from "./features/documents/ExternalFileNotice";
+import { useDocumentSession } from "./features/documents/useDocumentSession";
 import { getMarkdownOutline } from "./lib/markdown-outline";
-import {
-  loadRecentDocuments,
-  promoteRecentDocument,
-  saveRecentDocuments,
-  type RecentDocument,
-} from "./features/documents/recent-documents";
 import {
   type SearchArea,
 } from "./lib/text-search";
@@ -62,47 +45,11 @@ import {
   workspaceInteractionReducer,
 } from "./lib/workspace-interactions";
 import {
-  chooseMarkdownFilePath,
-  confirmDocumentSwitchDiscard,
-  confirmReloadDiscard,
-  getMarkdownFileStatus,
-  isDesktopRuntime,
-  readMarkdownFile,
-  showMarkdownMessage,
-  type OpenedMarkdownFile,
-} from "./features/documents/markdown-files";
+  createAppEventChannel,
+  type AppEventChannel,
+} from "./shared/app-events";
 import "./styles/base.css";
 import "./App.css";
-
-const initialMarkdown = `# 읽기 좋은 마크다운 뷰어
-
-왼쪽에서 마크다운을 작성하면 오른쪽에서 **바로 확인**할 수 있습니다.
-
-## 가독성을 위한 시작점
-
-- 편안한 본문 너비와 넉넉한 줄 간격
-- 제목과 본문이 명확하게 구분되는 크기
-- 표, 체크리스트, 코드 블록을 지원하는 GitHub Flavored Markdown
-
-> 좋은 문서는 내용뿐 아니라 읽는 경험도 중요합니다.
-
-### 작업 목록
-
-- [x] 좌우 분할 화면 만들기
-- [x] 실시간 미리보기 연결하기
-- [ ] 로컬 마크다운 파일 열기
-- [x] 글꼴과 테마 설정 추가하기
-
-| 요소 | 상태 |
-| --- | --- |
-| 실시간 미리보기 | 준비됨 |
-| 표와 체크리스트 | 준비됨 |
-
-~~~ts
-const message: string = "Aster에서 편안하게 읽기";
-console.log(message);
-~~~
-`;
 
 const themeStorageKey = "aster:theme:v1";
 const fontStorageKey = "aster:reading-font:v1";
@@ -121,8 +68,6 @@ function isEventInsideStageSidebar(target: EventTarget | null) {
     Boolean(target.closest("#document-outline, #document-sidebar"))
   );
 }
-type DocumentOperation = "open" | "reload";
-
 type ScrollProgress = {
   top: number;
   left: number;
@@ -196,97 +141,32 @@ function getSteppedReadingZoom(
   return readingZoomLevels[nextIndex].value;
 }
 
-function FileChangeIcon({ kind }: { kind: ExternalFileState["kind"] }) {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      {kind === "modified" ? (
-        <>
-          <path d="M10 3.25a6.75 6.75 0 1 0 6.2 4.08" />
-          <path d="M13.25 3.25H16.5V6.5M16.5 3.25l-3.7 3.7" />
-        </>
-      ) : (
-        <>
-          <path d="M10 3.25 17 16H3L10 3.25Z" />
-          <path d="M10 7.4v4.2M10 14.1v.1" />
-        </>
-      )}
-    </svg>
-  );
-}
-
-type ExternalFileNoticeProps = {
-  state: ExternalFileState;
-  isReloading: boolean;
-  noticeRef: RefObject<HTMLElement | null>;
-  onReload: () => void;
-  onDismiss: () => void;
-};
-
-function ExternalFileNotice({
-  state,
-  isReloading,
-  noticeRef,
-  onReload,
-  onDismiss,
-}: ExternalFileNoticeProps) {
-  const messageText =
-    state.kind === "modified"
-      ? "원본 파일이 다른 앱에서 변경되었습니다."
-      : "원본 파일을 확인할 수 없습니다. 현재 내용은 그대로 유지됩니다.";
-
-  return (
-    <aside
-      ref={noticeRef}
-      className={`external-file-notice is-${state.kind}`}
-      aria-label="원본 파일 상태"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          event.stopPropagation();
-          onDismiss();
-        }
-      }}
-    >
-      <span className="external-file-notice-icon">
-        <FileChangeIcon kind={state.kind} />
-      </span>
-      <span className="external-file-notice-message" role="status" aria-live="polite">
-        <strong>{state.kind === "modified" ? "새 변경 사항" : "파일 연결 끊김"}</strong>
-        <span>{messageText}</span>
-      </span>
-      <button
-        type="button"
-        className="external-file-reload"
-        disabled={isReloading}
-        onClick={onReload}
-      >
-        {isReloading
-          ? "확인 중…"
-          : state.kind === "modified"
-            ? "다시 불러오기"
-            : "다시 확인"}
-      </button>
-      <button
-        type="button"
-        className="external-file-dismiss"
-        aria-label="원본 파일 상태 알림 닫기"
-        title="닫기"
-        onClick={onDismiss}
-      >
-        <span aria-hidden="true">×</span>
-      </button>
-    </aside>
-  );
-}
-
 function App() {
-  const [markdown, setMarkdown] = useState(initialMarkdown);
-  const [loadedMarkdown, setLoadedMarkdown] = useState<string | null>(null);
-  const [loadedRevision, setLoadedRevision] = useState<string | null>(null);
-  const [documentName, setDocumentName] = useState("새 문서.md");
-  const [documentPath, setDocumentPath] = useState<string | null>(null);
-  const [isOpeningFile, setIsOpeningFile] = useState(false);
-  const [isReloadingFile, setIsReloadingFile] = useState(false);
+  const appEventsRef = useRef<AppEventChannel | null>(null);
+  if (appEventsRef.current === null) {
+    appEventsRef.current = createAppEventChannel();
+  }
+  const appEvents = appEventsRef.current;
+  const documentSession = useDocumentSession({ events: appEvents });
+  const {
+    document: { markdown, name: documentName, path: documentPath },
+    note: { value: note, saveStatus: noteSaveStatus },
+    recent: {
+      documents: recentDocuments,
+      unavailablePaths: unavailableRecentDocumentPaths,
+      persistenceLimited: isRecentDocumentPersistenceLimited,
+    },
+    externalFileState,
+    visibleExternalFileState,
+    isReloading: isReloadingFile,
+    isBusy: isDocumentBusy,
+    editMarkdown: handleMarkdownChange,
+    editNote: handleNoteChange,
+    openFromPicker,
+    openDocument,
+    reloadDocument: handleReloadExternalFile,
+    dismissExternalFileNotice,
+  } = documentSession;
   const [workspaceInteraction, dispatchWorkspaceInteraction] = useReducer(
     workspaceInteractionReducer,
     undefined,
@@ -303,20 +183,7 @@ function App() {
     isSettingsOpen,
     isPanelLayoutMenuOpen,
   } = workspaceInteraction;
-  const [recentDocuments, setRecentDocuments] = useState<RecentDocument[]>(
-    loadRecentDocuments,
-  );
-  const [unavailableRecentDocumentPaths, setUnavailableRecentDocumentPaths] =
-    useState<Set<string>>(() => new Set());
-  const [
-    isRecentDocumentPersistenceLimited,
-    setIsRecentDocumentPersistenceLimited,
-  ] = useState(false);
   const [leftPane, setLeftPane] = useState<PaneKind>("editor");
-  const [note, setNote] = useState(() =>
-    loadDocumentNote(untitledDocumentNoteStorageKey),
-  );
-  const [noteSaveStatus, setNoteSaveStatus] = useState<NoteSaveStatus>("saved");
   const [isWorkspaceStacked, setIsWorkspaceStacked] = useState(() =>
     window.matchMedia("(max-width: 720px)").matches,
   );
@@ -345,16 +212,6 @@ function App() {
   const externalFileNoticeReturnFocusRef = useRef<HTMLElement | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
-  const openFileRef = useRef<() => void>(() => undefined);
-  const documentOperationRef = useRef<DocumentOperation | null>(null);
-  const markdownRef = useRef(markdown);
-  const loadedMarkdownRef = useRef(loadedMarkdown);
-  const noteRef = useRef(note);
-  const documentPathRef = useRef(documentPath);
-  const documentGenerationRef = useRef(0);
-  const markdownEditVersionRef = useRef(0);
-  const recentDocumentsRef = useRef(recentDocuments);
-  const recentStatusBatchRef = useRef(0);
   const sourceScrollPositionsRef = useRef({ editor: 0, notes: 0 });
   const pendingSourceFocusRef = useRef<"editor" | "notes" | null>(null);
   const stageSidebarRef = useRef(stageSidebar);
@@ -378,21 +235,6 @@ function App() {
     dividerRef,
     splitGuideRef,
     isPreviewFocusMode,
-  });
-  const {
-    externalFileState,
-    visibleExternalFileState,
-    setExternalFileState,
-    setDismissedExternalObservationKey,
-    resetExternalFileStatus,
-  } = useExternalFileStatus({
-    documentPath,
-    loadedRevision,
-    onBeforeNotice: () => {
-      if (document.activeElement instanceof HTMLElement) {
-        externalFileNoticeReturnFocusRef.current = document.activeElement;
-      }
-    },
   });
   const [previewScrollElement, setPreviewScrollElement] =
     useState<HTMLDivElement | null>(null);
@@ -434,7 +276,6 @@ function App() {
     leftPane === "editor" ? primaryPane : "preview";
   const rightPaneContent: PaneContent =
     leftPane === "editor" ? "preview" : primaryPane;
-  const documentNoteStorageKey = getDocumentNoteStorageKey(documentPath);
   const readingZoomStyle = {
     "--reading-font-size": `${(17 * Number(readingZoom)) / 100}px`,
   } as CSSProperties;
@@ -444,11 +285,6 @@ function App() {
   isPanelLayoutMenuOpenRef.current = isPanelLayoutMenuOpen;
   isNotesOpenRef.current = isNotesOpen;
   isPreviewFocusModeRef.current = isPreviewFocusMode;
-  markdownRef.current = markdown;
-  loadedMarkdownRef.current = loadedMarkdown;
-  noteRef.current = note;
-  documentPathRef.current = documentPath;
-  recentDocumentsRef.current = recentDocuments;
   const isScrollSyncEnabled = scrollSyncPreference === "on";
   const isScrollSyncAvailable = !isNotesOpen && !isPreviewFocusMode;
   const { suppressScrollSyncRestore } = useScrollSync({
@@ -521,31 +357,71 @@ function App() {
     },
     [suppressScrollSyncRestore],
   );
+
+  useEffect(() => {
+    const unsubscribeDocumentCommitted = appEvents.subscribe(
+      "document-committed",
+      () => {
+        const shouldRestoreRecentFocus = stageSidebarRef.current === "recent";
+        resetSearchSessions();
+        stageSidebarRef.current = null;
+        dispatchWorkspaceInteraction({ type: "close-stage-sidebar" });
+        if (shouldRestoreRecentFocus) {
+          window.requestAnimationFrame(() =>
+            recentDocumentsButtonRef.current?.focus(),
+          );
+        }
+      },
+    );
+    const unsubscribeOpenSettled = appEvents.subscribe(
+      "document-open-settled",
+      ({ source, outcome }) => {
+        if (source !== "recent" || outcome !== "current") {
+          return;
+        }
+        stageSidebarRef.current = null;
+        dispatchWorkspaceInteraction({ type: "close-stage-sidebar" });
+        window.requestAnimationFrame(() =>
+          recentDocumentsButtonRef.current?.focus(),
+        );
+      },
+    );
+    const unsubscribeExternalWillShow = appEvents.subscribe(
+      "external-notice-will-show",
+      () => {
+        if (document.activeElement instanceof HTMLElement) {
+          externalFileNoticeReturnFocusRef.current = document.activeElement;
+        }
+      },
+    );
+    const unsubscribeExternalDismissed = appEvents.subscribe(
+      "external-notice-dismissed",
+      () => {
+        const returnFocusElement = externalFileNoticeReturnFocusRef.current;
+        window.requestAnimationFrame(() => {
+          if (returnFocusElement?.isConnected) {
+            returnFocusElement.focus({ preventScroll: true });
+          } else {
+            contentElementsRef.current[lastSearchAreaRef.current]?.focus({
+              preventScroll: true,
+            });
+          }
+        });
+      },
+    );
+
+    return () => {
+      unsubscribeDocumentCommitted();
+      unsubscribeOpenSettled();
+      unsubscribeExternalWillShow();
+      unsubscribeExternalDismissed();
+    };
+  }, [appEvents, resetSearchSessions]);
   const openPanelLayoutMenu = useCallback(() => {
     dispatchWorkspaceInteraction({ type: "open-panel-layout-menu" });
   }, []);
   const closePanelLayoutMenu = useCallback(() => {
     dispatchWorkspaceInteraction({ type: "close-panel-layout-menu" });
-  }, []);
-
-  useEffect(() => {
-    let isDisposed = false;
-    let stopListening: (() => void) | undefined;
-
-    void listen("open-markdown-requested", () => {
-      openFileRef.current();
-    }).then((unlisten) => {
-      if (isDisposed) {
-        unlisten();
-      } else {
-        stopListening = unlisten;
-      }
-    });
-
-    return () => {
-      isDisposed = true;
-      stopListening?.();
-    };
   }, []);
 
   useEffect(() => {
@@ -671,15 +547,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const saveTimer = window.setTimeout(() => {
-      const didSave = saveDocumentNote(documentNoteStorageKey, note);
-      setNoteSaveStatus(didSave ? "saved" : "error");
-    }, 350);
-
-    return () => window.clearTimeout(saveTimer);
-  }, [documentNoteStorageKey, note]);
-
-  useEffect(() => {
     const insetQuery = window.matchMedia("(min-width: 1280px)");
     const updateSidebarMode = () => {
       const nextIsSidebarInset = insetQuery.matches;
@@ -748,58 +615,6 @@ function App() {
   }, [stageSidebar]);
 
   useEffect(() => {
-    if (!isRecentDocumentsOpen || !isDesktopRuntime()) {
-      return;
-    }
-
-    const batch = recentStatusBatchRef.current + 1;
-    recentStatusBatchRef.current = batch;
-    let isDisposed = false;
-
-    void Promise.all(
-      recentDocuments.map(async (document) => {
-        try {
-          const status = await getMarkdownFileStatus(document.path);
-          return { path: document.path, status };
-        } catch {
-          return null;
-        }
-      }),
-    ).then((results) => {
-      if (isDisposed || batch !== recentStatusBatchRef.current) {
-        return;
-      }
-
-      const recentPaths = new Set(
-        recentDocuments.map((document) => document.path),
-      );
-      setUnavailableRecentDocumentPaths((currentPaths) => {
-        const nextPaths = new Set(
-          Array.from(currentPaths).filter((path) => recentPaths.has(path)),
-        );
-
-        for (const result of results) {
-          if (!result) {
-            continue;
-          }
-
-          if (result.status.kind === "unavailable") {
-            nextPaths.add(result.path);
-          } else {
-            nextPaths.delete(result.path);
-          }
-        }
-
-        return nextPaths;
-      });
-    });
-
-    return () => {
-      isDisposed = true;
-    };
-  }, [isRecentDocumentsOpen, recentDocuments]);
-
-  useEffect(() => {
     if (!isSettingsOpen) {
       return;
     }
@@ -853,11 +668,6 @@ function App() {
       savePreference(scrollSyncStorageKey, nextPreference);
       return nextPreference;
     });
-  }
-
-  function handleNoteChange(value: string) {
-    setNote(value);
-    setNoteSaveStatus("saving");
   }
 
   function requestSourceFocus(mode: "editor" | "notes") {
@@ -1046,342 +856,13 @@ function App() {
     if (!externalFileState) {
       return;
     }
-
-    const returnFocusElement = externalFileNoticeReturnFocusRef.current;
-    setDismissedExternalObservationKey(externalFileState.observationKey);
-
-    window.requestAnimationFrame(() => {
-      if (returnFocusElement?.isConnected) {
-        returnFocusElement.focus({ preventScroll: true });
-      } else {
-        contentElementsRef.current[lastSearchAreaRef.current]?.focus({
-          preventScroll: true,
-        });
-      }
-    });
+    dismissExternalFileNotice();
   }
 
-  function handleMarkdownChange(nextMarkdown: string) {
-    markdownEditVersionRef.current += 1;
-    markdownRef.current = nextMarkdown;
-    setMarkdown(nextMarkdown);
+  function handleRecentDocumentSelect(document: RecentDocument) {
+    void openDocument(document.path, "recent");
   }
 
-  async function handleReloadExternalFile() {
-    if (!documentPath || documentOperationRef.current !== null) {
-      return;
-    }
-
-    const pathToReload = documentPath;
-    const documentGenerationToReload = documentGenerationRef.current;
-    const reloadContext = {
-      generation: documentGenerationToReload,
-      path: pathToReload,
-    };
-    documentOperationRef.current = "reload";
-    setIsReloadingFile(true);
-
-    try {
-      if (
-        loadedMarkdownRef.current !== null &&
-        markdownRef.current !== loadedMarkdownRef.current
-      ) {
-        const shouldReload = await confirmReloadDiscard();
-
-        if (!shouldReload) {
-          return;
-        }
-      }
-
-      if (
-        !isDocumentContextCurrent(
-          {
-            generation: documentGenerationRef.current,
-            path: documentPathRef.current,
-          },
-          reloadContext,
-        )
-      ) {
-        return;
-      }
-
-      const approvedMarkdownEditVersion = markdownEditVersionRef.current;
-
-      const reloadedFile = await readMarkdownFile(pathToReload);
-
-      if (
-        !isDocumentContextCurrent(
-          {
-            generation: documentGenerationRef.current,
-            path: documentPathRef.current,
-          },
-          reloadContext,
-        )
-      ) {
-        return;
-      }
-
-      if (markdownEditVersionRef.current !== approvedMarkdownEditVersion) {
-        try {
-          await showMarkdownMessage(
-            "다시 불러오는 동안 Markdown이 수정되어 현재 내용을 유지했습니다. 최신 원본을 적용하려면 다시 시도해 주세요.",
-            {
-              title: "현재 변경 내용 유지",
-              kind: "info",
-            },
-          );
-        } catch {
-          console.info("다시 불러오는 동안 수정된 Markdown을 유지했습니다.");
-        }
-        return;
-      }
-
-      setDocumentName(reloadedFile.name);
-      markdownRef.current = reloadedFile.content;
-      setMarkdown(reloadedFile.content);
-      loadedMarkdownRef.current = reloadedFile.content;
-      setLoadedMarkdown(reloadedFile.content);
-      setLoadedRevision(reloadedFile.revision);
-      resetExternalFileStatus();
-      resetSearchSessions();
-    } catch (error) {
-      if (
-        !isDocumentContextCurrent(
-          {
-            generation: documentGenerationRef.current,
-            path: documentPathRef.current,
-          },
-          reloadContext,
-        )
-      ) {
-        return;
-      }
-
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const nextState: ExternalFileState = {
-        kind: "unavailable",
-        message: errorMessage,
-        observationKey: `unavailable:${errorMessage}`,
-      };
-      setExternalFileState(nextState);
-      setDismissedExternalObservationKey(null);
-    } finally {
-      if (documentOperationRef.current === "reload") {
-        documentOperationRef.current = null;
-      }
-      setIsReloadingFile(false);
-    }
-  }
-
-  async function showDocumentOpenError(error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-
-    try {
-      await showMarkdownMessage(errorMessage, {
-        title: "파일을 열 수 없습니다",
-        kind: "error",
-      });
-    } catch {
-      console.error("파일을 열 수 없습니다:", errorMessage);
-    }
-  }
-
-  function promoteOpenedDocument(
-    openedFile: OpenedMarkdownFile,
-    requestedPath: string,
-  ) {
-    const nextRecentDocuments = promoteRecentDocument(
-      recentDocumentsRef.current,
-      { path: openedFile.path, name: openedFile.name },
-      [requestedPath],
-    );
-    recentDocumentsRef.current = nextRecentDocuments;
-    setRecentDocuments(nextRecentDocuments);
-    setIsRecentDocumentPersistenceLimited(
-      !saveRecentDocuments(nextRecentDocuments),
-    );
-    setUnavailableRecentDocumentPaths((currentPaths) => {
-      const nextPaths = new Set(currentPaths);
-      nextPaths.delete(requestedPath);
-      nextPaths.delete(openedFile.path);
-      return nextPaths;
-    });
-  }
-
-  async function switchToMarkdownDocument(
-    requestedPath: string,
-    markUnavailableOnFailure: boolean,
-  ) {
-    let openedFile: OpenedMarkdownFile;
-
-    try {
-      openedFile = await readMarkdownFile(requestedPath);
-    } catch (error) {
-      if (markUnavailableOnFailure && isDesktopRuntime()) {
-        try {
-          const status = await getMarkdownFileStatus(requestedPath);
-          setUnavailableRecentDocumentPaths((currentPaths) => {
-            const nextPaths = new Set(currentPaths);
-
-            if (status.kind === "unavailable") {
-              nextPaths.add(requestedPath);
-            } else {
-              nextPaths.delete(requestedPath);
-            }
-
-            return nextPaths;
-          });
-        } catch {
-          // Transport failures do not prove that the document is unavailable.
-        }
-      }
-
-      await showDocumentOpenError(error);
-      return;
-    }
-
-    const documentGenerationBeforeConfirmation =
-      documentGenerationRef.current;
-    const documentPathBeforeConfirmation = documentPathRef.current;
-    const markdownEditVersionBeforeConfirmation =
-      markdownEditVersionRef.current;
-    const hasUnsavedChanges = hasUnsavedMarkdown(
-      markdownRef.current,
-      loadedMarkdownRef.current,
-      initialMarkdown,
-    );
-
-    if (hasUnsavedChanges) {
-      let shouldSwitch: boolean;
-
-      try {
-        shouldSwitch = await confirmDocumentSwitchDiscard();
-      } catch (error) {
-        await showDocumentOpenError(error);
-        return;
-      }
-
-      if (!shouldSwitch) {
-        return;
-      }
-    }
-
-    if (
-      !isDocumentContextCurrent(
-        {
-          generation: documentGenerationRef.current,
-          path: documentPathRef.current,
-          markdownEditVersion: markdownEditVersionRef.current,
-        },
-        {
-          generation: documentGenerationBeforeConfirmation,
-          path: documentPathBeforeConfirmation,
-          markdownEditVersion: markdownEditVersionBeforeConfirmation,
-        },
-      )
-    ) {
-      return;
-    }
-
-    const currentNoteStorageKey = getDocumentNoteStorageKey(
-      documentPathRef.current,
-    );
-    if (!saveDocumentNote(currentNoteStorageKey, noteRef.current)) {
-      setNoteSaveStatus("error");
-      try {
-        await showMarkdownMessage(
-          "현재 문서의 메모를 저장하지 못해 문서 전환을 중단했습니다. 저장 공간을 확인한 뒤 다시 시도해 주세요.",
-          {
-            title: "메모를 보존할 수 없습니다",
-            kind: "error",
-          },
-        );
-      } catch {
-        console.error("메모를 저장하지 못해 문서 전환을 중단했습니다.");
-      }
-      return;
-    }
-
-    const shouldRestoreRecentFocus = stageSidebarRef.current === "recent";
-    const nextNoteStorageKey = getDocumentNoteStorageKey(openedFile.path);
-    documentGenerationRef.current += 1;
-    setDocumentName(openedFile.name);
-    documentPathRef.current = openedFile.path;
-    setDocumentPath(openedFile.path);
-    markdownRef.current = openedFile.content;
-    setMarkdown(openedFile.content);
-    loadedMarkdownRef.current = openedFile.content;
-    setLoadedMarkdown(openedFile.content);
-    setLoadedRevision(openedFile.revision);
-    resetExternalFileStatus();
-    const nextNote = loadDocumentNote(nextNoteStorageKey);
-    noteRef.current = nextNote;
-    setNote(nextNote);
-    setNoteSaveStatus("saved");
-    resetSearchSessions();
-    promoteOpenedDocument(openedFile, requestedPath);
-    stageSidebarRef.current = null;
-    dispatchWorkspaceInteraction({ type: "close-stage-sidebar" });
-
-    if (shouldRestoreRecentFocus) {
-      window.requestAnimationFrame(() =>
-        recentDocumentsButtonRef.current?.focus(),
-      );
-    }
-  }
-
-  async function handleOpenFile() {
-    if (documentOperationRef.current !== null) {
-      return;
-    }
-
-    documentOperationRef.current = "open";
-    setIsOpeningFile(true);
-
-    try {
-      const selectedPath = await chooseMarkdownFilePath();
-
-      if (!selectedPath) {
-        return;
-      }
-
-      await switchToMarkdownDocument(selectedPath, false);
-    } catch (error) {
-      await showDocumentOpenError(error);
-    } finally {
-      if (documentOperationRef.current === "open") {
-        documentOperationRef.current = null;
-      }
-      setIsOpeningFile(false);
-    }
-  }
-
-  async function handleRecentDocumentSelect(document: RecentDocument) {
-    if (document.path === documentPathRef.current) {
-      handleDocumentSidebarClose();
-      return;
-    }
-
-    if (documentOperationRef.current !== null) {
-      return;
-    }
-
-    documentOperationRef.current = "open";
-    setIsOpeningFile(true);
-
-    try {
-      await switchToMarkdownDocument(document.path, true);
-    } catch (error) {
-      await showDocumentOpenError(error);
-    } finally {
-      if (documentOperationRef.current === "open") {
-        documentOperationRef.current = null;
-      }
-      setIsOpeningFile(false);
-    }
-  }
-
-  openFileRef.current = handleOpenFile;
 
   return (
     <div
@@ -1396,25 +877,29 @@ function App() {
         documentPath={documentPath}
         isRecentDocumentsOpen={isRecentDocumentsOpen}
         isOutlineOpen={isOutlineOpen}
-        isBusy={isOpeningFile || isReloadingFile}
+        isBusy={isDocumentBusy}
         isSettingsOpen={isSettingsOpen}
         recentDocumentsButtonRef={recentDocumentsButtonRef}
         outlineButtonRef={outlineButtonRef}
         settingsRef={settingsRef}
         settingsButtonRef={settingsButtonRef}
-        onRecentDocumentsToggle={() =>
+        onRecentDocumentsToggle={() => {
+          const willOpen = stageSidebarRef.current !== "recent";
           dispatchWorkspaceInteraction({
             type: "toggle-stage-sidebar",
             sidebar: "recent",
-          })
-        }
+          });
+          if (willOpen) {
+            appEvents.emit("recent-sidebar-opened", undefined);
+          }
+        }}
         onOutlineToggle={() =>
           dispatchWorkspaceInteraction({
             type: "toggle-stage-sidebar",
             sidebar: "outline",
           })
         }
-        onOpenFile={handleOpenFile}
+        onOpenFile={() => void openFromPicker("picker")}
         onSettingsToggle={() =>
           dispatchWorkspaceInteraction({ type: "toggle-settings" })
         }
@@ -1436,14 +921,14 @@ function App() {
         recentDocuments={recentDocuments}
         documentPath={documentPath}
         unavailableRecentDocumentPaths={unavailableRecentDocumentPaths}
-        isBusy={isOpeningFile || isReloadingFile}
+        isBusy={isDocumentBusy}
         isRecentDocumentPersistenceLimited={
           isRecentDocumentPersistenceLimited
         }
         outlineItems={outlineItems}
         activeHeadingId={activeHeadingId}
         onDocumentSidebarClose={handleDocumentSidebarClose}
-        onOpenFile={handleOpenFile}
+        onOpenFile={() => void openFromPicker("picker")}
         onRecentDocumentSelect={handleRecentDocumentSelect}
         onOutlineClose={handleOutlineClose}
         onOutlineNavigate={handleOutlineNavigate}
