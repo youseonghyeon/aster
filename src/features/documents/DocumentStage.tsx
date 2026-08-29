@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import type { MarkdownOutlineItem } from "../lib/markdown-outline";
-import type { RecentDocument } from "../features/documents/recent-documents";
+import type { MarkdownOutlineItem } from "../../lib/markdown-outline";
+import type { RecentDocument } from "./recent-documents";
 import { DocumentOutline } from "./DocumentOutline";
 import { DocumentSidebar } from "./DocumentSidebar";
 

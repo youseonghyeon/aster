@@ -5,7 +5,7 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
-import type { MarkdownOutlineItem } from "../lib/markdown-outline";
+import type { MarkdownOutlineItem } from "../../lib/markdown-outline";
 import "./DocumentOutline.css";
 
 type OutlineTreeItem = MarkdownOutlineItem & {

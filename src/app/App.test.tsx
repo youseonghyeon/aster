@@ -6,9 +6,9 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { untitledDocumentNoteStorageKey } from "./features/documents/document-session";
-import { recentDocumentsStorageKey } from "./features/documents/recent-documents";
-import { setViewportWidth } from "./test/setup";
+import { untitledDocumentNoteStorageKey } from "../features/documents/document-session";
+import { recentDocumentsStorageKey } from "../features/documents/recent-documents";
+import { setViewportWidth } from "../test/setup";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -22,11 +22,11 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   message: vi.fn(),
   open: vi.fn(),
 }));
-vi.mock("./components/SyntaxHighlightedCode", () => ({
+vi.mock("../components/SyntaxHighlightedCode", () => ({
   SyntaxHighlightedCode: ({ code }: { code: string }) => <pre>{code}</pre>,
 }));
-vi.mock("./hooks/useTextSearch", async () => {
-  const { findTextMatches } = await import("./lib/text-search");
+vi.mock("../hooks/useTextSearch", async () => {
+  const { findTextMatches } = await import("../lib/text-search");
   const { useMemo } = await import("react");
 
   return {

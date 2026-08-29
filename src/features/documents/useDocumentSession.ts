@@ -30,7 +30,11 @@ import {
   showMarkdownMessage,
   type OpenedMarkdownFile,
 } from "./markdown-files";
-import { promoteRecentDocument, saveRecentDocuments } from "./recent-documents";
+import {
+  promoteRecentDocument,
+  saveRecentDocuments,
+  type RecentDocument,
+} from "./recent-documents";
 import {
   useExternalFileStatus,
   type ExternalFileState,
@@ -396,6 +400,10 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
       switchToDocument,
     ],
   );
+  const openRecentDocument = useCallback(
+    (document: RecentDocument) => openDocument(document.path, "recent"),
+    [openDocument],
+  );
 
   const reloadDocument = useCallback(async (): Promise<DocumentOpenOutcome> => {
     const initial = stateRef.current.document;
@@ -634,6 +642,7 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
     editNote,
     openFromPicker,
     openDocument,
+    openRecentDocument,
     reloadDocument,
     dismissExternalFileNotice,
   };

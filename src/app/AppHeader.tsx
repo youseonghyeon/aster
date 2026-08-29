@@ -1,6 +1,6 @@
 import type { ReactNode, Ref } from "react";
 
-type AppHeaderProps = {
+export type AppHeaderProps = {
   documentName: string;
   documentPath: string | null;
   isRecentDocumentsOpen: boolean;

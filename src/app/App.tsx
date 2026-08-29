@@ -1,19 +1,18 @@
 import { useRef } from "react";
-import { AppHeader } from "./components/AppHeader";
-import { DocumentStage } from "./components/DocumentStage";
-import { PaneDivider } from "./features/workspace/PaneDivider";
-import { WorkspacePane } from "./features/workspace/WorkspacePane";
-import { ExternalFileNotice } from "./features/documents/ExternalFileNotice";
-import type { RecentDocument } from "./features/documents/recent-documents";
-import { useDocumentSession } from "./features/documents/useDocumentSession";
-import { ReadingSettings } from "./features/reading/ReadingSettings";
-import { useReadingPreferences } from "./features/reading/useReadingPreferences";
-import { useWorkspaceController } from "./features/workspace/useWorkspaceController";
+import { AppHeader } from "./AppHeader";
+import { DocumentStage } from "../features/documents/DocumentStage";
+import { ExternalFileNotice } from "../features/documents/ExternalFileNotice";
+import { useDocumentSession } from "../features/documents/useDocumentSession";
+import { ReadingSettings } from "../features/reading/ReadingSettings";
+import { useReadingPreferences } from "../features/reading/useReadingPreferences";
+import { PaneDivider } from "../features/workspace/PaneDivider";
+import { WorkspacePane } from "../features/workspace/WorkspacePane";
+import { useWorkspaceController } from "../features/workspace/useWorkspaceController";
 import {
   createAppEventChannel,
   type AppEventChannel,
-} from "./shared/app-events";
-import "./styles/base.css";
+} from "../shared/app-events";
+import "../styles/base.css";
 import "./App.css";
 
 function App() {
@@ -30,10 +29,6 @@ function App() {
     isScrollSyncEnabled: reading.isScrollSyncEnabled,
   });
   const { state, outline, search, elements, divider, actions } = workspace;
-
-  function handleRecentDocumentSelect(document: RecentDocument) {
-    void documents.openDocument(document.path, "recent");
-  }
 
   return (
     <div
@@ -84,7 +79,7 @@ function App() {
         activeHeadingId={outline.activeHeadingId}
         onDocumentSidebarClose={actions.closeDocumentSidebar}
         onOpenFile={() => void documents.openFromPicker("picker")}
-        onRecentDocumentSelect={handleRecentDocumentSelect}
+        onRecentDocumentSelect={documents.openRecentDocument}
         onOutlineClose={actions.closeOutline}
         onOutlineNavigate={actions.navigateOutline}
       >
