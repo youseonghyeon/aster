@@ -356,7 +356,10 @@ export function useDocumentNavigation({
   );
 
   const openDocument = useCallback(
-    async (path: string, source: "recent" = "recent") => {
+    async (
+      path: string,
+      source: Extract<DocumentOpenSource, "folder" | "recent"> = "recent",
+    ) => {
       if (path === stateRef.current.document.path) {
         emitOpenSettled(source, "current");
         return "current" as const;

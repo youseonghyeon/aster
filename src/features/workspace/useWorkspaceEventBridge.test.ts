@@ -5,11 +5,15 @@ import { useWorkspaceEventBridge } from "./useWorkspaceEventBridge";
 import type { StageSidebar } from "./workspace-interactions";
 import type { WorkspaceContentElements } from "./workspace-types";
 
-function createOptions() {
+function createOptions(
+  sidebar: StageSidebar = "recent",
+  isSidebarInset = true,
+) {
   return {
     events: createAppEventChannel(),
-    stageSidebarRef: { current: "recent" as StageSidebar },
-    recentDocumentsButtonRef: { current: null },
+    stageSidebarRef: { current: sidebar },
+    isSidebarInsetRef: { current: isSidebarInset },
+    documentBrowserButtonRef: { current: null },
     externalFileNoticeReturnFocusRef: { current: null },
     contentElementsRef: {
       current: {
@@ -27,9 +31,6 @@ function createOptions() {
 
 describe("useWorkspaceEventBridge", () => {
   it.each([
-    { source: "picker", outcome: "current" },
-    { source: "native", outcome: "current" },
-    { source: "recent", outcome: "opened" },
     { source: "recent", outcome: "cancelled" },
     { source: "recent", outcome: "failed" },
     { source: "recent", outcome: "busy" },
@@ -48,14 +49,62 @@ describe("useWorkspaceEventBridge", () => {
     },
   );
 
-  it("closes recent documents only when the selected document is already current", () => {
-    const options = createOptions();
+  it.each(["opened", "current"] as const)(
+    "closes recent documents after a %s result",
+    (outcome) => {
+      const options = createOptions();
+      renderHook(() => useWorkspaceEventBridge(options));
+
+      act(() => {
+        options.events.emit("document-open-settled", {
+          source: "recent",
+          outcome,
+        });
+      });
+
+      expect(options.stageSidebarRef.current).toBeNull();
+      expect(options.closeStageSidebar).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("keeps an inset file browser open after opening a document", () => {
+    const options = createOptions("files", true);
     renderHook(() => useWorkspaceEventBridge(options));
 
     act(() => {
       options.events.emit("document-open-settled", {
-        source: "recent",
-        outcome: "current",
+        source: "folder",
+        outcome: "opened",
+      });
+    });
+
+    expect(options.stageSidebarRef.current).toBe("files");
+    expect(options.closeStageSidebar).not.toHaveBeenCalled();
+  });
+
+  it("closes a modal file browser after opening a document", () => {
+    const options = createOptions("files", false);
+    renderHook(() => useWorkspaceEventBridge(options));
+
+    act(() => {
+      options.events.emit("document-open-settled", {
+        source: "folder",
+        outcome: "opened",
+      });
+    });
+
+    expect(options.stageSidebarRef.current).toBeNull();
+    expect(options.closeStageSidebar).toHaveBeenCalledOnce();
+  });
+
+  it("closes a modal outline after a document opens", () => {
+    const options = createOptions("outline", false);
+    renderHook(() => useWorkspaceEventBridge(options));
+
+    act(() => {
+      options.events.emit("document-open-settled", {
+        source: "picker",
+        outcome: "opened",
       });
     });
 

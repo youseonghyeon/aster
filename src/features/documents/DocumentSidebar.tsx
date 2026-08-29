@@ -10,6 +10,7 @@ type DocumentSidebarProps = {
   isBusy: boolean;
   isPersistenceLimited: boolean;
   onClose: () => void;
+  onFilesView: () => void;
   onOpenFile: () => void;
   onSelectDocument: (document: RecentDocument) => void;
 };
@@ -71,6 +72,7 @@ export function DocumentSidebar({
   isBusy,
   isPersistenceLimited,
   onClose,
+  onFilesView,
   onOpenFile,
   onSelectDocument,
 }: DocumentSidebarProps) {
@@ -165,6 +167,15 @@ export function DocumentSidebar({
           <CloseIcon />
         </button>
       </header>
+
+      <div className="document-browser-tabs" role="tablist" aria-label="문서 탐색 보기">
+        <button type="button" role="tab" aria-selected="false" onClick={onFilesView}>
+          파일
+        </button>
+        <button type="button" role="tab" aria-selected="true">
+          최근
+        </button>
+      </div>
 
       <div className="recent-document-content">
         {documents.length > 0 ? (

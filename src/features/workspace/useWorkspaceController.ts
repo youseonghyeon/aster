@@ -65,7 +65,7 @@ export function useWorkspaceController({
   const dividerRef = useRef<HTMLDivElement>(null);
   const splitGuideRef = useRef<HTMLDivElement>(null);
   const outlineButtonRef = useRef<HTMLButtonElement>(null);
-  const recentDocumentsButtonRef = useRef<HTMLButtonElement>(null);
+  const documentBrowserButtonRef = useRef<HTMLButtonElement>(null);
   const externalFileNoticeRef = useRef<HTMLElement>(null);
   const externalFileNoticeReturnFocusRef = useRef<HTMLElement | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -79,9 +79,13 @@ export function useWorkspaceController({
   const isNotesOpenRef = useRef(isNotesOpen);
   const isPreviewFocusModeRef = useRef(isPreviewFocusMode);
   const dismissNonPersistentStageSidebar = useCallback(() => {
-    const shouldPreserveOutline =
-      stageSidebarRef.current === "outline" && isSidebarInsetRef.current;
-    stageSidebarRef.current = shouldPreserveOutline ? "outline" : null;
+    const shouldPreserveSidebar =
+      (stageSidebarRef.current === "outline" ||
+        stageSidebarRef.current === "files") &&
+      isSidebarInsetRef.current;
+    stageSidebarRef.current = shouldPreserveSidebar
+      ? stageSidebarRef.current
+      : null;
     isSettingsOpenRef.current = false;
     isPanelLayoutMenuOpenRef.current = false;
     dispatch({ type: "start-document-action" });
@@ -120,7 +124,9 @@ export function useWorkspaceController({
 
   const previewMarkdown = useDeferredValue(markdown);
   const isOutlineOpen = stageSidebar === "outline";
+  const isFilesOpen = stageSidebar === "files";
   const isRecentDocumentsOpen = stageSidebar === "recent";
+  const isDocumentBrowserOpen = isFilesOpen || isRecentDocumentsOpen;
   const isPreviewUpdating = markdown !== previewMarkdown;
   const outlineItems = useMemo(
     () => (isOutlineOpen ? getMarkdownOutline(previewMarkdown) : []),
@@ -171,9 +177,9 @@ export function useWorkspaceController({
     },
     [],
   );
-  const registerRecentDocumentsButton = useCallback(
+  const registerDocumentBrowserButton = useCallback(
     (element: HTMLButtonElement | null) => {
-      recentDocumentsButtonRef.current = element;
+      documentBrowserButtonRef.current = element;
     },
     [],
   );
@@ -280,7 +286,8 @@ export function useWorkspaceController({
   useWorkspaceEventBridge({
     events,
     stageSidebarRef,
-    recentDocumentsButtonRef,
+    isSidebarInsetRef,
+    documentBrowserButtonRef,
     externalFileNoticeReturnFocusRef,
     contentElementsRef,
     lastSearchAreaRef,
@@ -347,7 +354,7 @@ export function useWorkspaceController({
     stageSidebarRef.current = null;
     dispatch({ type: "close-stage-sidebar" });
     window.requestAnimationFrame(() =>
-      recentDocumentsButtonRef.current?.focus(),
+      documentBrowserButtonRef.current?.focus(),
     );
   }, []);
 
@@ -364,11 +371,30 @@ export function useWorkspaceController({
     }
   }, [isSidebarInset, navigateToHeading]);
 
-  const toggleRecentDocuments = useCallback(() => {
-    const willOpen = stageSidebarRef.current !== "recent";
-    dispatch({ type: "toggle-stage-sidebar", sidebar: "recent" });
-    if (willOpen) events.emit("recent-sidebar-opened", undefined);
-  }, [events]);
+  const toggleDocumentBrowser = useCallback(
+    (preferred: "files" | "recent") => {
+      const current = stageSidebarRef.current;
+      const isOpen = current === "files" || current === "recent";
+      stageSidebarRef.current = isOpen ? null : preferred;
+      dispatch(
+        isOpen
+          ? { type: "close-stage-sidebar" }
+          : { type: "open-stage-sidebar", sidebar: preferred },
+      );
+      if (!isOpen && preferred === "recent") {
+        events.emit("recent-sidebar-opened", undefined);
+      }
+    },
+    [events],
+  );
+  const showDocumentBrowser = useCallback(
+    (view: "files" | "recent") => {
+      stageSidebarRef.current = view;
+      dispatch({ type: "open-stage-sidebar", sidebar: view });
+      if (view === "recent") events.emit("recent-sidebar-opened", undefined);
+    },
+    [events],
+  );
 
   const toggleOutline = useCallback(
     () => dispatch({ type: "toggle-stage-sidebar", sidebar: "outline" }),
@@ -423,7 +449,9 @@ export function useWorkspaceController({
       isWorkspaceStacked,
       isScrollSyncAvailable,
       isOutlineOpen,
+      isFilesOpen,
       isRecentDocumentsOpen,
+      isDocumentBrowserOpen,
       leftPaneContent,
       rightPaneContent,
       previewMarkdown,
@@ -442,7 +470,7 @@ export function useWorkspaceController({
       divider: registerDivider,
       splitGuide: registerSplitGuide,
       outlineButton: registerOutlineButton,
-      recentDocumentsButton: registerRecentDocumentsButton,
+      documentBrowserButton: registerDocumentBrowserButton,
       externalFileNotice: registerExternalFileNotice,
       settings: registerSettings,
       settingsButton: registerSettingsButton,
@@ -459,7 +487,8 @@ export function useWorkspaceController({
       onLostPointerCapture: handleDividerLostPointerCapture,
     },
     actions: {
-      toggleRecentDocuments,
+      toggleDocumentBrowser,
+      showDocumentBrowser,
       toggleOutline,
       toggleSettings,
       closeDocumentSidebar: handleDocumentSidebarClose,

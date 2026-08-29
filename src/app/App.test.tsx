@@ -102,6 +102,7 @@ describe("workspace regression contracts", () => {
     render(<App />);
 
     await user.click(screen.getByRole("button", { name: "문서 탐색 열기" }));
+    await user.click(screen.getByRole("tab", { name: "최근" }));
     expect(screen.getByRole("heading", { name: "최근 문서" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "메모" }));
     expect(screen.queryByRole("heading", { name: "최근 문서" })).not.toBeInTheDocument();
@@ -650,6 +651,7 @@ describe("workspace regression contracts", () => {
 
     const recentTrigger = screen.getByRole("button", { name: "문서 탐색 열기" });
     await user.click(recentTrigger);
+    await user.click(screen.getByRole("tab", { name: "최근" }));
     await user.click(screen.getByRole("button", { name: "current.md, 현재 문서" }));
     await nextAnimationFrame();
 
@@ -658,6 +660,57 @@ describe("workspace regression contracts", () => {
     expect(
       vi.mocked(invoke).mock.calls.filter(([command]) => command === "read_markdown_file"),
     ).toHaveLength(1);
+  });
+
+  it("opens a folder document only after explicit tree activation", async () => {
+    vi.mocked(open).mockResolvedValue("/docs");
+    vi.mocked(invoke).mockImplementation(async (command) => {
+      if (command === "open_folder") {
+        return { token: 4, path: "/docs", name: "docs" };
+      }
+      if (command === "list_folder_children") {
+        return {
+          rootToken: 4,
+          directory: "",
+          truncated: false,
+          entries: [
+            {
+              name: "guide.md",
+              relativePath: "guide.md",
+              path: "/docs/guide.md",
+              kind: "markdown",
+            },
+          ],
+        };
+      }
+      if (command === "read_markdown_file") {
+        return {
+          path: "/docs/guide.md",
+          name: "guide.md",
+          content: "# 폴더 문서",
+          revision: "folder-revision",
+          format: { hasBom: false, lineEnding: "lf" },
+        };
+      }
+      return undefined;
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "문서 탐색 열기" }));
+    await user.click(screen.getByRole("button", { name: "폴더 선택" }));
+    const guide = await screen.findByRole("treeitem", { name: "guide.md" });
+
+    await user.click(guide);
+    expect(
+      vi.mocked(invoke).mock.calls.filter(([command]) => command === "read_markdown_file"),
+    ).toHaveLength(0);
+
+    await user.dblClick(guide);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "폴더 문서" })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("heading", { name: "docs" })).toBeInTheDocument();
   });
 
   it("shares one synchronous open lock with native open requests", async () => {

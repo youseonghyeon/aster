@@ -45,6 +45,7 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
     initialPreferencesRef.current.sidebarWidth,
   );
   const [isPersistenceLimited, setPersistenceLimited] = useState(false);
+  const [operationError, setOperationError] = useState<string | null>(null);
   const [state, reducerDispatch] = useReducer(
     folderTreeReducer,
     undefined,
@@ -164,14 +165,20 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
   }, [isActive, refresh]);
 
   const chooseRoot = useCallback(async () => {
-    const path = await chooseFolderPath();
-    if (path) await registerRoot(path, false);
+    setOperationError(null);
+    try {
+      const path = await chooseFolderPath();
+      if (path) await registerRoot(path, false);
+    } catch (error) {
+      setOperationError(errorMessage(error));
+    }
   }, [registerRoot]);
 
   const clearRoot = useCallback(async () => {
     const token = stateRef.current.root?.token;
     ++rootRequestRef.current;
     dispatch({ type: "clear-root" });
+    setOperationError(null);
     persist({ rootPath: null, expandedPaths: [] });
     await closeFolderRoot(token).catch(() => undefined);
   }, [dispatch, persist]);
@@ -210,7 +217,12 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
   const openImage = useCallback(async (entry: FolderEntry) => {
     const root = stateRef.current.root;
     if (!root || entry.kind !== "image") return;
-    await openFolderImage(root.token, entry.relativePath);
+    setOperationError(null);
+    try {
+      await openFolderImage(root.token, entry.relativePath);
+    } catch (error) {
+      setOperationError(errorMessage(error));
+    }
   }, []);
 
   const setView = useCallback(
@@ -234,6 +246,7 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
     view,
     sidebarWidth,
     isPersistenceLimited,
+    operationError,
     actions: {
       chooseRoot,
       clearRoot,

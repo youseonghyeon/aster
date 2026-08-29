@@ -11,6 +11,7 @@ export type WorkspaceInteractionState = {
 
 export type WorkspaceInteractionAction =
   | { type: "toggle-stage-sidebar"; sidebar: Exclude<StageSidebar, null> }
+  | { type: "open-stage-sidebar"; sidebar: Exclude<StageSidebar, null> }
   | { type: "close-stage-sidebar" }
   | { type: "toggle-settings" }
   | { type: "close-settings" }
@@ -51,6 +52,13 @@ export function workspaceInteractionReducer(
         ...state,
         stageSidebar:
           state.stageSidebar === action.sidebar ? null : action.sidebar,
+        isSettingsOpen: false,
+        isPanelLayoutMenuOpen: false,
+      };
+    case "open-stage-sidebar":
+      return {
+        ...state,
+        stageSidebar: action.sidebar,
         isSettingsOpen: false,
         isPanelLayoutMenuOpen: false,
       };

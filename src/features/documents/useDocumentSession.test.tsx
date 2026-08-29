@@ -127,7 +127,9 @@ describe("document session controller", () => {
     const { result } = renderHook(() => useDocumentSession({ events }));
 
     await act(async () => {
-      expect(await result.current.openDocument(firstFile.path)).toBe("opened");
+      expect(await result.current.openDocument(firstFile.path, "folder")).toBe(
+        "opened",
+      );
     });
     await act(async () => {
       expect(await result.current.openDocument(firstFile.path)).toBe("current");
@@ -137,7 +139,7 @@ describe("document session controller", () => {
     });
 
     expect(settled).toEqual([
-      { source: "recent", outcome: "opened" },
+      { source: "folder", outcome: "opened" },
       { source: "recent", outcome: "current" },
       { source: "recent", outcome: "failed" },
     ]);

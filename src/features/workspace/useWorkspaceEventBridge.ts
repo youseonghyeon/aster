@@ -12,7 +12,8 @@ import {
 type UseWorkspaceEventBridgeOptions = {
   events: AppEventChannel;
   stageSidebarRef: RefObject<StageSidebar>;
-  recentDocumentsButtonRef: RefObject<HTMLButtonElement | null>;
+  isSidebarInsetRef: RefObject<boolean>;
+  documentBrowserButtonRef: RefObject<HTMLButtonElement | null>;
   externalFileNoticeReturnFocusRef: RefObject<HTMLElement | null>;
   contentElementsRef: RefObject<WorkspaceContentElements>;
   lastSearchAreaRef: RefObject<SearchArea>;
@@ -24,7 +25,8 @@ type UseWorkspaceEventBridgeOptions = {
 export function useWorkspaceEventBridge({
   events,
   stageSidebarRef,
-  recentDocumentsButtonRef,
+  isSidebarInsetRef,
+  documentBrowserButtonRef,
   externalFileNoticeReturnFocusRef,
   contentElementsRef,
   lastSearchAreaRef,
@@ -80,33 +82,36 @@ export function useWorkspaceEventBridge({
   }, [appliedExternalCommitToken, contentElementsRef, isPreviewUpdating]);
 
   useEffect(() => {
-    function closeRecentAndRestoreFocus() {
+    function closeDocumentBrowserAndRestoreFocus() {
       stageSidebarRef.current = null;
       closeStageSidebar();
       window.requestAnimationFrame(() =>
-        recentDocumentsButtonRef.current?.focus(),
+        documentBrowserButtonRef.current?.focus(),
       );
     }
 
     const unsubscribeDocumentCommitted = events.subscribe(
       "document-committed",
       () => {
-        const shouldRestoreRecentFocus = stageSidebarRef.current === "recent";
         resetSearchSessions();
-        stageSidebarRef.current = null;
-        closeStageSidebar();
-        if (shouldRestoreRecentFocus) {
-          window.requestAnimationFrame(() =>
-            recentDocumentsButtonRef.current?.focus(),
-          );
-        }
       },
     );
     const unsubscribeOpenSettled = events.subscribe(
       "document-open-settled",
       ({ source, outcome }) => {
-        if (source === "recent" && outcome === "current") {
-          closeRecentAndRestoreFocus();
+        if (outcome !== "opened" && outcome !== "current") return;
+        const sidebar = stageSidebarRef.current;
+        if (sidebar === "outline" && !isSidebarInsetRef.current) {
+          stageSidebarRef.current = null;
+          closeStageSidebar();
+          return;
+        }
+        const shouldClose =
+          source === "recent" ||
+          !isSidebarInsetRef.current ||
+          sidebar === "recent";
+        if (shouldClose && (sidebar === "files" || sidebar === "recent")) {
+          closeDocumentBrowserAndRestoreFocus();
         }
       },
     );
@@ -169,10 +174,11 @@ export function useWorkspaceEventBridge({
   }, [
     closeStageSidebar,
     contentElementsRef,
+    documentBrowserButtonRef,
     events,
     externalFileNoticeReturnFocusRef,
+    isSidebarInsetRef,
     lastSearchAreaRef,
-    recentDocumentsButtonRef,
     resetSearchSessions,
     stageSidebarRef,
   ]);

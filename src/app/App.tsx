@@ -1,9 +1,8 @@
 import { useRef } from "react";
 import { AppHeader } from "./AppHeader";
-import { DocumentOutline } from "../features/documents/DocumentOutline";
-import { DocumentSidebar } from "../features/documents/DocumentSidebar";
 import { ExternalFileNotice } from "../features/documents/ExternalFileNotice";
 import { useDocumentSession } from "../features/documents/useDocumentSession";
+import { useFolderBrowser } from "../features/file-browser/useFolderBrowser";
 import { ReadingSettings } from "../features/reading/ReadingSettings";
 import { useReadingPreferences } from "../features/reading/useReadingPreferences";
 import { PaneDivider } from "../features/workspace/PaneDivider";
@@ -14,6 +13,7 @@ import {
   createAppEventChannel,
   type AppEventChannel,
 } from "../shared/app-events";
+import { AppStageSidebar } from "./AppStageSidebar";
 import "../styles/base.css";
 import "./App.css";
 
@@ -30,7 +30,10 @@ function App() {
     markdown: documents.document.markdown,
     isScrollSyncEnabled: reading.isScrollSyncEnabled,
   });
-  const { state, outline, search, elements, divider, actions } = workspace;
+  const folderBrowser = useFolderBrowser({
+    isActive: workspace.state.stageSidebar === "files",
+  });
+  const { state, search, elements, divider, actions } = workspace;
 
   return (
     <div
@@ -45,15 +48,17 @@ function App() {
         documentPath={documents.document.path}
         saveStatus={documents.document.saveStatus}
         recovered={documents.document.recovered}
-        isDocumentBrowserOpen={state.isRecentDocumentsOpen}
+        isDocumentBrowserOpen={state.isDocumentBrowserOpen}
         isOutlineOpen={state.isOutlineOpen}
         isBusy={documents.isBusy}
         isSettingsOpen={state.isSettingsOpen}
-        documentBrowserButtonRef={elements.recentDocumentsButton}
+        documentBrowserButtonRef={elements.documentBrowserButton}
         outlineButtonRef={elements.outlineButton}
         settingsRef={elements.settings}
         settingsButtonRef={elements.settingsButton}
-        onDocumentBrowserToggle={actions.toggleRecentDocuments}
+        onDocumentBrowserToggle={() =>
+          actions.toggleDocumentBrowser(folderBrowser.view)
+        }
         onOutlineToggle={actions.toggleOutline}
         onOpenFile={() => void documents.openFromPicker("picker")}
         onSaveFile={() => void documents.saveDocument()}
@@ -72,26 +77,11 @@ function App() {
 
       <StageSidebarLayout
         sidebar={
-          state.stageSidebar === "recent" ? (
-            <DocumentSidebar
-              documents={documents.recent.documents}
-              currentDocumentPath={documents.document.path}
-              unavailableDocumentPaths={documents.recent.unavailablePaths}
-              isModal={!state.isSidebarInset}
-              isBusy={documents.isBusy}
-              isPersistenceLimited={documents.recent.persistenceLimited}
-              onClose={actions.closeDocumentSidebar}
-              onOpenFile={() => void documents.openFromPicker("picker")}
-              onSelectDocument={documents.openRecentDocument}
-            />
-          ) : state.stageSidebar === "outline" ? (
-            <DocumentOutline
-              items={outline.items}
-              activeHeadingId={outline.activeHeadingId}
-              documentKey={documents.document.path ?? "untitled"}
-              isModal={!state.isSidebarInset}
-              onClose={actions.closeOutline}
-              onNavigate={actions.navigateOutline}
+          state.stageSidebar ? (
+            <AppStageSidebar
+              documents={documents}
+              folderBrowser={folderBrowser}
+              workspace={workspace}
             />
           ) : null
         }
