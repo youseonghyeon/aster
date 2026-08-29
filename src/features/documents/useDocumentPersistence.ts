@@ -30,6 +30,9 @@ type SaveOptions = {
 type UseDocumentPersistenceOptions = {
   events: AppEventChannel;
   stateRef: RefObject<DocumentSessionState>;
+  scopedDocumentReaderRef: RefObject<
+    (() => Promise<OpenedMarkdownFile>) | null
+  >;
   mountedRef: RefObject<boolean>;
   nextExternalCommitTokenRef: RefObject<number>;
   handledExternalObservationRef: RefObject<string | null>;
@@ -45,6 +48,7 @@ type UseDocumentPersistenceOptions = {
 export function useDocumentPersistence({
   events,
   stateRef,
+  scopedDocumentReaderRef,
   mountedRef,
   nextExternalCommitTokenRef,
   handledExternalObservationRef,
@@ -138,9 +142,20 @@ export function useDocumentPersistence({
         targetPath = await chooseMarkdownSavePath(snapshot.name);
         if (!targetPath || !mountedRef.current) return false;
       }
+      const scopedReader =
+        targetPath === snapshot.path ? scopedDocumentReaderRef.current : null;
 
       dispatch({ type: "save-started" });
       try {
+        if (scopedReader) {
+          const verified = await scopedReader();
+          if (verified.path !== snapshot.path) {
+            throw new Error(
+              "선택한 폴더 밖으로 변경된 Markdown은 저장할 수 없습니다.",
+            );
+          }
+          targetPath = verified.path;
+        }
         const result = await saveMarkdownFile({
           path: targetPath,
           content: snapshot.markdown,
@@ -167,7 +182,8 @@ export function useDocumentPersistence({
           const decision = await chooseExternalConflictDecision(snapshot.name);
           if (!mountedRef.current || decision === "cancel") return false;
           if (decision === "external") {
-            const external = await readMarkdownFile(targetPath);
+            const external = await (scopedReader?.() ??
+              readMarkdownFile(targetPath));
             return applyExternalFile(external);
           }
           return performSaveRef.current({
@@ -227,6 +243,7 @@ export function useDocumentPersistence({
       handledExternalObservationRef,
       mountedRef,
       resetExternalFileStatus,
+      scopedDocumentReaderRef,
       showError,
       stateRef,
     ],

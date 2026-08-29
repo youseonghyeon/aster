@@ -65,11 +65,11 @@ export function openFolderImage(
 }
 
 export function readFolderMarkdown(
-  rootToken: number,
+  rootPath: string,
   relativePath: string,
 ): Promise<FolderMarkdownDocument> {
   return invoke<FolderMarkdownDocument>("read_folder_markdown", {
-    rootToken,
+    rootPath,
     relativePath,
   });
 }

@@ -45,6 +45,9 @@ type LeaveResult = {
 type UseDocumentNavigationOptions = {
   events: AppEventChannel;
   stateRef: RefObject<DocumentSessionState>;
+  scopedDocumentReaderRef: RefObject<
+    (() => Promise<OpenedMarkdownFile>) | null
+  >;
   mountedRef: RefObject<boolean>;
   dispatch: (action: DocumentSessionAction) => void;
   beginOperation: (kind: DocumentOperationKind) => DocumentOperation | null;
@@ -69,6 +72,7 @@ type UseDocumentNavigationOptions = {
 export function useDocumentNavigation({
   events,
   stateRef,
+  scopedDocumentReaderRef,
   mountedRef,
   dispatch,
   beginOperation,
@@ -144,6 +148,7 @@ export function useDocumentNavigation({
       const current = stateRef.current;
       const unavailablePaths = new Set(current.recent.unavailablePaths);
       unavailablePaths.add(requestedPath);
+      scopedDocumentReaderRef.current = null;
       dispatch({
         type: "commit-open",
         document: {
@@ -185,6 +190,7 @@ export function useDocumentNavigation({
       loadDraft,
       mountedRef,
       resetExternalFileStatus,
+      scopedDocumentReaderRef,
       stateRef,
     ],
   );
@@ -193,9 +199,10 @@ export function useDocumentNavigation({
     async (
       requestedPath: string,
       markUnavailableOnFailure: boolean,
-      readRequestedFile: () => Promise<OpenedMarkdownFile> = () =>
-        readMarkdownFile(requestedPath),
+      scopedReader?: () => Promise<OpenedMarkdownFile>,
     ): Promise<DocumentOpenOutcome> => {
+      const readRequestedFile =
+        scopedReader ?? (() => readMarkdownFile(requestedPath));
       let preflight: OpenedMarkdownFile;
       try {
         preflight = await readRequestedFile();
@@ -279,6 +286,7 @@ export function useDocumentNavigation({
         generation: current.document.generation + 1,
         editVersion: current.document.editVersion + 1,
       };
+      scopedDocumentReaderRef.current = scopedReader ?? null;
       dispatch({
         type: "commit-open",
         document: nextDocument,
@@ -319,6 +327,7 @@ export function useDocumentNavigation({
       mountedRef,
       resetExternalFileStatus,
       restoreUnavailableDraft,
+      scopedDocumentReaderRef,
       showError,
       stateRef,
     ],
@@ -361,7 +370,7 @@ export function useDocumentNavigation({
     async (
       path: string,
       source: Extract<DocumentOpenSource, "folder" | "recent"> = "recent",
-      readRequestedFile?: () => Promise<OpenedMarkdownFile>,
+      scopedReader?: () => Promise<OpenedMarkdownFile>,
     ) => {
       if (path === stateRef.current.document.path) {
         emitOpenSettled(source, "current");
@@ -374,7 +383,7 @@ export function useDocumentNavigation({
       }
       let outcome: DocumentOpenOutcome = "failed";
       try {
-        outcome = await switchToDocument(path, true, readRequestedFile);
+        outcome = await switchToDocument(path, true, scopedReader);
       } finally {
         finishOperation(operation);
         emitOpenSettled(source, outcome);
@@ -400,7 +409,8 @@ export function useDocumentNavigation({
       }
       if (!mountedRef.current) return "cancelled";
       const approved = stateRef.current.document;
-      const file = await readMarkdownFile(original.path);
+      const file = await (scopedDocumentReaderRef.current?.() ??
+        readMarkdownFile(original.path));
       if (!mountedRef.current) return "cancelled";
       if (!isSameDocumentContext(stateRef.current.document, approved, true)) {
         await showMarkdownMessage(
@@ -445,6 +455,7 @@ export function useDocumentNavigation({
     finishOperation,
     mountedRef,
     resetExternalFileStatus,
+    scopedDocumentReaderRef,
     setDismissedExternalObservationKey,
     setExternalFileState,
     stateRef,

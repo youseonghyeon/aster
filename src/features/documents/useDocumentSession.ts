@@ -29,6 +29,7 @@ import {
   isDesktopRuntime,
   readMarkdownFile,
   showMarkdownMessage,
+  type OpenedMarkdownFile,
 } from "./markdown-files";
 import { useDocumentCloseGuard } from "./useDocumentCloseGuard";
 import { useDocumentNavigation } from "./useDocumentNavigation";
@@ -54,6 +55,9 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
   const handledExternalObservationRef = useRef<string | null>(null);
   const initialRecoveryCheckedRef = useRef(false);
   const saveDocumentRef = useRef<() => Promise<boolean>>(async () => false);
+  const scopedDocumentReaderRef = useRef<
+    (() => Promise<OpenedMarkdownFile>) | null
+  >(null);
   const openFromPickerRef = useRef<
     (source: "picker" | "native") => Promise<DocumentOpenOutcome>
   >(async () => "cancelled");
@@ -171,6 +175,7 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
     useDocumentPersistence({
       events,
       stateRef,
+      scopedDocumentReaderRef,
       mountedRef,
       nextExternalCommitTokenRef,
       handledExternalObservationRef,
@@ -193,6 +198,7 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
   } = useDocumentNavigation({
     events,
     stateRef,
+    scopedDocumentReaderRef,
     mountedRef,
     dispatch,
     beginOperation,
@@ -224,7 +230,8 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
       try {
         const snapshot = stateRef.current.document;
         if (!snapshot.path) return;
-        const external = await readMarkdownFile(snapshot.path);
+        const external = await (scopedDocumentReaderRef.current?.() ??
+          readMarkdownFile(snapshot.path));
         if (!mountedRef.current || stateRef.current.document.path !== snapshot.path) return;
         if (!isDocumentDirty(stateRef.current.document)) {
           await applyExternalFile(external);
@@ -237,7 +244,9 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
           await applyExternalFile(external);
         } else if (decision === "overwrite") {
           await performSave({
-            targetPath: external.path,
+            targetPath: scopedDocumentReaderRef.current
+              ? snapshot.path
+              : external.path,
             expectedRevision: external.revision,
           });
         }
@@ -254,6 +263,7 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
     externalFileState,
     finishOperation,
     performSave,
+    scopedDocumentReaderRef,
     showError,
     state.operation,
   ]);

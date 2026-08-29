@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -21,7 +22,12 @@ export function flattenVisibleFolderEntries(
 
   function appendDirectory(directory: string, level: number) {
     const listing = state.directories[directory];
-    if (!listing || listing.status === "error") return;
+    if (
+      !listing ||
+      (listing.status === "error" && listing.entries.length === 0)
+    ) {
+      return;
+    }
     for (const entry of listing.entries) {
       if (visible.length >= maximumEntries) return;
       visible.push({ ...entry, level });
@@ -110,43 +116,135 @@ export function FolderTree({
     () => allVisibleEntries.slice(0, maximumVisibleTreeEntries),
     [allVisibleEntries],
   );
-  const [visibleLimit, setVisibleLimit] = useState(folderTreePageSize);
+  const [visiblePage, setVisiblePage] = useState(0);
+  const pageCount = Math.max(
+    1,
+    Math.ceil(visibleEntries.length / folderTreePageSize),
+  );
+  const boundedVisiblePage = Math.min(visiblePage, pageCount - 1);
+  const pageStart = boundedVisiblePage * folderTreePageSize;
   const renderedEntries = useMemo(
-    () => visibleEntries.slice(0, visibleLimit),
-    [visibleEntries, visibleLimit],
+    () => visibleEntries.slice(pageStart, pageStart + folderTreePageSize),
+    [pageStart, visibleEntries],
   );
   const entryByPath = useMemo(
-    () => new Map(renderedEntries.map((entry) => [entry.relativePath, entry])),
-    [renderedEntries],
+    () => new Map(visibleEntries.map((entry) => [entry.relativePath, entry])),
+    [visibleEntries],
   );
+  const siblingPositionByPath = useMemo(() => {
+    const groups = new Map<string, VisibleFolderEntry[]>();
+    for (const entry of visibleEntries) {
+      const groupKey = `${entry.level}:${parentPath(entry.relativePath) ?? ""}`;
+      const group = groups.get(groupKey) ?? [];
+      group.push(entry);
+      groups.set(groupKey, group);
+    }
+    const positions = new Map<string, { position: number; size: number }>();
+    for (const siblings of groups.values()) {
+      siblings.forEach((entry, index) =>
+        positions.set(entry.relativePath, {
+          position: index + 1,
+          size: siblings.length,
+        }),
+      );
+    }
+    return positions;
+  }, [visibleEntries]);
+  const pendingFocusPathRef = useRef<string | null>(null);
+  const lastActiveIndexRef = useRef(0);
+  const hasTreeFocusRef = useRef(false);
   const [activePath, setActivePath] = useState<string | null>(null);
   const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
   const typeaheadRef = useRef({ value: "", timer: 0 });
 
+  useEffect(() => setVisiblePage(0), [state.root?.token]);
+
   useEffect(() => {
-    if (activePath && entryByPath.has(activePath)) return;
-    const next =
+    if (visiblePage === boundedVisiblePage) return;
+    setVisiblePage(boundedVisiblePage);
+  }, [boundedVisiblePage, visiblePage]);
+
+  useLayoutEffect(() => {
+    if (visibleEntries.length === 0) {
+      setActivePath(null);
+      return;
+    }
+
+    const existingIndex = activePath
+      ? visibleEntries.findIndex((entry) => entry.relativePath === activePath)
+      : -1;
+    if (existingIndex >= 0) {
+      lastActiveIndexRef.current = existingIndex;
+      const targetPage = Math.floor(existingIndex / folderTreePageSize);
+      if (targetPage !== boundedVisiblePage) {
+        if (hasTreeFocusRef.current) pendingFocusPathRef.current = activePath;
+        setVisiblePage(targetPage);
+      }
+      return;
+    }
+
+    const preferredPath =
       (state.selectedPath && entryByPath.has(state.selectedPath)
         ? state.selectedPath
-        : renderedEntries.find((entry) => entry.path === currentDocumentPath)
+        : visibleEntries.find((entry) => entry.path === currentDocumentPath)
             ?.relativePath) ??
-      renderedEntries[0]?.relativePath ??
-      null;
-    setActivePath(next);
+      visibleEntries[
+        Math.min(lastActiveIndexRef.current, visibleEntries.length - 1)
+      ].relativePath;
+    const preferredIndex = visibleEntries.findIndex(
+      (entry) => entry.relativePath === preferredPath,
+    );
+    lastActiveIndexRef.current = preferredIndex;
+    setActivePath(preferredPath);
+    const targetPage = Math.floor(preferredIndex / folderTreePageSize);
+    if (hasTreeFocusRef.current) {
+      pendingFocusPathRef.current = preferredPath;
+      onSelect(preferredPath);
+    }
+    if (targetPage !== boundedVisiblePage) setVisiblePage(targetPage);
   }, [
     activePath,
+    boundedVisiblePage,
     currentDocumentPath,
     entryByPath,
-    renderedEntries,
+    onSelect,
     state.selectedPath,
+    visibleEntries,
   ]);
 
-  useEffect(() => setVisibleLimit(folderTreePageSize), [state.root?.token]);
+  useLayoutEffect(() => {
+    const path = pendingFocusPathRef.current;
+    if (!path) return;
+    const element = buttonRefs.current.get(path);
+    if (!element) return;
+    pendingFocusPathRef.current = null;
+    element.focus();
+    element.scrollIntoView({ block: "nearest" });
+  }, [renderedEntries]);
 
   function focusEntry(path: string) {
+    const index = visibleEntries.findIndex(
+      (entry) => entry.relativePath === path,
+    );
+    if (index < 0) return;
+    lastActiveIndexRef.current = index;
     setActivePath(path);
     onSelect(path);
-    buttonRefs.current.get(path)?.focus({ preventScroll: true });
+    const targetPage = Math.floor(index / folderTreePageSize);
+    if (targetPage !== boundedVisiblePage) {
+      pendingFocusPathRef.current = path;
+      setVisiblePage(targetPage);
+      return;
+    }
+    const element = buttonRefs.current.get(path);
+    element?.focus();
+    element?.scrollIntoView({ block: "nearest" });
+  }
+
+  function showPage(page: number) {
+    const nextPage = Math.min(pageCount - 1, Math.max(0, page));
+    const firstEntry = visibleEntries[nextPage * folderTreePageSize];
+    if (firstEntry) focusEntry(firstEntry.relativePath);
   }
 
   function activateEntry(entry: FolderEntry) {
@@ -171,23 +269,22 @@ export function FolderTree({
     event: KeyboardEvent<HTMLButtonElement>,
     entry: VisibleFolderEntry,
   ) {
-    const index = renderedEntries.findIndex(
+    const index = visibleEntries.findIndex(
       (candidate) => candidate.relativePath === entry.relativePath,
     );
     let target: VisibleFolderEntry | undefined;
-    if (event.key === "ArrowDown") target = renderedEntries[index + 1];
-    else if (event.key === "ArrowUp") target = renderedEntries[index - 1];
-    else if (event.key === "Home") target = renderedEntries[0];
+    if (event.key === "ArrowDown") target = visibleEntries[index + 1];
+    else if (event.key === "ArrowUp") target = visibleEntries[index - 1];
+    else if (event.key === "Home") target = visibleEntries[0];
     else if (event.key === "End") {
-      target = renderedEntries[renderedEntries.length - 1];
-    }
-    else if (event.key === "ArrowRight" && entry.kind === "directory") {
+      target = visibleEntries[visibleEntries.length - 1];
+    } else if (event.key === "ArrowRight" && entry.kind === "directory") {
       if (!state.expandedPaths.has(entry.relativePath)) {
         event.preventDefault();
         onToggleDirectory(entry);
         return;
       }
-      const child = renderedEntries[index + 1];
+      const child = visibleEntries[index + 1];
       if (child?.level === entry.level + 1) target = child;
     } else if (event.key === "ArrowLeft") {
       if (
@@ -218,8 +315,8 @@ export function FolderTree({
       typeaheadRef.current.value += event.key.toLocaleLowerCase();
       const query = typeaheadRef.current.value;
       target = [
-        ...renderedEntries.slice(index + 1),
-        ...renderedEntries.slice(0, index + 1),
+        ...visibleEntries.slice(index + 1),
+        ...visibleEntries.slice(0, index + 1),
       ].find(
         (candidate) => candidate.name.toLocaleLowerCase().startsWith(query),
       );
@@ -237,7 +334,22 @@ export function FolderTree({
 
   return (
     <div className="folder-tree-frame">
-      <div className="folder-tree" role="tree" aria-label="폴더 파일">
+      <div
+        className="folder-tree"
+        role="tree"
+        aria-label="폴더 파일"
+        onFocusCapture={() => {
+          hasTreeFocusRef.current = true;
+        }}
+        onBlurCapture={(event) => {
+          if (
+            event.relatedTarget instanceof Node &&
+            !event.currentTarget.contains(event.relatedTarget)
+          ) {
+            hasTreeFocusRef.current = false;
+          }
+        }}
+      >
         {renderedEntries.map((entry) => {
           const isDirectory = entry.kind === "directory";
           const isExpanded =
@@ -247,6 +359,9 @@ export function FolderTree({
             : undefined;
           const isSelected = state.selectedPath === entry.relativePath;
           const isCurrent = entry.path === currentDocumentPath;
+          const siblingPosition = siblingPositionByPath.get(
+            entry.relativePath,
+          );
           const statusLabel =
             directory?.status === "loading"
               ? ", 불러오는 중"
@@ -257,66 +372,105 @@ export function FolderTree({
                   : "";
           return (
             <button
-            key={entry.relativePath}
-            ref={(element) => {
-              if (element) buttonRefs.current.set(entry.relativePath, element);
-              else buttonRefs.current.delete(entry.relativePath);
-            }}
-            type="button"
-            role="treeitem"
-            className={`folder-tree-item is-${entry.kind}`}
-            style={{
-              paddingInlineStart: `${8 + Math.min(entry.level - 1, maximumVisualIndentLevel - 1) * 16}px`,
-            }}
-            tabIndex={activePath === entry.relativePath ? 0 : -1}
-            aria-level={entry.level}
-            aria-expanded={isDirectory ? isExpanded : undefined}
-            aria-selected={isSelected}
-            aria-current={isCurrent ? "page" : undefined}
-            aria-label={`${entry.name}${isCurrent ? ", 현재 문서" : ""}${statusLabel}`}
-            title={
-              directory?.error
-                ? `${entry.path}\n${directory.error}`
-                : entry.path
-            }
-            onFocus={() => setActivePath(entry.relativePath)}
-            onClick={() => {
-              setActivePath(entry.relativePath);
-              onSelect(entry.relativePath);
-            }}
-            onDoubleClick={() => activateEntry(entry)}
-            onKeyDown={(event) => handleKeyDown(event, entry)}
-          >
-            <span className="folder-tree-leading" aria-hidden="true">
-              {isDirectory ? <DisclosureIcon expanded={isExpanded} /> : <span />}
-              <span className="folder-tree-icon">
-                <EntryIcon kind={entry.kind} />
+              key={entry.relativePath}
+              ref={(element) => {
+                if (element) {
+                  buttonRefs.current.set(entry.relativePath, element);
+                } else {
+                  buttonRefs.current.delete(entry.relativePath);
+                }
+              }}
+              type="button"
+              role="treeitem"
+              className={`folder-tree-item is-${entry.kind}`}
+              style={{
+                paddingInlineStart: `${8 + Math.min(entry.level - 1, maximumVisualIndentLevel - 1) * 16}px`,
+              }}
+              tabIndex={activePath === entry.relativePath ? 0 : -1}
+              aria-level={entry.level}
+              aria-posinset={siblingPosition?.position}
+              aria-setsize={siblingPosition?.size}
+              aria-expanded={isDirectory ? isExpanded : undefined}
+              aria-selected={isSelected}
+              aria-current={isCurrent ? "page" : undefined}
+              aria-label={`${entry.name}${isCurrent ? ", 현재 문서" : ""}${statusLabel}`}
+              title={
+                directory?.error
+                  ? `${entry.path}\n${directory.error}`
+                  : entry.path
+              }
+              onFocus={() => {
+                lastActiveIndexRef.current = visibleEntries.findIndex(
+                  (candidate) =>
+                    candidate.relativePath === entry.relativePath,
+                );
+                setActivePath(entry.relativePath);
+              }}
+              onClick={() => {
+                setActivePath(entry.relativePath);
+                onSelect(entry.relativePath);
+              }}
+              onDoubleClick={() => activateEntry(entry)}
+              onKeyDown={(event) => handleKeyDown(event, entry)}
+            >
+              <span className="folder-tree-leading" aria-hidden="true">
+                {isDirectory ? (
+                  <DisclosureIcon expanded={isExpanded} />
+                ) : (
+                  <span />
+                )}
+                <span className="folder-tree-icon">
+                  <EntryIcon kind={entry.kind} />
+                </span>
               </span>
-            </span>
-            <span className="folder-tree-name">{entry.name}</span>
-            {directory?.status === "loading" ? (
-              <span className="folder-tree-state" aria-hidden="true">…</span>
-            ) : directory?.status === "error" ? (
-              <span className="folder-tree-state is-error" aria-hidden="true">
-                다시 시도
-              </span>
-            ) : directory?.truncated ? (
-              <span className="folder-tree-state" aria-hidden="true">+</span>
-            ) : null}
+              <span className="folder-tree-name">{entry.name}</span>
+              {directory?.status === "loading" ? (
+                <span className="folder-tree-state" aria-hidden="true">
+                  …
+                </span>
+              ) : directory?.status === "error" ? (
+                <span className="folder-tree-state is-error" aria-hidden="true">
+                  읽기 오류
+                </span>
+              ) : directory?.truncated ? (
+                <span className="folder-tree-state" aria-hidden="true">
+                  +
+                </span>
+              ) : null}
             </button>
           );
         })}
       </div>
-      {visibleEntries.length > renderedEntries.length ? (
-        <button
-          type="button"
-          className="folder-tree-more"
-          onClick={() => setVisibleLimit((limit) => limit + folderTreePageSize)}
+      {pageCount > 1 ? (
+        <div
+          className="folder-tree-pagination"
+          role="group"
+          aria-label="파일 목록 페이지"
         >
-          다음{
-            " "
-          }{Math.min(folderTreePageSize, visibleEntries.length - renderedEntries.length)}개 표시
-        </button>
+          <button
+            type="button"
+            className="folder-tree-more"
+            disabled={boundedVisiblePage === 0}
+            onClick={() => showPage(boundedVisiblePage - 1)}
+          >
+            이전
+          </button>
+          <span
+            className="folder-tree-page-status"
+            aria-label={`${pageCount}페이지 중 ${boundedVisiblePage + 1}페이지`}
+            aria-live="polite"
+          >
+            {boundedVisiblePage + 1} / {pageCount}
+          </span>
+          <button
+            type="button"
+            className="folder-tree-more"
+            disabled={boundedVisiblePage === pageCount - 1}
+            onClick={() => showPage(boundedVisiblePage + 1)}
+          >
+            다음
+          </button>
+        </div>
       ) : null}
       {isTreeCapped ? (
         <p className="folder-browser-limit" role="status">

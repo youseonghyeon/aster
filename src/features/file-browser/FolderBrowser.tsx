@@ -1,4 +1,9 @@
-import { useEffect, useRef, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type KeyboardEvent,
+} from "react";
 import type { FolderEntry } from "./folder-gateway";
 import type { FolderTreeState } from "./folder-tree-state";
 import { FolderTree } from "./FolderTree";
@@ -19,7 +24,7 @@ type FolderBrowserProps = {
   onSelectEntry: (path: string) => void;
   onToggleDirectory: (entry: FolderEntry) => void;
   onRetryDirectory: (directory: string) => void;
-  onOpenMarkdown: (rootToken: number, entry: FolderEntry) => void;
+  onOpenMarkdown: (rootPath: string, entry: FolderEntry) => void;
   onOpenImage: (entry: FolderEntry) => void;
 };
 
@@ -68,12 +73,23 @@ export function FolderBrowser({
 }: FolderBrowserProps) {
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const refreshButtonRef = useRef<HTMLButtonElement>(null);
   const previousIsModalRef = useRef(isModal);
+  const hadTreeFocusRef = useRef(false);
+
+  function findPreferredFocusTarget() {
+    return (
+      sidebarRef.current?.querySelector<HTMLElement>(
+        '[role="treeitem"][tabindex="0"]',
+      ) ??
+      sidebarRef.current?.querySelector<HTMLElement>(
+        '[role="treeitem"], [data-primary-action="true"]',
+      )
+    );
+  }
 
   useEffect(() => {
-    const focusTarget = sidebarRef.current?.querySelector<HTMLElement>(
-      '[role="treeitem"], [data-primary-action="true"]',
-    );
+    const focusTarget = findPreferredFocusTarget();
     (focusTarget ?? closeButtonRef.current)?.focus();
   }, []);
 
@@ -81,9 +97,7 @@ export function FolderBrowser({
     const becameModal = isModal && !previousIsModalRef.current;
     previousIsModalRef.current = isModal;
     if (becameModal && !sidebarRef.current?.contains(document.activeElement)) {
-      const focusTarget = sidebarRef.current?.querySelector<HTMLElement>(
-        '[role="treeitem"], [data-primary-action="true"]',
-      );
+      const focusTarget = findPreferredFocusTarget();
       (focusTarget ?? closeButtonRef.current)?.focus();
     }
   }, [isModal]);
@@ -124,7 +138,23 @@ export function FolderBrowser({
     state.root &&
     (!rootListing ||
       rootListing.status === "idle" ||
-      rootListing.status === "loading");
+      (rootListing.status === "loading" && rootListing.entries.length === 0));
+  const isRootListingBusy = rootListing?.status === "loading";
+  const hasCachedEntries = Boolean(rootListing?.entries.length);
+  const hasVisibleTree = Boolean(
+    state.root &&
+      rootListing &&
+      !isLoadingListing &&
+      (rootListing.status !== "error" || hasCachedEntries) &&
+      !isEmpty,
+  );
+
+  useLayoutEffect(() => {
+    if (hasVisibleTree || !hadTreeFocusRef.current) return;
+    if (sidebarRef.current?.contains(document.activeElement)) return;
+    hadTreeFocusRef.current = false;
+    (refreshButtonRef.current ?? closeButtonRef.current)?.focus();
+  }, [hasVisibleTree]);
 
   return (
     <aside
@@ -135,6 +165,10 @@ export function FolderBrowser({
       aria-modal={isModal ? true : undefined}
       aria-labelledby="folder-browser-title"
       onKeyDown={handleKeyDown}
+      onFocusCapture={(event) => {
+        hadTreeFocusRef.current =
+          (event.target as HTMLElement).getAttribute("role") === "treeitem";
+      }}
     >
       <header className="document-sidebar-header">
         <div>
@@ -163,10 +197,14 @@ export function FolderBrowser({
           type="button"
           role="tab"
           aria-selected="true"
-          aria-controls="document-files-panel"
+          aria-controls="document-browser-panel"
           tabIndex={0}
           onKeyDown={(event) => {
-            if (event.key === "ArrowRight" || event.key === "End") {
+            if (
+              event.key === "ArrowLeft" ||
+              event.key === "ArrowRight" ||
+              event.key === "End"
+            ) {
               event.preventDefault();
               showRecentView();
             }
@@ -179,7 +217,7 @@ export function FolderBrowser({
           type="button"
           role="tab"
           aria-selected="false"
-          aria-controls="document-recent-panel"
+          aria-controls="document-browser-panel"
           tabIndex={-1}
           onClick={showRecentView}
         >
@@ -188,11 +226,11 @@ export function FolderBrowser({
       </div>
 
       <div
-        id="document-files-panel"
+        id="document-browser-panel"
         className="folder-browser-content"
         role="tabpanel"
         aria-labelledby="document-files-tab"
-        aria-busy={isLoadingRoot || Boolean(isLoadingListing)}
+        aria-busy={isLoadingRoot || Boolean(isRootListingBusy)}
       >
         {isLoadingRoot ? (
           <div className="folder-browser-message" role="status">
@@ -217,7 +255,7 @@ export function FolderBrowser({
             <strong>파일 목록을 불러오고 있습니다</strong>
             <span>이 폴더의 Markdown과 이미지를 확인하는 중입니다.</span>
           </div>
-        ) : rootListing?.status === "error" ? (
+        ) : rootListing?.status === "error" && !hasCachedEntries ? (
           <div className="folder-browser-message" role="alert">
             <strong>폴더를 읽지 못했습니다</strong>
             <span>{rootListing.error}</span>
@@ -244,11 +282,22 @@ export function FolderBrowser({
             onToggleDirectory={onToggleDirectory}
             onRetryDirectory={onRetryDirectory}
             onOpenMarkdown={(entry) =>
-              state.root && onOpenMarkdown(state.root.token, entry)
+              state.root && onOpenMarkdown(state.root.path, entry)
             }
             onOpenImage={onOpenImage}
           />
         )}
+        {rootListing?.status === "loading" &&
+        rootListing.entries.length > 0 ? (
+          <p className="folder-browser-limit" role="status">
+            파일 목록을 새로고침하고 있습니다.
+          </p>
+        ) : null}
+        {rootListing?.status === "error" && hasCachedEntries ? (
+          <p className="folder-browser-inline-error" role="alert">
+            파일 목록을 새로고침하지 못했습니다: {rootListing.error}
+          </p>
+        ) : null}
         {state.rootError || operationError ? (
           <p className="folder-browser-inline-error" role="alert">
             {operationError ?? state.rootError}
@@ -282,7 +331,7 @@ export function FolderBrowser({
         ) : null}
         {state.root ? (
           <div className="folder-browser-footer-actions">
-            <button type="button" onClick={onRefresh}>
+            <button ref={refreshButtonRef} type="button" onClick={onRefresh}>
               <RefreshIcon />
               새로고침
             </button>

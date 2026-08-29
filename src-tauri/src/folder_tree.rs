@@ -200,7 +200,8 @@ impl FolderTreeState {
         let canonical = path
             .canonicalize()
             .map_err(|error| format!("이미지 경로를 확인할 수 없습니다: {error}"))?;
-        if !canonical.starts_with(&session.root)
+        if canonical != path
+            || !canonical.starts_with(&session.root)
             || supported_file_kind(&canonical) != Some(FolderEntryKind::Image)
         {
             return Err("선택한 이미지가 현재 폴더 안에 있지 않습니다.".into());
@@ -210,12 +211,23 @@ impl FolderTreeState {
 
     pub(crate) fn read_markdown(
         &self,
-        root_token: u64,
+        root_path: String,
         relative_path: String,
     ) -> Result<MarkdownDocument, String> {
-        let session = self.current_session(root_token)?;
+        let expected_root = PathBuf::from(&root_path);
+        let root_metadata = fs::symlink_metadata(&expected_root)
+            .map_err(|error| format!("Markdown 루트 정보를 읽을 수 없습니다: {error}"))?;
+        if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+            return Err("Markdown 루트가 더 이상 안전한 폴더가 아닙니다.".into());
+        }
+        let root = expected_root
+            .canonicalize()
+            .map_err(|error| format!("Markdown 루트를 확인할 수 없습니다: {error}"))?;
+        if root != expected_root {
+            return Err("Markdown 루트의 위치가 변경되어 파일을 사용할 수 없습니다.".into());
+        }
         let relative = validate_relative_file(&relative_path)?;
-        let path = session.root.join(relative);
+        let path = root.join(relative);
         let metadata = fs::symlink_metadata(&path)
             .map_err(|error| format!("Markdown 파일 정보를 읽을 수 없습니다: {error}"))?;
         if metadata.file_type().is_symlink() || !metadata.is_file() {
@@ -224,7 +236,8 @@ impl FolderTreeState {
         let canonical = path
             .canonicalize()
             .map_err(|error| format!("Markdown 경로를 확인할 수 없습니다: {error}"))?;
-        if !canonical.starts_with(&session.root)
+        if canonical != path
+            || !canonical.starts_with(&root)
             || supported_file_kind(&canonical) != Some(FolderEntryKind::Markdown)
         {
             return Err("선택한 Markdown 파일이 현재 폴더 안에 있지 않습니다.".into());
@@ -289,7 +302,7 @@ fn resolve_directory(root: &Path, relative: &Path) -> Result<PathBuf, String> {
     let canonical = requested
         .canonicalize()
         .map_err(|error| format!("폴더 경로를 확인할 수 없습니다: {error}"))?;
-    if !canonical.starts_with(root) {
+    if canonical != requested || !canonical.starts_with(root) {
         return Err("현재 폴더 밖의 경로는 탐색할 수 없습니다.".into());
     }
     Ok(canonical)
@@ -472,7 +485,65 @@ mod tests {
         fs::remove_file(&markdown).unwrap();
         symlink(outside.path().join("outside.md"), &markdown).unwrap();
         assert!(state
-            .read_markdown(root.token, "replaced.md".into())
+            .read_markdown(root.path, "replaced.md".into())
+            .is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_a_root_reached_through_a_replaced_parent_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let workspace = TempDir::new().unwrap();
+        let original_parent = workspace.path().join("parent");
+        let original_root = original_parent.join("root");
+        fs::create_dir_all(&original_root).unwrap();
+        fs::write(original_root.join("document.md"), "# Original").unwrap();
+        let state = FolderTreeState::default();
+        let root = state
+            .open_folder(original_root.to_string_lossy().into_owned())
+            .unwrap();
+
+        let moved_parent = workspace.path().join("moved-parent");
+        fs::rename(&original_parent, &moved_parent).unwrap();
+        let outside_parent = workspace.path().join("outside-parent");
+        let outside_root = outside_parent.join("root");
+        fs::create_dir_all(&outside_root).unwrap();
+        fs::write(outside_root.join("document.md"), "# Outside").unwrap();
+        symlink(&outside_parent, &original_parent).unwrap();
+
+        assert!(state
+            .read_markdown(root.path, "document.md".into())
+            .is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_a_file_reached_through_a_replaced_internal_directory_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let directory = TempDir::new().unwrap();
+        let first = directory.path().join("first");
+        let second = directory.path().join("second");
+        fs::create_dir_all(&first).unwrap();
+        fs::create_dir_all(&second).unwrap();
+        fs::write(first.join("document.md"), "# First").unwrap();
+        fs::write(second.join("document.md"), "# Second").unwrap();
+        let (state, root) = open_test_root(&directory);
+
+        let listing = state
+            .list_children(ListFolderChildrenRequest {
+                root_token: root.token,
+                relative_path: "first".into(),
+            })
+            .unwrap();
+        assert_eq!(listing.entries[0].relative_path, "first/document.md");
+
+        fs::rename(&first, directory.path().join("moved-first")).unwrap();
+        symlink(&second, &first).unwrap();
+
+        assert!(state
+            .read_markdown(root.path, "first/document.md".into())
             .is_err());
     }
 }

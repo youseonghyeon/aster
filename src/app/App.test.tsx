@@ -741,7 +741,7 @@ describe("workspace regression contracts", () => {
       expect(screen.getByRole("heading", { name: "폴더 문서" })).toBeInTheDocument(),
     );
     expect(invoke).toHaveBeenCalledWith("read_folder_markdown", {
-      rootToken: 4,
+      rootPath: "/docs",
       relativePath: "guide.md",
     });
     expect(screen.getByRole("heading", { name: "docs" })).toBeInTheDocument();

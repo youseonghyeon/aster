@@ -384,6 +384,38 @@ describe("document session controller", () => {
     expect(result.current.document.saveStatus).toBe("saved");
   });
 
+  it("revalidates a folder document with its scoped reader before saving", async () => {
+    const scopedReader = vi
+      .fn()
+      .mockResolvedValueOnce(firstFile)
+      .mockRejectedValueOnce(new Error("선택한 폴더 밖의 파일입니다"));
+    const { result } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+    await act(async () => {
+      expect(
+        await result.current.openDocument(
+          firstFile.path,
+          "folder",
+          scopedReader,
+        ),
+      ).toBe("opened");
+    });
+    act(() => result.current.editMarkdown("# 안전하게 저장할 내용"));
+
+    await act(async () => {
+      expect(await result.current.saveDocument()).toBe(false);
+    });
+
+    expect(scopedReader).toHaveBeenCalledTimes(2);
+    expect(saveMarkdownFile).not.toHaveBeenCalled();
+    expect(showMarkdownMessage).toHaveBeenCalledWith(
+      "선택한 폴더 밖의 파일입니다",
+      expect.objectContaining({ title: "Markdown을 저장할 수 없습니다" }),
+    );
+    expect(result.current.document.saveStatus).toBe("error");
+  });
+
   it("keeps edits made while a save is in flight unsaved", async () => {
     const saving = deferred<{
       kind: "saved";
@@ -644,5 +676,62 @@ describe("document session controller", () => {
 
     expect(chooseExternalConflictDecision).toHaveBeenCalledWith("first.md");
     expect(result.current.document.markdown).toBe("# 외부 변경");
+  });
+
+  it("never adopts a changed external path when overwriting a folder document", async () => {
+    const external = {
+      ...firstFile,
+      path: "/outside/victim.md",
+      name: "victim.md",
+      content: "# 외부 파일",
+      revision: "external-revision",
+    };
+    const scopedReader = vi
+      .fn()
+      .mockResolvedValueOnce(firstFile)
+      .mockResolvedValueOnce(external)
+      .mockResolvedValueOnce(firstFile);
+    vi.mocked(chooseExternalConflictDecision).mockResolvedValue("overwrite");
+    vi.mocked(saveMarkdownFile).mockResolvedValue({
+      kind: "saved",
+      document: {
+        ...firstFile,
+        content: "# 내부 변경",
+        revision: "saved-revision",
+      },
+    });
+    const { result, rerender } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+    await act(async () => {
+      await result.current.openDocument(
+        firstFile.path,
+        "folder",
+        scopedReader,
+      );
+    });
+    act(() => result.current.editMarkdown("# 내부 변경"));
+    mockedExternalStatus.state = {
+      kind: "modified",
+      revision: external.revision,
+      observationKey: "modified:external-revision",
+    };
+
+    rerender();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(saveMarkdownFile).toHaveBeenCalledWith({
+      path: firstFile.path,
+      content: "# 내부 변경",
+      expectedRevision: external.revision,
+      format: firstFile.format,
+    });
+    expect(saveMarkdownFile).not.toHaveBeenCalledWith(
+      expect.objectContaining({ path: external.path }),
+    );
   });
 });

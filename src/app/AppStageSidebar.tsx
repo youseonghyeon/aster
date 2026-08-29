@@ -39,9 +39,9 @@ export function AppStageSidebar({
         onSelectEntry={folderBrowser.actions.selectEntry}
         onToggleDirectory={folderBrowser.actions.toggleDirectory}
         onRetryDirectory={folderBrowser.actions.retryDirectory}
-        onOpenMarkdown={(rootToken, entry) =>
+        onOpenMarkdown={(rootPath, entry) =>
           void documents.openDocument(entry.path, "folder", () =>
-            readFolderMarkdown(rootToken, entry.relativePath),
+            readFolderMarkdown(rootPath, entry.relativePath),
           )
         }
         onOpenImage={(entry) => void folderBrowser.actions.openImage(entry)}

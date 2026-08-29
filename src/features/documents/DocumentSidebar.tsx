@@ -185,7 +185,7 @@ export function DocumentSidebar({
           type="button"
           role="tab"
           aria-selected="false"
-          aria-controls="document-files-panel"
+          aria-controls="document-browser-panel"
           tabIndex={-1}
           onClick={showFilesView}
         >
@@ -196,10 +196,14 @@ export function DocumentSidebar({
           type="button"
           role="tab"
           aria-selected="true"
-          aria-controls="document-recent-panel"
+          aria-controls="document-browser-panel"
           tabIndex={0}
           onKeyDown={(event) => {
-            if (event.key === "ArrowLeft" || event.key === "Home") {
+            if (
+              event.key === "ArrowLeft" ||
+              event.key === "ArrowRight" ||
+              event.key === "Home"
+            ) {
               event.preventDefault();
               showFilesView();
             }
@@ -210,7 +214,7 @@ export function DocumentSidebar({
       </div>
 
       <div
-        id="document-recent-panel"
+        id="document-browser-panel"
         className="recent-document-content"
         role="tabpanel"
         aria-labelledby="document-recent-tab"

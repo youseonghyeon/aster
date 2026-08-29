@@ -169,7 +169,121 @@ describe("FolderTree", () => {
     renderTree(state);
 
     expect(screen.getAllByRole("treeitem")).toHaveLength(300);
-    await user.click(screen.getByRole("button", { name: "다음 1개 표시" }));
-    expect(screen.getAllByRole("treeitem")).toHaveLength(301);
+    await user.click(screen.getByRole("button", { name: "다음" }));
+    expect(screen.getAllByRole("treeitem")).toHaveLength(1);
+    expect(screen.getByRole("treeitem", { name: "문서-300.md" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "이전" }));
+    expect(screen.getAllByRole("treeitem")).toHaveLength(300);
+    expect(screen.getByRole("treeitem", { name: "문서-0.md" })).toHaveFocus();
+  });
+
+  it("moves keyboard focus across a page boundary without growing the DOM", async () => {
+    const state = treeState();
+    state.expandedPaths = new Set();
+    state.selectedPath = "문서-299.md";
+    state.directories[""].entries = Array.from({ length: 301 }, (_, index) => ({
+      name: `문서-${index}.md`,
+      relativePath: `문서-${index}.md`,
+      path: `/docs/문서-${index}.md`,
+      kind: "markdown" as const,
+    }));
+    const user = userEvent.setup();
+    renderTree(state);
+
+    screen.getByRole("treeitem", { name: "문서-299.md" }).focus();
+    await user.keyboard("{ArrowDown}");
+
+    expect(screen.getAllByRole("treeitem")).toHaveLength(1);
+    expect(screen.getByRole("treeitem", { name: "문서-300.md" })).toHaveFocus();
+  });
+
+  it("opens on the page containing the current document", async () => {
+    const state = treeState();
+    state.expandedPaths = new Set();
+    state.selectedPath = null;
+    state.directories[""].entries = Array.from({ length: 301 }, (_, index) => ({
+      name: `문서-${index}.md`,
+      relativePath: `문서-${index}.md`,
+      path: `/docs/문서-${index}.md`,
+      kind: "markdown" as const,
+    }));
+    const props = {
+      state,
+      currentDocumentPath: "/docs/문서-300.md",
+      isDocumentBusy: false,
+      onSelect: vi.fn(),
+      onToggleDirectory: vi.fn(),
+      onRetryDirectory: vi.fn(),
+      onOpenMarkdown: vi.fn(),
+      onOpenImage: vi.fn(),
+    };
+    render(<FolderTree {...props} />);
+
+    expect(
+      await screen.findByRole("treeitem", {
+        name: "문서-300.md, 현재 문서",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("treeitem")).toHaveLength(1);
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+  });
+
+  it("restores focus to the nearest item when refresh removes the active page", async () => {
+    const entries = Array.from({ length: 301 }, (_, index) => ({
+      name: `문서-${index}.md`,
+      relativePath: `문서-${index}.md`,
+      path: `/docs/문서-${index}.md`,
+      kind: "markdown" as const,
+    }));
+    const state = treeState();
+    state.expandedPaths = new Set();
+    state.selectedPath = "문서-300.md";
+    state.directories[""].entries = entries;
+    const props = {
+      state,
+      currentDocumentPath: null,
+      isDocumentBusy: false,
+      onSelect: vi.fn(),
+      onToggleDirectory: vi.fn(),
+      onRetryDirectory: vi.fn(),
+      onOpenMarkdown: vi.fn(),
+      onOpenImage: vi.fn(),
+    };
+    const { rerender } = render(<FolderTree {...props} />);
+    const lastItem = await screen.findByRole("treeitem", {
+      name: "문서-300.md",
+    });
+    lastItem.focus();
+
+    const refreshedState = {
+      ...state,
+      selectedPath: "문서-300.md",
+      directories: {
+        ...state.directories,
+        "": { ...state.directories[""], entries: entries.slice(0, 300) },
+      },
+    };
+    rerender(<FolderTree {...props} state={refreshedState} />);
+
+    expect(await screen.findByRole("treeitem", { name: "문서-299.md" })).toHaveFocus();
+    expect(screen.getAllByRole("treeitem")).toHaveLength(300);
+    expect(props.onSelect).toHaveBeenLastCalledWith("문서-299.md");
+  });
+
+  it("caps expanded branches before rendering pages", () => {
+    const state = treeState();
+    state.expandedPaths = new Set();
+    state.directories[""].entries = Array.from({ length: 6_001 }, (_, index) => ({
+      name: `문서-${index}.md`,
+      relativePath: `문서-${index}.md`,
+      path: `/docs/문서-${index}.md`,
+      kind: "markdown" as const,
+    }));
+    renderTree(state);
+
+    expect(screen.getAllByRole("treeitem")).toHaveLength(300);
+    expect(screen.getByText(/처음 6,000개만 표시/)).toBeInTheDocument();
+    expect(screen.getByText("1 / 20")).toBeInTheDocument();
   });
 });
