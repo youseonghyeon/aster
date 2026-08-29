@@ -3,7 +3,7 @@ import {
   emptySearchSession,
   type SearchArea,
   type SearchSession,
-} from "../lib/text-search";
+} from "../../lib/text-search";
 
 type SearchSessions = Record<SearchArea, SearchSession>;
 

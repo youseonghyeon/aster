@@ -20,7 +20,7 @@ import {
 import { useActiveHeading } from "./hooks/useActiveHeading";
 import { usePaneSplit } from "./hooks/usePaneSplit";
 import { useScrollSync } from "./hooks/useScrollSync";
-import { useWorkspaceSearch } from "./hooks/useWorkspaceSearch";
+import { useWorkspaceSearch } from "./features/workspace/useWorkspaceSearch";
 import type { RecentDocument } from "./features/documents/recent-documents";
 import { ExternalFileNotice } from "./features/documents/ExternalFileNotice";
 import { useDocumentSession } from "./features/documents/useDocumentSession";
@@ -32,7 +32,7 @@ import {
   createWorkspaceInteractionState,
   getEscapeOwner,
   workspaceInteractionReducer,
-} from "./lib/workspace-interactions";
+} from "./features/workspace/workspace-interactions";
 import {
   createAppEventChannel,
   type AppEventChannel,
