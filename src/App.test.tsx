@@ -219,7 +219,7 @@ describe("workspace regression contracts", () => {
     expect(editor.selectionEnd).toBe(7);
   });
 
-  it("keeps preview Escape restoration behavior unchanged", async () => {
+  it("keeps the current preview result position when Escape closes search", async () => {
     const user = userEvent.setup();
     render(<App />);
     const preview = screen.getByLabelText<HTMLDivElement>("미리보기 내용");
@@ -243,10 +243,10 @@ describe("workspace regression contracts", () => {
     await user.keyboard("{Escape}");
     await flushSearchFrames();
 
-    expect(preview.scrollTop).toBe(85);
-    expect(preview.scrollLeft).toBe(12);
-    expect(nested.scrollTop).toBe(9);
-    expect(nested.scrollLeft).toBe(34);
+    expect(preview.scrollTop).toBe(710);
+    expect(preview.scrollLeft).toBe(220);
+    expect(nested.scrollTop).toBe(410);
+    expect(nested.scrollLeft).toBe(330);
   });
 
   it("preserves edited Markdown when document switching is cancelled", async () => {

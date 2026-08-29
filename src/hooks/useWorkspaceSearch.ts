@@ -169,7 +169,7 @@ export function useWorkspaceSearch(onOpen: () => void) {
       window.requestAnimationFrame(() => {
         const contentElement = contentElementsRef.current[area];
 
-        if (area !== "editor") {
+        if (area === "notes") {
           if (contentElement instanceof HTMLTextAreaElement && snapshot) {
             restoreTextareaSnapshot(contentElement, snapshot);
           } else if (contentElement && snapshot) {
