@@ -47,25 +47,39 @@
 .folder-browser-content {
   min-height: 0;
   padding: 4px 7px 18px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.folder-tree-viewport {
+  min-height: 0;
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior-inline: contain;
 }
 
 .folder-tree {
   display: grid;
+  width: max-content;
+  min-width: 100%;
   gap: 1px;
 }
 
 .folder-tree-frame {
   display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto auto;
   gap: 8px;
 }
 
 .folder-tree-item {
   display: grid;
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   min-height: 30px;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
+  grid-template-columns: 24px 18px max-content auto;
   gap: 3px;
   align-items: center;
   padding-block: 3px;
@@ -104,10 +118,31 @@
   outline-offset: 1px;
 }
 
-.folder-tree-leading {
+.folder-tree-disclosure-button,
+.folder-tree-disclosure-placeholder {
   display: grid;
-  grid-template-columns: 12px 18px;
-  align-items: center;
+  width: 24px;
+  height: 100%;
+  min-height: 24px;
+  place-items: center;
+}
+
+.folder-tree-disclosure-button {
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.folder-tree-disclosure-button:hover {
+  background: color-mix(in srgb, currentColor 9%, transparent);
+}
+
+.folder-tree-disclosure-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .folder-tree-disclosure {
@@ -137,7 +172,10 @@
   color: var(--text-faint);
 }
 
-.folder-tree-name,
+.folder-tree-name {
+  white-space: nowrap;
+}
+
 .folder-browser-root span {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -145,6 +183,7 @@
 }
 
 .folder-tree-state {
+  margin-inline-start: 5px;
   color: var(--text-faint);
   font-size: 11px;
 }

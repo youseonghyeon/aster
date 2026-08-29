@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   chooseFolderPath,
   closeFolderRoot,
@@ -43,6 +43,10 @@ describe("useFolderBrowser", () => {
     vi.mocked(listFolderChildren).mockImplementation((_, directory) =>
       Promise.resolve(listing(directory)),
     );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("closes a stale root that completes after a newer selection", async () => {
@@ -110,5 +114,287 @@ describe("useFolderBrowser", () => {
     expect(result.current.sidebarWidth).toBe(420);
     expect(JSON.parse(localStorage.getItem(folderBrowserStorageKey) ?? "{}"))
       .toMatchObject({ sidebarWidth: 420 });
+  });
+
+  it("schedules one refresh after the adaptive delay and pauses when inactive", async () => {
+    vi.useFakeTimers();
+    localStorage.setItem(
+      folderBrowserStorageKey,
+      JSON.stringify({
+        rootPath: "/docs",
+        expandedPaths: [],
+        view: "files",
+        sidebarWidth: 280,
+      }),
+    );
+    const { rerender } = renderHook(
+      ({ isActive }) => useFolderBrowser({ isActive }),
+      { initialProps: { isActive: true } },
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(listFolderChildren).toHaveBeenCalledTimes(1);
+
+    await act(async () => vi.advanceTimersByTimeAsync(9_999));
+    expect(listFolderChildren).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(listFolderChildren).toHaveBeenCalledTimes(2);
+
+    rerender({ isActive: false });
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(listFolderChildren).toHaveBeenCalledTimes(2);
+  });
+
+  it("pauses while hidden, refreshes on return, and clears the unmounted timer", async () => {
+    vi.useFakeTimers();
+    localStorage.setItem(
+      folderBrowserStorageKey,
+      JSON.stringify({
+        rootPath: "/docs",
+        expandedPaths: [],
+        view: "files",
+        sidebarWidth: 280,
+      }),
+    );
+    const originalVisibility = Object.getOwnPropertyDescriptor(
+      document,
+      "visibilityState",
+    );
+    const setVisibility = (visibilityState: DocumentVisibilityState) => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        value: visibilityState,
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+    const { unmount } = renderHook(() =>
+      useFolderBrowser({ isActive: true }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(listFolderChildren).toHaveBeenCalledTimes(1);
+
+    act(() => setVisibility("hidden"));
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(listFolderChildren).toHaveBeenCalledTimes(1);
+
+    act(() => setVisibility("visible"));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(listFolderChildren).toHaveBeenCalledTimes(2);
+
+    unmount();
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(listFolderChildren).toHaveBeenCalledTimes(2);
+    if (originalVisibility) {
+      Object.defineProperty(document, "visibilityState", originalVisibility);
+    }
+  });
+
+  it("coalesces repeated refresh requests into one trailing pass", async () => {
+    localStorage.setItem(
+      folderBrowserStorageKey,
+      JSON.stringify({
+        rootPath: "/docs",
+        expandedPaths: [],
+        view: "files",
+        sidebarWidth: 280,
+      }),
+    );
+    const { result } = renderHook(() => useFolderBrowser({ isActive: true }));
+    await waitFor(() => expect(listFolderChildren).toHaveBeenCalledTimes(1));
+    const pending = deferred<FolderListing>();
+    vi.mocked(listFolderChildren)
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce(listing(""));
+
+    let firstRefresh!: Promise<void>;
+    act(() => {
+      firstRefresh = result.current.actions.refresh();
+      void result.current.actions.refresh();
+      void result.current.actions.refresh();
+    });
+    expect(listFolderChildren).toHaveBeenCalledTimes(2);
+    pending.resolve(listing(""));
+    await act(async () => firstRefresh);
+
+    expect(listFolderChildren).toHaveBeenCalledTimes(3);
+  });
+
+  it("restarts the scheduler after visibility changes during a refresh", async () => {
+    vi.useFakeTimers();
+    localStorage.setItem(
+      folderBrowserStorageKey,
+      JSON.stringify({
+        rootPath: "/docs",
+        expandedPaths: [],
+        view: "files",
+        sidebarWidth: 280,
+      }),
+    );
+    const originalVisibility = Object.getOwnPropertyDescriptor(
+      document,
+      "visibilityState",
+    );
+    const setVisibility = (visibilityState: DocumentVisibilityState) => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        value: visibilityState,
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+    const { result } = renderHook(() =>
+      useFolderBrowser({ isActive: true }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const staleRefresh = deferred<FolderListing>();
+    vi.mocked(listFolderChildren)
+      .mockReturnValueOnce(staleRefresh.promise)
+      .mockResolvedValue(listing(""));
+
+    let stalePromise!: Promise<void>;
+    act(() => {
+      stalePromise = result.current.actions.refresh();
+      setVisibility("hidden");
+      setVisibility("visible");
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(listFolderChildren).toHaveBeenCalledTimes(3);
+
+    staleRefresh.resolve(listing(""));
+    await act(async () => stalePromise);
+    await act(async () => vi.advanceTimersByTimeAsync(9_999));
+    expect(listFolderChildren).toHaveBeenCalledTimes(3);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(listFolderChildren).toHaveBeenCalledTimes(4);
+    if (originalVisibility) {
+      Object.defineProperty(document, "visibilityState", originalVisibility);
+    }
+  });
+
+  it("keeps detached old-root trailing requests out of the new flight", async () => {
+    localStorage.setItem(
+      folderBrowserStorageKey,
+      JSON.stringify({
+        rootPath: "/docs",
+        expandedPaths: [],
+        view: "files",
+        sidebarWidth: 280,
+      }),
+    );
+    const { result } = renderHook(() => useFolderBrowser({ isActive: true }));
+    await waitFor(() => expect(listFolderChildren).toHaveBeenCalledTimes(1));
+    const oldRefresh = deferred<FolderListing>();
+    const newRefresh = deferred<FolderListing>();
+    vi.mocked(listFolderChildren).mockImplementation((token, directory) => {
+      if (token === 7) return oldRefresh.promise;
+      if (token === 8) return newRefresh.promise;
+      return Promise.resolve({
+        rootToken: token,
+        directory,
+        entries: [],
+        truncated: false,
+      });
+    });
+    vi.mocked(chooseFolderPath).mockResolvedValue("/next");
+    vi.mocked(openFolderRoot).mockResolvedValue({
+      token: 8,
+      path: "/next",
+      name: "next",
+    });
+
+    let oldPromise!: Promise<void>;
+    let choosePromise!: Promise<void>;
+    act(() => {
+      oldPromise = result.current.actions.refresh();
+      choosePromise = result.current.actions.chooseRoot();
+    });
+    await waitFor(() =>
+      expect(listFolderChildren).toHaveBeenCalledWith(8, ""),
+    );
+    act(() => {
+      void result.current.actions.refresh();
+      void result.current.actions.refresh();
+    });
+
+    oldRefresh.resolve(listing(""));
+    await act(async () => oldPromise);
+    expect(
+      vi.mocked(listFolderChildren).mock.calls.filter(([token]) => token === 8),
+    ).toHaveLength(1);
+
+    newRefresh.resolve({
+      rootToken: 8,
+      directory: "",
+      entries: [],
+      truncated: false,
+    });
+    await act(async () => choosePromise);
+    expect(
+      vi.mocked(listFolderChildren).mock.calls.filter(([token]) => token === 8),
+    ).toHaveLength(2);
+  });
+
+  it("does not let a stale refresh replace or reschedule a new root", async () => {
+    localStorage.setItem(
+      folderBrowserStorageKey,
+      JSON.stringify({
+        rootPath: "/docs",
+        expandedPaths: [],
+        view: "files",
+        sidebarWidth: 280,
+      }),
+    );
+    const { result } = renderHook(() => useFolderBrowser({ isActive: true }));
+    await waitFor(() => expect(result.current.state.root).toEqual(root));
+    await waitFor(() => expect(listFolderChildren).toHaveBeenCalledTimes(1));
+
+    const staleRefresh = deferred<FolderListing>();
+    vi.mocked(listFolderChildren).mockImplementation((token, directory) => {
+      if (token === root.token) return staleRefresh.promise;
+      return Promise.resolve({
+        rootToken: token,
+        directory,
+        entries: [],
+        truncated: false,
+      });
+    });
+    vi.mocked(chooseFolderPath).mockResolvedValue("/next");
+    vi.mocked(openFolderRoot).mockResolvedValue({
+      token: 8,
+      path: "/next",
+      name: "next",
+    });
+
+    let refreshPromise!: Promise<void>;
+    let choosePromise!: Promise<void>;
+    act(() => {
+      refreshPromise = result.current.actions.refresh();
+      choosePromise = result.current.actions.chooseRoot();
+    });
+    await act(async () => choosePromise);
+    staleRefresh.resolve(listing(""));
+    await act(async () => refreshPromise);
+
+    expect(result.current.state.root?.path).toBe("/next");
+    expect(listFolderChildren).toHaveBeenCalledWith(8, "");
+    expect(
+      vi.mocked(listFolderChildren).mock.calls.filter(([token]) => token === 7),
+    ).toHaveLength(2);
   });
 });

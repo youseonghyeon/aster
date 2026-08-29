@@ -154,7 +154,7 @@ export function FolderTree({
   const lastActiveIndexRef = useRef(0);
   const hasTreeFocusRef = useRef(false);
   const [activePath, setActivePath] = useState<string | null>(null);
-  const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const entryRefs = useRef(new Map<string, HTMLElement>());
   const typeaheadRef = useRef({ value: "", timer: 0 });
 
   useEffect(() => setVisiblePage(0), [state.root?.token]);
@@ -215,11 +215,11 @@ export function FolderTree({
   useLayoutEffect(() => {
     const path = pendingFocusPathRef.current;
     if (!path) return;
-    const element = buttonRefs.current.get(path);
+    const element = entryRefs.current.get(path);
     if (!element) return;
     pendingFocusPathRef.current = null;
     element.focus();
-    element.scrollIntoView({ block: "nearest" });
+    element.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [renderedEntries]);
 
   function focusEntry(path: string) {
@@ -236,9 +236,9 @@ export function FolderTree({
       setVisiblePage(targetPage);
       return;
     }
-    const element = buttonRefs.current.get(path);
+    const element = entryRefs.current.get(path);
     element?.focus();
-    element?.scrollIntoView({ block: "nearest" });
+    element?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
   function showPage(page: number) {
@@ -266,7 +266,7 @@ export function FolderTree({
   }
 
   function handleKeyDown(
-    event: KeyboardEvent<HTMLButtonElement>,
+    event: KeyboardEvent<HTMLElement>,
     entry: VisibleFolderEntry,
   ) {
     const index = visibleEntries.findIndex(
@@ -334,112 +334,148 @@ export function FolderTree({
 
   return (
     <div className="folder-tree-frame">
-      <div
-        className="folder-tree"
-        role="tree"
-        aria-label="폴더 파일"
-        onFocusCapture={() => {
-          hasTreeFocusRef.current = true;
-        }}
-        onBlurCapture={(event) => {
-          if (
-            event.relatedTarget instanceof Node &&
-            !event.currentTarget.contains(event.relatedTarget)
-          ) {
-            hasTreeFocusRef.current = false;
-          }
-        }}
-      >
-        {renderedEntries.map((entry) => {
-          const isDirectory = entry.kind === "directory";
-          const isExpanded =
-            isDirectory && state.expandedPaths.has(entry.relativePath);
-          const directory = isDirectory
-            ? state.directories[entry.relativePath]
-            : undefined;
-          const isSelected = state.selectedPath === entry.relativePath;
-          const isCurrent = entry.path === currentDocumentPath;
-          const siblingPosition = siblingPositionByPath.get(
-            entry.relativePath,
-          );
-          const statusLabel =
-            directory?.status === "loading"
-              ? ", 불러오는 중"
-              : directory?.status === "error"
-                ? `, 읽기 오류: ${directory.error}. Enter로 다시 시도`
-                : directory?.truncated
-                  ? ", 일부 항목만 표시"
-                  : "";
-          return (
-            <button
-              key={entry.relativePath}
-              ref={(element) => {
-                if (element) {
-                  buttonRefs.current.set(entry.relativePath, element);
-                } else {
-                  buttonRefs.current.delete(entry.relativePath);
+      <div className="folder-tree-viewport">
+        <div
+          className="folder-tree"
+          role="tree"
+          aria-label="폴더 파일"
+          onFocusCapture={() => {
+            hasTreeFocusRef.current = true;
+          }}
+          onBlurCapture={(event) => {
+            if (
+              event.relatedTarget instanceof Node &&
+              !event.currentTarget.contains(event.relatedTarget)
+            ) {
+              hasTreeFocusRef.current = false;
+            }
+          }}
+        >
+          {renderedEntries.map((entry) => {
+            const isDirectory = entry.kind === "directory";
+            const isExpanded =
+              isDirectory && state.expandedPaths.has(entry.relativePath);
+            const directory = isDirectory
+              ? state.directories[entry.relativePath]
+              : undefined;
+            const isSelected = state.selectedPath === entry.relativePath;
+            const isCurrent = entry.path === currentDocumentPath;
+            const siblingPosition = siblingPositionByPath.get(
+              entry.relativePath,
+            );
+            const statusLabel =
+              directory?.status === "loading"
+                ? ", 불러오는 중"
+                : directory?.status === "error"
+                  ? `, 읽기 오류: ${directory.error}. Enter로 다시 시도`
+                  : directory?.truncated
+                    ? ", 일부 항목만 표시"
+                    : "";
+            return (
+              <div
+                key={entry.relativePath}
+                ref={(element) => {
+                  if (element) {
+                    entryRefs.current.set(entry.relativePath, element);
+                  } else {
+                    entryRefs.current.delete(entry.relativePath);
+                  }
+                }}
+                role="treeitem"
+                className={`folder-tree-item is-${entry.kind}`}
+                style={{
+                  paddingInlineStart: `${8 + Math.min(entry.level - 1, maximumVisualIndentLevel - 1) * 16}px`,
+                }}
+                tabIndex={activePath === entry.relativePath ? 0 : -1}
+                aria-level={entry.level}
+                aria-posinset={siblingPosition?.position}
+                aria-setsize={siblingPosition?.size}
+                aria-expanded={isDirectory ? isExpanded : undefined}
+                aria-selected={isSelected}
+                aria-current={isCurrent ? "page" : undefined}
+                aria-label={`${entry.name}${isCurrent ? ", 현재 문서" : ""}${statusLabel}`}
+                title={
+                  directory?.error
+                    ? `${entry.path}\n${directory.error}`
+                    : entry.path
                 }
-              }}
-              type="button"
-              role="treeitem"
-              className={`folder-tree-item is-${entry.kind}`}
-              style={{
-                paddingInlineStart: `${8 + Math.min(entry.level - 1, maximumVisualIndentLevel - 1) * 16}px`,
-              }}
-              tabIndex={activePath === entry.relativePath ? 0 : -1}
-              aria-level={entry.level}
-              aria-posinset={siblingPosition?.position}
-              aria-setsize={siblingPosition?.size}
-              aria-expanded={isDirectory ? isExpanded : undefined}
-              aria-selected={isSelected}
-              aria-current={isCurrent ? "page" : undefined}
-              aria-label={`${entry.name}${isCurrent ? ", 현재 문서" : ""}${statusLabel}`}
-              title={
-                directory?.error
-                  ? `${entry.path}\n${directory.error}`
-                  : entry.path
-              }
-              onFocus={() => {
-                lastActiveIndexRef.current = visibleEntries.findIndex(
-                  (candidate) =>
-                    candidate.relativePath === entry.relativePath,
-                );
-                setActivePath(entry.relativePath);
-              }}
-              onClick={() => {
-                setActivePath(entry.relativePath);
-                onSelect(entry.relativePath);
-              }}
-              onDoubleClick={() => activateEntry(entry)}
-              onKeyDown={(event) => handleKeyDown(event, entry)}
-            >
-              <span className="folder-tree-leading" aria-hidden="true">
+                onFocus={() => {
+                  lastActiveIndexRef.current = visibleEntries.findIndex(
+                    (candidate) =>
+                      candidate.relativePath === entry.relativePath,
+                  );
+                  setActivePath(entry.relativePath);
+                }}
+                onClick={() => {
+                  setActivePath(entry.relativePath);
+                  onSelect(entry.relativePath);
+                }}
+                onDoubleClick={(event) => {
+                  if (
+                    event.target instanceof Element &&
+                    event.target.closest(".folder-tree-disclosure-button")
+                  ) {
+                    return;
+                  }
+                  activateEntry(entry);
+                }}
+                onKeyDown={(event) => handleKeyDown(event, entry)}
+              >
                 {isDirectory ? (
-                  <DisclosureIcon expanded={isExpanded} />
+                  <button
+                    type="button"
+                    className="folder-tree-disclosure-button"
+                    tabIndex={-1}
+                    aria-expanded={isExpanded}
+                    aria-label={`${entry.name} 폴더 ${isExpanded ? "접기" : "펼치기"}`}
+                    title={isExpanded ? "폴더 접기" : "폴더 펼치기"}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (event.detail > 1) return;
+                      entryRefs.current
+                        .get(entry.relativePath)
+                        ?.focus({ preventScroll: true });
+                      setActivePath(entry.relativePath);
+                      onToggleDirectory(entry);
+                    }}
+                    onDoubleClick={(event) => event.stopPropagation()}
+                  >
+                    <DisclosureIcon expanded={isExpanded} />
+                  </button>
                 ) : (
-                  <span />
+                  <span
+                    className="folder-tree-disclosure-placeholder"
+                    aria-hidden="true"
+                  />
                 )}
-                <span className="folder-tree-icon">
+                <span className="folder-tree-icon" aria-hidden="true">
                   <EntryIcon kind={entry.kind} />
                 </span>
-              </span>
-              <span className="folder-tree-name">{entry.name}</span>
-              {directory?.status === "loading" ? (
-                <span className="folder-tree-state" aria-hidden="true">
-                  …
-                </span>
-              ) : directory?.status === "error" ? (
-                <span className="folder-tree-state is-error" aria-hidden="true">
-                  읽기 오류
-                </span>
-              ) : directory?.truncated ? (
-                <span className="folder-tree-state" aria-hidden="true">
-                  +
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
+                <span className="folder-tree-name">{entry.name}</span>
+                {directory?.status === "loading" ? (
+                  <span className="folder-tree-state" aria-hidden="true">
+                    …
+                  </span>
+                ) : directory?.status === "error" ? (
+                  <span
+                    className="folder-tree-state is-error"
+                    aria-hidden="true"
+                  >
+                    읽기 오류
+                  </span>
+                ) : directory?.truncated ? (
+                  <span className="folder-tree-state" aria-hidden="true">
+                    +
+                  </span>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
       </div>
       {pageCount > 1 ? (
         <div

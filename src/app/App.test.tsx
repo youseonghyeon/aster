@@ -666,7 +666,7 @@ describe("workspace regression contracts", () => {
     ]);
   });
 
-  it("closes recent documents and restores trigger focus for the current item", async () => {
+  it("keeps inset recent documents open for the current item", async () => {
     vi.mocked(open).mockResolvedValue("/docs/current.md");
     vi.mocked(invoke).mockResolvedValue({
       path: "/docs/current.md",
@@ -679,14 +679,14 @@ describe("workspace regression contracts", () => {
     await user.click(screen.getByRole("button", { name: "Markdown 파일 열기" }));
     await waitFor(() => expect(screen.getByText("current.md")).toBeInTheDocument());
 
-    const recentTrigger = screen.getByRole("button", { name: "문서 탐색 열기" });
-    await user.click(recentTrigger);
+    await user.click(screen.getByRole("button", { name: "문서 탐색 열기" }));
     await user.click(screen.getByRole("tab", { name: "최근" }));
     await user.click(screen.getByRole("button", { name: "current.md, 현재 문서" }));
-    await nextAnimationFrame();
-
-    expect(screen.queryByRole("heading", { name: "최근 문서" })).not.toBeInTheDocument();
-    expect(recentTrigger).toHaveFocus();
+    expect(screen.getByRole("heading", { name: "최근 문서" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "최근" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(
       vi.mocked(invoke).mock.calls.filter(([command]) => command === "read_markdown_file"),
     ).toHaveLength(1);

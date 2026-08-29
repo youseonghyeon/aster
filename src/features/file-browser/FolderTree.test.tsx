@@ -104,6 +104,33 @@ describe("FolderTree", () => {
     );
   });
 
+  it("toggles a directory once from a single disclosure click", async () => {
+    const user = userEvent.setup();
+    const props = renderTree();
+    screen.getByRole("treeitem", { name: "README.md, 현재 문서" }).focus();
+
+    await user.click(screen.getByRole("button", { name: "guide 폴더 접기" }));
+
+    expect(screen.getByRole("treeitem", { name: "guide" })).toHaveFocus();
+    expect(props.onToggleDirectory).toHaveBeenCalledOnce();
+    expect(props.onToggleDirectory).toHaveBeenCalledWith(
+      expect.objectContaining({ relativePath: "guide" }),
+    );
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("treeitem", { name: "start.md" })).toHaveFocus();
+  });
+
+  it("does not toggle a disclosure twice on a double click", async () => {
+    const user = userEvent.setup();
+    const props = renderTree();
+
+    await user.dblClick(
+      screen.getByRole("button", { name: "guide 폴더 접기" }),
+    );
+
+    expect(props.onToggleDirectory).toHaveBeenCalledOnce();
+  });
+
   it("supports arrow navigation, expansion, and explicit Enter activation", async () => {
     const user = userEvent.setup();
     const props = renderTree();
@@ -122,6 +149,23 @@ describe("FolderTree", () => {
     expect(props.onToggleDirectory).toHaveBeenCalledWith(
       expect.objectContaining({ relativePath: "guide" }),
     );
+  });
+
+  it("keeps focused long names visible in both scroll directions", async () => {
+    const scrollIntoView = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+    const user = userEvent.setup();
+    renderTree();
+    const guide = screen.getByRole("treeitem", { name: "guide" });
+    guide.focus();
+
+    await user.keyboard("{ArrowDown}");
+
+    expect(scrollIntoView).toHaveBeenLastCalledWith({
+      block: "nearest",
+      inline: "nearest",
+    });
+    expect(document.querySelector(".folder-tree-viewport")).toBeInTheDocument();
+    scrollIntoView.mockRestore();
   });
 
   it("opens images through the dedicated callback", async () => {

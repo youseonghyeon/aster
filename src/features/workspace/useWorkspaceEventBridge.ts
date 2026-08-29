@@ -98,7 +98,7 @@ export function useWorkspaceEventBridge({
     );
     const unsubscribeOpenSettled = events.subscribe(
       "document-open-settled",
-      ({ source, outcome }) => {
+      ({ outcome }) => {
         if (outcome !== "opened" && outcome !== "current") return;
         const sidebar = stageSidebarRef.current;
         if (sidebar === "outline" && !isSidebarInsetRef.current) {
@@ -106,11 +106,7 @@ export function useWorkspaceEventBridge({
           closeStageSidebar();
           return;
         }
-        const shouldClose =
-          outcome === "current" ||
-          source === "recent" ||
-          !isSidebarInsetRef.current ||
-          sidebar === "recent";
+        const shouldClose = !isSidebarInsetRef.current;
         if (shouldClose && (sidebar === "files" || sidebar === "recent")) {
           closeDocumentBrowserAndRestoreFocus();
         }

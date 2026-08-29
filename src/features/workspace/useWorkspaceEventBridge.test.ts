@@ -50,7 +50,7 @@ describe("useWorkspaceEventBridge", () => {
   );
 
   it.each(["opened", "current"] as const)(
-    "closes recent documents after a %s result",
+    "keeps inset recent documents after a %s result",
     (outcome) => {
       const options = createOptions();
       renderHook(() => useWorkspaceEventBridge(options));
@@ -62,8 +62,8 @@ describe("useWorkspaceEventBridge", () => {
         });
       });
 
-      expect(options.stageSidebarRef.current).toBeNull();
-      expect(options.closeStageSidebar).toHaveBeenCalledOnce();
+      expect(options.stageSidebarRef.current).toBe("recent");
+      expect(options.closeStageSidebar).not.toHaveBeenCalled();
     },
   );
 
@@ -82,7 +82,7 @@ describe("useWorkspaceEventBridge", () => {
     expect(options.closeStageSidebar).not.toHaveBeenCalled();
   });
 
-  it("closes an inset file browser when the current document is activated", () => {
+  it("keeps an inset file browser when the current document is activated", () => {
     const options = createOptions("files", true);
     renderHook(() => useWorkspaceEventBridge(options));
 
@@ -93,24 +93,27 @@ describe("useWorkspaceEventBridge", () => {
       });
     });
 
-    expect(options.stageSidebarRef.current).toBeNull();
-    expect(options.closeStageSidebar).toHaveBeenCalledOnce();
+    expect(options.stageSidebarRef.current).toBe("files");
+    expect(options.closeStageSidebar).not.toHaveBeenCalled();
   });
 
-  it("closes a modal file browser after opening a document", () => {
-    const options = createOptions("files", false);
-    renderHook(() => useWorkspaceEventBridge(options));
+  it.each([
+    { sidebar: "files" as const, source: "folder" as const },
+    { sidebar: "recent" as const, source: "recent" as const },
+  ])("closes a modal $sidebar browser after opening a document", ({ sidebar, source }) => {
+      const options = createOptions(sidebar, false);
+      renderHook(() => useWorkspaceEventBridge(options));
 
-    act(() => {
-      options.events.emit("document-open-settled", {
-        source: "folder",
-        outcome: "opened",
+      act(() => {
+        options.events.emit("document-open-settled", {
+          source,
+          outcome: "opened",
+        });
       });
-    });
 
-    expect(options.stageSidebarRef.current).toBeNull();
-    expect(options.closeStageSidebar).toHaveBeenCalledOnce();
-  });
+      expect(options.stageSidebarRef.current).toBeNull();
+      expect(options.closeStageSidebar).toHaveBeenCalledOnce();
+    });
 
   it("closes a modal outline after a document opens", () => {
     const options = createOptions("outline", false);
