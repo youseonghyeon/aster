@@ -1,0 +1,426 @@
+use serde::{Deserialize, Serialize};
+use std::{
+    fs,
+    path::{Component, Path, PathBuf},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+    },
+};
+
+const MAX_DIRECTORY_DEPTH: usize = 64;
+const MAX_DIRECTORY_ENTRIES: usize = 2_000;
+
+#[derive(Clone, Default)]
+pub(crate) struct FolderTreeState {
+    inner: Arc<FolderTreeInner>,
+}
+
+#[derive(Default)]
+struct FolderTreeInner {
+    next_token: AtomicU64,
+    session: Mutex<Option<FolderSession>>,
+}
+
+#[derive(Clone)]
+struct FolderSession {
+    token: u64,
+    root: PathBuf,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FolderRoot {
+    pub(crate) token: u64,
+    pub(crate) path: String,
+    pub(crate) name: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum FolderEntryKind {
+    Directory,
+    Markdown,
+    Image,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FolderEntry {
+    pub(crate) name: String,
+    pub(crate) relative_path: String,
+    pub(crate) path: String,
+    pub(crate) kind: FolderEntryKind,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FolderListing {
+    pub(crate) root_token: u64,
+    pub(crate) directory: String,
+    pub(crate) entries: Vec<FolderEntry>,
+    pub(crate) truncated: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ListFolderChildrenRequest {
+    pub(crate) root_token: u64,
+    pub(crate) relative_path: String,
+}
+
+impl FolderTreeState {
+    pub(crate) fn open_folder(&self, requested_path: String) -> Result<FolderRoot, String> {
+        let root = PathBuf::from(&requested_path)
+            .canonicalize()
+            .map_err(|error| format!("폴더 경로를 확인할 수 없습니다: {error}"))?;
+        let metadata = fs::metadata(&root)
+            .map_err(|error| format!("폴더 정보를 읽을 수 없습니다: {error}"))?;
+        if !metadata.is_dir() {
+            return Err("선택한 경로가 폴더가 아닙니다.".into());
+        }
+        let name = root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| root.to_str().unwrap_or("폴더"))
+            .to_owned();
+        let token = self
+            .inner
+            .next_token
+            .fetch_add(1, Ordering::Relaxed)
+            .saturating_add(1);
+        *self
+            .inner
+            .session
+            .lock()
+            .map_err(|_| "폴더 탐색 상태를 사용할 수 없습니다.".to_owned())? =
+            Some(FolderSession {
+                token,
+                root: root.clone(),
+            });
+        Ok(FolderRoot {
+            token,
+            path: root.to_string_lossy().into_owned(),
+            name,
+        })
+    }
+
+    pub(crate) fn close_folder(&self, root_token: Option<u64>) -> Result<(), String> {
+        let mut session = self
+            .inner
+            .session
+            .lock()
+            .map_err(|_| "폴더 탐색 상태를 사용할 수 없습니다.".to_owned())?;
+        if root_token.is_none()
+            || session
+                .as_ref()
+                .is_some_and(|open| Some(open.token) == root_token)
+        {
+            *session = None;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn list_children(
+        &self,
+        request: ListFolderChildrenRequest,
+    ) -> Result<FolderListing, String> {
+        let session = self.current_session(request.root_token)?;
+        let relative = validate_relative_directory(&request.relative_path)?;
+        let directory = resolve_directory(&session.root, &relative)?;
+        let mut entries = Vec::new();
+        let mut truncated = false;
+        let children = fs::read_dir(&directory)
+            .map_err(|error| format!("폴더 내용을 읽을 수 없습니다: {error}"))?;
+
+        for child in children {
+            let child = match child {
+                Ok(child) => child,
+                Err(_) => continue,
+            };
+            let Some(name) = child.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            if name.starts_with('.') {
+                continue;
+            }
+            let metadata = match fs::symlink_metadata(child.path()) {
+                Ok(metadata) if !metadata.file_type().is_symlink() => metadata,
+                _ => continue,
+            };
+            let kind = if metadata.is_dir() {
+                FolderEntryKind::Directory
+            } else if metadata.is_file() {
+                match supported_file_kind(&child.path()) {
+                    Some(kind) => kind,
+                    None => continue,
+                }
+            } else {
+                continue;
+            };
+            if entries.len() == MAX_DIRECTORY_ENTRIES {
+                truncated = true;
+                break;
+            }
+            let child_relative = relative.join(&name);
+            let relative_path = relative_path_string(&child_relative)?;
+            entries.push(FolderEntry {
+                name,
+                relative_path,
+                path: child.path().to_string_lossy().into_owned(),
+                kind,
+            });
+        }
+
+        entries.sort_by(|left, right| {
+            entry_sort_rank(&left.kind)
+                .cmp(&entry_sort_rank(&right.kind))
+                .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
+                .then_with(|| left.name.cmp(&right.name))
+        });
+
+        Ok(FolderListing {
+            root_token: session.token,
+            directory: relative_path_string(&relative)?,
+            entries,
+            truncated,
+        })
+    }
+
+    pub(crate) fn resolve_image(
+        &self,
+        root_token: u64,
+        relative_path: String,
+    ) -> Result<PathBuf, String> {
+        let session = self.current_session(root_token)?;
+        let relative = validate_relative_file(&relative_path)?;
+        let path = session.root.join(relative);
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|error| format!("이미지 정보를 읽을 수 없습니다: {error}"))?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err("선택한 이미지 파일을 열 수 없습니다.".into());
+        }
+        let canonical = path
+            .canonicalize()
+            .map_err(|error| format!("이미지 경로를 확인할 수 없습니다: {error}"))?;
+        if !canonical.starts_with(&session.root)
+            || supported_file_kind(&canonical) != Some(FolderEntryKind::Image)
+        {
+            return Err("선택한 이미지가 현재 폴더 안에 있지 않습니다.".into());
+        }
+        Ok(canonical)
+    }
+
+    fn current_session(&self, token: u64) -> Result<FolderSession, String> {
+        let session = self
+            .inner
+            .session
+            .lock()
+            .map_err(|_| "폴더 탐색 상태를 사용할 수 없습니다.".to_owned())?;
+        match session.as_ref() {
+            Some(session) if session.token == token => Ok(session.clone()),
+            _ => Err("폴더 탐색 세션이 변경되었습니다. 다시 시도해 주세요.".into()),
+        }
+    }
+}
+
+fn validate_relative_directory(path: &str) -> Result<PathBuf, String> {
+    if path.is_empty() {
+        return Ok(PathBuf::new());
+    }
+    validate_relative_path(path)
+}
+
+fn validate_relative_file(path: &str) -> Result<PathBuf, String> {
+    let relative = validate_relative_path(path)?;
+    if relative.as_os_str().is_empty() {
+        return Err("파일 경로가 비어 있습니다.".into());
+    }
+    Ok(relative)
+}
+
+fn validate_relative_path(path: &str) -> Result<PathBuf, String> {
+    let relative = PathBuf::from(path);
+    if relative.is_absolute() {
+        return Err("절대 경로는 사용할 수 없습니다.".into());
+    }
+    let mut depth = 0;
+    for component in relative.components() {
+        match component {
+            Component::Normal(_) => depth += 1,
+            _ => return Err("현재 폴더 밖의 경로는 사용할 수 없습니다.".into()),
+        }
+    }
+    if depth > MAX_DIRECTORY_DEPTH {
+        return Err("폴더 깊이가 탐색 한도를 초과했습니다.".into());
+    }
+    Ok(relative)
+}
+
+fn resolve_directory(root: &Path, relative: &Path) -> Result<PathBuf, String> {
+    let requested = root.join(relative);
+    let metadata = fs::symlink_metadata(&requested)
+        .map_err(|error| format!("폴더 정보를 읽을 수 없습니다: {error}"))?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err("선택한 경로가 탐색 가능한 폴더가 아닙니다.".into());
+    }
+    let canonical = requested
+        .canonicalize()
+        .map_err(|error| format!("폴더 경로를 확인할 수 없습니다: {error}"))?;
+    if !canonical.starts_with(root) {
+        return Err("현재 폴더 밖의 경로는 탐색할 수 없습니다.".into());
+    }
+    Ok(canonical)
+}
+
+fn supported_file_kind(path: &Path) -> Option<FolderEntryKind> {
+    let extension = path.extension()?.to_str()?.to_ascii_lowercase();
+    match extension.as_str() {
+        "md" | "markdown" => Some(FolderEntryKind::Markdown),
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" => Some(FolderEntryKind::Image),
+        _ => None,
+    }
+}
+
+fn entry_sort_rank(kind: &FolderEntryKind) -> u8 {
+    match kind {
+        FolderEntryKind::Directory => 0,
+        FolderEntryKind::Markdown => 1,
+        FolderEntryKind::Image => 2,
+    }
+}
+
+fn relative_path_string(path: &Path) -> Result<String, String> {
+    path.to_str()
+        .map(|path| path.replace(std::path::MAIN_SEPARATOR, "/"))
+        .ok_or_else(|| "UTF-8로 표현할 수 없는 경로는 탐색할 수 없습니다.".to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn open_test_root(directory: &TempDir) -> (FolderTreeState, FolderRoot) {
+        let state = FolderTreeState::default();
+        let root = state
+            .open_folder(directory.path().to_string_lossy().into_owned())
+            .unwrap();
+        (state, root)
+    }
+
+    #[test]
+    fn filters_hidden_unsupported_and_sorts_supported_entries() {
+        let directory = TempDir::new().unwrap();
+        fs::create_dir(directory.path().join("guide")).unwrap();
+        fs::write(directory.path().join("B.md"), "# B").unwrap();
+        fs::write(directory.path().join("a.markdown"), "# A").unwrap();
+        fs::write(directory.path().join("cover.PNG"), []).unwrap();
+        fs::write(directory.path().join("notes.txt"), "ignored").unwrap();
+        fs::write(directory.path().join(".private.md"), "ignored").unwrap();
+        let (state, root) = open_test_root(&directory);
+
+        let listing = state
+            .list_children(ListFolderChildrenRequest {
+                root_token: root.token,
+                relative_path: String::new(),
+            })
+            .unwrap();
+
+        assert_eq!(
+            listing
+                .entries
+                .iter()
+                .map(|entry| (&entry.name, &entry.kind))
+                .collect::<Vec<_>>(),
+            vec![
+                (&"guide".to_owned(), &FolderEntryKind::Directory),
+                (&"a.markdown".to_owned(), &FolderEntryKind::Markdown),
+                (&"B.md".to_owned(), &FolderEntryKind::Markdown),
+                (&"cover.PNG".to_owned(), &FolderEntryKind::Image),
+            ]
+        );
+    }
+
+    #[test]
+    fn lists_only_the_requested_directory_level() {
+        let directory = TempDir::new().unwrap();
+        let nested = directory.path().join("guide");
+        fs::create_dir(&nested).unwrap();
+        fs::write(nested.join("start.md"), "# Start").unwrap();
+        let (state, root) = open_test_root(&directory);
+
+        let root_listing = state
+            .list_children(ListFolderChildrenRequest {
+                root_token: root.token,
+                relative_path: String::new(),
+            })
+            .unwrap();
+        let nested_listing = state
+            .list_children(ListFolderChildrenRequest {
+                root_token: root.token,
+                relative_path: "guide".into(),
+            })
+            .unwrap();
+
+        assert_eq!(root_listing.entries.len(), 1);
+        assert_eq!(nested_listing.entries[0].relative_path, "guide/start.md");
+    }
+
+    #[test]
+    fn rejects_escape_absolute_and_stale_session_paths() {
+        let first = TempDir::new().unwrap();
+        let second = TempDir::new().unwrap();
+        let (state, first_root) = open_test_root(&first);
+
+        assert!(state
+            .list_children(ListFolderChildrenRequest {
+                root_token: first_root.token,
+                relative_path: "../outside".into(),
+            })
+            .is_err());
+        assert!(state
+            .list_children(ListFolderChildrenRequest {
+                root_token: first_root.token,
+                relative_path: "/tmp".into(),
+            })
+            .is_err());
+
+        state
+            .open_folder(second.path().to_string_lossy().into_owned())
+            .unwrap();
+        assert!(state
+            .list_children(ListFolderChildrenRequest {
+                root_token: first_root.token,
+                relative_path: String::new(),
+            })
+            .is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn does_not_list_or_traverse_symbolic_links() {
+        use std::os::unix::fs::symlink;
+
+        let directory = TempDir::new().unwrap();
+        let outside = TempDir::new().unwrap();
+        fs::write(outside.path().join("outside.md"), "# Outside").unwrap();
+        symlink(outside.path(), directory.path().join("linked")).unwrap();
+        let (state, root) = open_test_root(&directory);
+
+        let listing = state
+            .list_children(ListFolderChildrenRequest {
+                root_token: root.token,
+                relative_path: String::new(),
+            })
+            .unwrap();
+        assert!(listing.entries.is_empty());
+        assert!(state
+            .list_children(ListFolderChildrenRequest {
+                root_token: root.token,
+                relative_path: "linked".into(),
+            })
+            .is_err());
+    }
+}

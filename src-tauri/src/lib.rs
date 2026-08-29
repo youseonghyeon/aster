@@ -1,11 +1,13 @@
 mod close_guard;
 mod document_io;
 mod file_watch;
+mod folder_tree;
 mod recovery;
 
 use close_guard::{CloseGuardState, ResolveCloseRequest};
 use document_io::{MarkdownDocument, MarkdownFileStatus, SaveMarkdownRequest, SaveMarkdownResult};
 use file_watch::{FileWatchState, WatchRegistration};
+use folder_tree::{FolderListing, FolderRoot, FolderTreeState, ListFolderChildrenRequest};
 use recovery::{
     DeleteRecoveryDraftRequest, RecoveryDraft, RecoveryState, SaveRecoveryDraftRequest,
 };
@@ -13,6 +15,7 @@ use tauri::{
     menu::{Menu, MenuItemBuilder, MenuItemKind, PredefinedMenuItem},
     AppHandle, Emitter, Manager, State, Window,
 };
+use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
 async fn read_markdown_file(path: String) -> Result<MarkdownDocument, String> {
@@ -35,6 +38,51 @@ async fn save_markdown_file(request: SaveMarkdownRequest) -> Result<SaveMarkdown
     tauri::async_runtime::spawn_blocking(move || document_io::save_markdown_file_to_disk(request))
         .await
         .map_err(|error| format!("파일 저장 작업을 완료하지 못했습니다: {error}"))?
+}
+
+#[tauri::command]
+async fn open_folder(
+    state: State<'_, FolderTreeState>,
+    path: String,
+) -> Result<FolderRoot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || state.open_folder(path))
+        .await
+        .map_err(|error| format!("폴더 열기 작업을 완료하지 못했습니다: {error}"))?
+}
+
+#[tauri::command]
+async fn list_folder_children(
+    state: State<'_, FolderTreeState>,
+    request: ListFolderChildrenRequest,
+) -> Result<FolderListing, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || state.list_children(request))
+        .await
+        .map_err(|error| format!("폴더 읽기 작업을 완료하지 못했습니다: {error}"))?
+}
+
+#[tauri::command]
+fn close_folder(state: State<'_, FolderTreeState>, root_token: Option<u64>) -> Result<(), String> {
+    state.close_folder(root_token)
+}
+
+#[tauri::command]
+async fn open_folder_image(
+    app: AppHandle,
+    state: State<'_, FolderTreeState>,
+    root_token: u64,
+    relative_path: String,
+) -> Result<(), String> {
+    let state = state.inner().clone();
+    let path = tauri::async_runtime::spawn_blocking(move || {
+        state.resolve_image(root_token, relative_path)
+    })
+    .await
+    .map_err(|error| format!("이미지 확인 작업을 완료하지 못했습니다: {error}"))??;
+    app.opener()
+        .open_path(path.to_string_lossy(), None::<&str>)
+        .map_err(|error| format!("이미지를 기본 앱으로 열 수 없습니다: {error}"))
 }
 
 #[tauri::command]
@@ -124,6 +172,7 @@ fn resolve_close_request(
 pub fn run() {
     tauri::Builder::default()
         .manage(FileWatchState::default())
+        .manage(FolderTreeState::default())
         .manage(RecoveryState::default())
         .manage(CloseGuardState::default())
         .plugin(tauri_plugin_dialog::init())
@@ -189,6 +238,10 @@ pub fn run() {
             read_markdown_file,
             get_markdown_file_status,
             save_markdown_file,
+            open_folder,
+            list_folder_children,
+            close_folder,
+            open_folder_image,
             watch_markdown_file,
             unwatch_markdown_file,
             save_recovery_draft,
