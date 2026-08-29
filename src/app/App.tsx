@@ -1,11 +1,13 @@
 import { useRef } from "react";
 import { AppHeader } from "./AppHeader";
-import { DocumentStage } from "../features/documents/DocumentStage";
+import { DocumentOutline } from "../features/documents/DocumentOutline";
+import { DocumentSidebar } from "../features/documents/DocumentSidebar";
 import { ExternalFileNotice } from "../features/documents/ExternalFileNotice";
 import { useDocumentSession } from "../features/documents/useDocumentSession";
 import { ReadingSettings } from "../features/reading/ReadingSettings";
 import { useReadingPreferences } from "../features/reading/useReadingPreferences";
 import { PaneDivider } from "../features/workspace/PaneDivider";
+import { StageSidebarLayout } from "../features/workspace/StageSidebarLayout";
 import { WorkspacePane } from "../features/workspace/WorkspacePane";
 import { useWorkspaceController } from "../features/workspace/useWorkspaceController";
 import {
@@ -43,15 +45,15 @@ function App() {
         documentPath={documents.document.path}
         saveStatus={documents.document.saveStatus}
         recovered={documents.document.recovered}
-        isRecentDocumentsOpen={state.isRecentDocumentsOpen}
+        isDocumentBrowserOpen={state.isRecentDocumentsOpen}
         isOutlineOpen={state.isOutlineOpen}
         isBusy={documents.isBusy}
         isSettingsOpen={state.isSettingsOpen}
-        recentDocumentsButtonRef={elements.recentDocumentsButton}
+        documentBrowserButtonRef={elements.recentDocumentsButton}
         outlineButtonRef={elements.outlineButton}
         settingsRef={elements.settings}
         settingsButtonRef={elements.settingsButton}
-        onRecentDocumentsToggle={actions.toggleRecentDocuments}
+        onDocumentBrowserToggle={actions.toggleRecentDocuments}
         onOutlineToggle={actions.toggleOutline}
         onOpenFile={() => void documents.openFromPicker("picker")}
         onSaveFile={() => void documents.saveDocument()}
@@ -68,23 +70,39 @@ function App() {
         }
       />
 
-      <DocumentStage
-        stageSidebar={state.stageSidebar}
-        isSidebarInset={state.isSidebarInset}
-        recentDocuments={documents.recent.documents}
-        documentPath={documents.document.path}
-        unavailableRecentDocumentPaths={documents.recent.unavailablePaths}
-        isBusy={documents.isBusy}
-        isRecentDocumentPersistenceLimited={
-          documents.recent.persistenceLimited
+      <StageSidebarLayout
+        sidebar={
+          state.stageSidebar === "recent" ? (
+            <DocumentSidebar
+              documents={documents.recent.documents}
+              currentDocumentPath={documents.document.path}
+              unavailableDocumentPaths={documents.recent.unavailablePaths}
+              isModal={!state.isSidebarInset}
+              isBusy={documents.isBusy}
+              isPersistenceLimited={documents.recent.persistenceLimited}
+              onClose={actions.closeDocumentSidebar}
+              onOpenFile={() => void documents.openFromPicker("picker")}
+              onSelectDocument={documents.openRecentDocument}
+            />
+          ) : state.stageSidebar === "outline" ? (
+            <DocumentOutline
+              items={outline.items}
+              activeHeadingId={outline.activeHeadingId}
+              documentKey={documents.document.path ?? "untitled"}
+              isModal={!state.isSidebarInset}
+              onClose={actions.closeOutline}
+              onNavigate={actions.navigateOutline}
+            />
+          ) : null
         }
-        outlineItems={outline.items}
-        activeHeadingId={outline.activeHeadingId}
-        onDocumentSidebarClose={actions.closeDocumentSidebar}
-        onOpenFile={() => void documents.openFromPicker("picker")}
-        onRecentDocumentSelect={documents.openRecentDocument}
-        onOutlineClose={actions.closeOutline}
-        onOutlineNavigate={actions.navigateOutline}
+        closeLabel={
+          state.stageSidebar === "outline" ? "목차 닫기" : "문서 탐색 닫기"
+        }
+        onClose={
+          state.stageSidebar === "outline"
+            ? actions.closeOutline
+            : actions.closeDocumentSidebar
+        }
       >
         <main
           ref={elements.workspace}
@@ -175,7 +193,7 @@ function App() {
             />
           ) : null}
         </main>
-      </DocumentStage>
+      </StageSidebarLayout>
     </div>
   );
 }

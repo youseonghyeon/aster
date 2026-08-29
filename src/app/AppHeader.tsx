@@ -6,15 +6,15 @@ export type AppHeaderProps = {
   documentPath: string | null;
   saveStatus: MarkdownSaveStatus;
   recovered: boolean;
-  isRecentDocumentsOpen: boolean;
+  isDocumentBrowserOpen: boolean;
   isOutlineOpen: boolean;
   isBusy: boolean;
   isSettingsOpen: boolean;
-  recentDocumentsButtonRef: Ref<HTMLButtonElement>;
+  documentBrowserButtonRef: Ref<HTMLButtonElement>;
   outlineButtonRef: Ref<HTMLButtonElement>;
   settingsRef: Ref<HTMLDivElement>;
   settingsButtonRef: Ref<HTMLButtonElement>;
-  onRecentDocumentsToggle: () => void;
+  onDocumentBrowserToggle: () => void;
   onOutlineToggle: () => void;
   onOpenFile: () => void;
   onSaveFile: () => void;
@@ -36,7 +36,7 @@ function AsterBrandIcon() {
   );
 }
 
-function RecentDocumentsIcon() {
+function DocumentBrowserIcon() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true">
       <path d="M6.25 3.5h8.25v10.75H6.25z" />
@@ -87,15 +87,15 @@ export function AppHeader({
   documentPath,
   saveStatus,
   recovered,
-  isRecentDocumentsOpen,
+  isDocumentBrowserOpen,
   isOutlineOpen,
   isBusy,
   isSettingsOpen,
-  recentDocumentsButtonRef,
+  documentBrowserButtonRef,
   outlineButtonRef,
   settingsRef,
   settingsButtonRef,
-  onRecentDocumentsToggle,
+  onDocumentBrowserToggle,
   onOutlineToggle,
   onOpenFile,
   onSaveFile,
@@ -131,16 +131,16 @@ export function AppHeader({
         <span className="header-group-divider" aria-hidden="true" />
         <nav className="stage-navigation" aria-label="문서 탐색">
           <button
-            ref={recentDocumentsButtonRef}
+            ref={documentBrowserButtonRef}
             className="header-icon-button recent-documents-trigger"
             type="button"
-            aria-label={isRecentDocumentsOpen ? "최근 문서 닫기" : "최근 문서 열기"}
-            aria-expanded={isRecentDocumentsOpen}
+            aria-label={isDocumentBrowserOpen ? "문서 탐색 닫기" : "문서 탐색 열기"}
+            aria-expanded={isDocumentBrowserOpen}
             aria-controls="document-sidebar"
-            title={isRecentDocumentsOpen ? "최근 문서 닫기" : "최근 문서 열기"}
-            onClick={onRecentDocumentsToggle}
+            title={isDocumentBrowserOpen ? "문서 탐색 닫기" : "문서 탐색 열기"}
+            onClick={onDocumentBrowserToggle}
           >
-            <RecentDocumentsIcon />
+            <DocumentBrowserIcon />
           </button>
           <button
             ref={outlineButtonRef}

@@ -1,4 +1,4 @@
-export type StageSidebar = "outline" | "recent" | null;
+export type StageSidebar = "files" | "outline" | "recent" | null;
 
 export type WorkspaceInteractionState = {
   stageSidebar: StageSidebar;
@@ -35,7 +35,8 @@ export function createWorkspaceInteractionState(
 }
 
 function sidebarForDocumentAction(state: WorkspaceInteractionState) {
-  return state.stageSidebar === "outline" && state.isSidebarInset
+  return (state.stageSidebar === "outline" || state.stageSidebar === "files") &&
+    state.isSidebarInset
     ? state.stageSidebar
     : null;
 }

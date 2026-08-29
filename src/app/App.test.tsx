@@ -101,7 +101,7 @@ describe("workspace regression contracts", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "최근 문서 열기" }));
+    await user.click(screen.getByRole("button", { name: "문서 탐색 열기" }));
     expect(screen.getByRole("heading", { name: "최근 문서" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "메모" }));
     expect(screen.queryByRole("heading", { name: "최근 문서" })).not.toBeInTheDocument();
@@ -648,7 +648,7 @@ describe("workspace regression contracts", () => {
     await user.click(screen.getByRole("button", { name: "Markdown 파일 열기" }));
     await waitFor(() => expect(screen.getByText("current.md")).toBeInTheDocument());
 
-    const recentTrigger = screen.getByRole("button", { name: "최근 문서 열기" });
+    const recentTrigger = screen.getByRole("button", { name: "문서 탐색 열기" });
     await user.click(recentTrigger);
     await user.click(screen.getByRole("button", { name: "current.md, 현재 문서" }));
     await nextAnimationFrame();

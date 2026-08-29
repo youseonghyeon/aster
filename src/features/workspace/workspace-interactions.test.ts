@@ -30,7 +30,7 @@ describe("workspace interaction transitions", () => {
     expect(state.isSettingsOpen).toBe(true);
   });
 
-  it("preserves only an inset outline during document actions", () => {
+  it("preserves inset outline and files during document actions", () => {
     const insetOutline = workspaceInteractionReducer(
       { ...createWorkspaceInteractionState(true), stageSidebar: "outline" },
       { type: "start-document-action" },
@@ -39,12 +39,17 @@ describe("workspace interaction transitions", () => {
       { ...createWorkspaceInteractionState(true), stageSidebar: "recent" },
       { type: "start-document-action" },
     );
+    const insetFiles = workspaceInteractionReducer(
+      { ...createWorkspaceInteractionState(true), stageSidebar: "files" },
+      { type: "start-document-action" },
+    );
     const modalOutline = workspaceInteractionReducer(
       { ...createWorkspaceInteractionState(false), stageSidebar: "outline" },
       { type: "start-document-action" },
     );
 
     expect(insetOutline.stageSidebar).toBe("outline");
+    expect(insetFiles.stageSidebar).toBe("files");
     expect(insetRecent.stageSidebar).toBeNull();
     expect(modalOutline.stageSidebar).toBeNull();
   });
