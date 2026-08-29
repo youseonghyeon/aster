@@ -21,7 +21,6 @@ function renderHeader(
     onDocumentBrowserToggle: vi.fn(),
     onOutlineToggle: vi.fn(),
     onOpenFile: vi.fn(),
-    onSaveFile: vi.fn(),
     onSettingsToggle: vi.fn(),
     settings: null,
     ...options,
@@ -50,5 +49,14 @@ describe("AppHeader document status", () => {
     const status = renderHeader(options);
     expect(status).toHaveTextContent(label);
     expect(status).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("does not expose a redundant header save action", () => {
+    renderHeader({ saveStatus: "modified" });
+
+    expect(
+      screen.queryByRole("button", { name: "Markdown 저장" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("저장되지 않음");
   });
 });

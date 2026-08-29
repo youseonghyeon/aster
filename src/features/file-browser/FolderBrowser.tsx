@@ -44,15 +44,6 @@ function FolderIcon() {
   );
 }
 
-function RefreshIcon() {
-  return (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M14.5 7A5.75 5.75 0 1 0 15 10" />
-      <path d="M11.5 4.5h3.25v3.25" />
-    </svg>
-  );
-}
-
 export function FolderBrowser({
   state,
   currentDocumentPath,
@@ -73,7 +64,7 @@ export function FolderBrowser({
 }: FolderBrowserProps) {
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const refreshButtonRef = useRef<HTMLButtonElement>(null);
+  const changeFolderButtonRef = useRef<HTMLButtonElement>(null);
   const previousIsModalRef = useRef(isModal);
   const hadTreeFocusRef = useRef(false);
 
@@ -153,7 +144,7 @@ export function FolderBrowser({
     if (hasVisibleTree || !hadTreeFocusRef.current) return;
     if (sidebarRef.current?.contains(document.activeElement)) return;
     hadTreeFocusRef.current = false;
-    (refreshButtonRef.current ?? closeButtonRef.current)?.focus();
+    (changeFolderButtonRef.current ?? closeButtonRef.current)?.focus();
   }, [hasVisibleTree]);
 
   return (
@@ -295,7 +286,8 @@ export function FolderBrowser({
         ) : null}
         {rootListing?.status === "error" && hasCachedEntries ? (
           <p className="folder-browser-inline-error" role="alert">
-            파일 목록을 새로고침하지 못했습니다: {rootListing.error}
+            파일 목록을 새로고침하지 못했습니다: {rootListing.error}. 잠시 후
+            자동으로 다시 시도합니다.
           </p>
         ) : null}
         {state.rootError || operationError ? (
@@ -331,11 +323,11 @@ export function FolderBrowser({
         ) : null}
         {state.root ? (
           <div className="folder-browser-footer-actions">
-            <button ref={refreshButtonRef} type="button" onClick={onRefresh}>
-              <RefreshIcon />
-              새로고침
-            </button>
-            <button type="button" onClick={onChooseRoot}>
+            <button
+              ref={changeFolderButtonRef}
+              type="button"
+              onClick={onChooseRoot}
+            >
               <FolderIcon />
               폴더 변경
             </button>

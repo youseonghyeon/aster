@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { FolderTree, flattenVisibleFolderEntries } from "./FolderTree";
@@ -98,7 +98,13 @@ describe("FolderTree", () => {
     expect(props.onSelect).toHaveBeenCalledWith("README.md");
     expect(props.onOpenMarkdown).not.toHaveBeenCalled();
 
-    await user.dblClick(readme);
+    const doubleClickEvent = new MouseEvent("dblclick", {
+      bubbles: true,
+      cancelable: true,
+    });
+    expect(fireEvent(readme, doubleClickEvent)).toBe(false);
+    expect(doubleClickEvent.defaultPrevented).toBe(true);
+    expect(props.onOpenMarkdown).toHaveBeenCalledOnce();
     expect(props.onOpenMarkdown).toHaveBeenCalledWith(
       expect.objectContaining({ relativePath: "README.md" }),
     );

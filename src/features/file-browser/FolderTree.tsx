@@ -417,6 +417,7 @@ export function FolderTree({
                   ) {
                     return;
                   }
+                  event.preventDefault();
                   activateEntry(entry);
                 }}
                 onKeyDown={(event) => handleKeyDown(event, entry)}

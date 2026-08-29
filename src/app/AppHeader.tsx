@@ -17,7 +17,6 @@ export type AppHeaderProps = {
   onDocumentBrowserToggle: () => void;
   onOutlineToggle: () => void;
   onOpenFile: () => void;
-  onSaveFile: () => void;
   onSettingsToggle: () => void;
   settings: ReactNode;
 };
@@ -62,15 +61,6 @@ function OpenFileIcon() {
   );
 }
 
-function SaveFileIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M4 3.5h10.25L16 5.25V16.5H4z" />
-      <path d="M7 3.5v4h6v-4M7 16.5v-5h6v5" />
-    </svg>
-  );
-}
-
 function ReadingSettingsIcon() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -98,7 +88,6 @@ export function AppHeader({
   onDocumentBrowserToggle,
   onOutlineToggle,
   onOpenFile,
-  onSaveFile,
   onSettingsToggle,
   settings,
 }: AppHeaderProps) {
@@ -168,16 +157,6 @@ export function AppHeader({
         </span>
       </div>
       <div className="header-actions">
-        <button
-          className="header-icon-button save-file-trigger"
-          type="button"
-          aria-label="Markdown 저장"
-          title="Markdown 저장 (⌘/Ctrl S)"
-          disabled={isBusy}
-          onClick={onSaveFile}
-        >
-          <SaveFileIcon />
-        </button>
         <button
           className="header-icon-button open-file-trigger"
           type="button"

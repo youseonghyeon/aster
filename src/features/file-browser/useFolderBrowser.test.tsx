@@ -148,6 +148,72 @@ describe("useFolderBrowser", () => {
     expect(listFolderChildren).toHaveBeenCalledTimes(2);
   });
 
+  it("retries a cached refresh error on the next error-paced schedule", async () => {
+    vi.useFakeTimers();
+    localStorage.setItem(
+      folderBrowserStorageKey,
+      JSON.stringify({
+        rootPath: "/docs",
+        expandedPaths: [],
+        view: "files",
+        sidebarWidth: 280,
+      }),
+    );
+    const cachedListing: FolderListing = {
+      ...listing(""),
+      entries: [
+        {
+          name: "cached.md",
+          relativePath: "cached.md",
+          path: "/docs/cached.md",
+          kind: "markdown",
+        },
+      ],
+    };
+    const refreshedListing: FolderListing = {
+      ...listing(""),
+      entries: [
+        {
+          name: "refreshed.md",
+          relativePath: "refreshed.md",
+          path: "/docs/refreshed.md",
+          kind: "markdown",
+        },
+      ],
+    };
+    vi.mocked(listFolderChildren)
+      .mockResolvedValueOnce(cachedListing)
+      .mockRejectedValueOnce(new Error("일시적인 오류"))
+      .mockResolvedValueOnce(refreshedListing);
+    const { result } = renderHook(() =>
+      useFolderBrowser({ isActive: true }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(listFolderChildren).toHaveBeenCalledTimes(1);
+
+    await act(async () => vi.advanceTimersByTimeAsync(10_000));
+    expect(listFolderChildren).toHaveBeenCalledTimes(2);
+    expect(result.current.state.directories[""]).toMatchObject({
+      status: "error",
+      error: "일시적인 오류",
+      entries: cachedListing.entries,
+    });
+
+    await act(async () => vi.advanceTimersByTimeAsync(59_999));
+    expect(listFolderChildren).toHaveBeenCalledTimes(2);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(listFolderChildren).toHaveBeenCalledTimes(3);
+    expect(result.current.state.directories[""]).toMatchObject({
+      status: "loaded",
+      error: null,
+      entries: refreshedListing.entries,
+    });
+  });
+
   it("pauses while hidden, refreshes on return, and clears the unmounted timer", async () => {
     vi.useFakeTimers();
     localStorage.setItem(

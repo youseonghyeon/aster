@@ -61,7 +61,6 @@ function App() {
         }
         onOutlineToggle={actions.toggleOutline}
         onOpenFile={() => void documents.openFromPicker("picker")}
-        onSaveFile={() => void documents.saveDocument()}
         onSettingsToggle={actions.toggleSettings}
         settings={
           <ReadingSettings

@@ -101,6 +101,8 @@
   cursor: default;
   font-size: 12px;
   text-align: left;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .folder-tree-item:hover {
@@ -323,7 +325,7 @@
 
 .folder-browser-footer-actions {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 1fr;
   gap: 6px;
 }
 

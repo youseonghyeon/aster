@@ -498,13 +498,12 @@ describe("workspace regression contracts", () => {
     expect(open).toHaveBeenCalledTimes(2);
   });
 
-  it("saves header edits through the revision-checked document command", async () => {
+  it("shows unsaved edits without a redundant header save action", async () => {
     const format = { hasBom: false, lineEnding: "lf" };
-    let currentRevision = "r1";
     vi.mocked(open).mockResolvedValue("/docs/save.md");
     vi.mocked(invoke).mockImplementation(async (command) => {
       if (command === "get_markdown_file_status") {
-        return { kind: "available", revision: currentRevision };
+        return { kind: "available", revision: "r1" };
       }
       if (command === "read_markdown_file") {
         return {
@@ -513,19 +512,6 @@ describe("workspace regression contracts", () => {
           content: "# 원본",
           revision: "r1",
           format,
-        };
-      }
-      if (command === "save_markdown_file") {
-        currentRevision = "r2";
-        return {
-          kind: "saved",
-          document: {
-            path: "/docs/save.md",
-            name: "save.md",
-            content: "# 변경",
-            revision: "r2",
-            format,
-          },
         };
       }
       return null;
@@ -538,17 +524,9 @@ describe("workspace regression contracts", () => {
     await user.clear(editor);
     await user.type(editor, "# 변경");
     expect(screen.getByText("저장되지 않음")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Markdown 저장" }));
-
-    await waitFor(() => expect(screen.getByText("저장됨")).toBeInTheDocument());
-    expect(invoke).toHaveBeenCalledWith("save_markdown_file", {
-      request: {
-        path: "/docs/save.md",
-        content: "# 변경",
-        expectedRevision: "r1",
-        format,
-      },
-    });
+    expect(
+      screen.queryByRole("button", { name: "Markdown 저장" }),
+    ).not.toBeInTheDocument();
   });
 
   it("treats an edit made while the target is read as an unsaved change", async () => {
