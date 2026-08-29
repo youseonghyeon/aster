@@ -5,12 +5,30 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-30
+
+### Added
+
+- Markdown 편집 내용을 `Command/Ctrl+S`와 네이티브 Save 메뉴로 안전하게 저장하고, 종료·문서 전환 전에 저장 여부를 확인하는 문서 수명주기
+- 예기치 않은 종료 뒤 저장하지 않은 Markdown 변경을 복구하고, 외부 파일 변경과 로컬 편집이 충돌할 때 적용 방향을 선택하는 복구 흐름
+- 선택한 폴더의 Markdown과 이미지를 계층적으로 탐색하고 현재 문서, 펼침 상태와 사이드바 너비를 복원하는 파일 사이드바
+- 마크다운 원문 검색 결과의 현재 항목과 나머지 항목을 구분하는 source highlight
+
+### Changed
+
+- 파일 수와 직전 작업 비용에 따라 10–60초 간격으로 폴더 목록을 자동 갱신하고, 긴 파일 이름은 전용 가로 스크롤로 확인하도록 개선
+- 문서 탐색을 파일·최근 탭으로 통합하고, 디렉터리 disclosure를 한 번의 클릭으로 열고 닫도록 정리
+- 앱 shell의 문서, 검색, 읽기 설정과 workspace 책임을 feature 단위 controller와 component로 분리
+- 중복된 폴더 새로고침과 header 저장 버튼을 제거하고 오류 복구, 저장 상태와 메뉴·단축키 경로는 유지
+
 ### Fixed
 
 - 넓은 창에서 미리보기 집중 모드, Markdown/메모 전환 또는 패널 검색을 사용해도 열린 문서 목차를 유지
-- 검색 버튼과 `Command/Ctrl+F`의 목차 동작을 일치시키고, 목차와 함께 열린 검색·집중 모드를 `Escape`로 현재 작업부터 순서대로 닫도록 수정
-- 집중 모드 진입 시 화면에서 숨겨지는 Markdown·메모 검색을 정상 종료해 선택·스크롤을 복원하고, 숨은 검색이 `Escape`를 소비하지 않도록 수정
-- 작은 창에서는 모달 목차를 닫은 뒤 메모·검색 단축키의 대상 입력으로 포커스를 정확히 이동
+- 검색 버튼과 `Command/Ctrl+F`의 목차 동작을 일치시키고, 검색 종료 뒤 선택·스크롤·포커스가 이동하거나 숨은 검색이 `Escape`를 소비하는 문제 수정
+- 저장·외부 갱신·문서 전환이 겹쳐 최신 편집이나 복구 초안이 사라질 수 있던 경쟁 조건 수정
+- 폴더 root 밖으로 바뀐 심볼릭 링크를 통한 읽기·저장을 차단하고 stale 갱신이 새 root 상태를 덮지 않도록 수정
+- 파일 더블 클릭 시 파일명이 복사 가능한 텍스트처럼 선택되고, tree 가로 스크롤바 아래 불필요한 공간이 남던 문제 수정
+- 작은 창에서 모달 탐색을 닫은 뒤 입력 영역으로 포커스가 정확히 복원되지 않던 문제 수정
 
 ## [1.2.0] - 2026-08-09
 
@@ -78,4 +96,5 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 [1.0.0]: https://github.com/youseonghyeon/aster/releases/tag/v1.0.0
 [1.1.0]: https://github.com/youseonghyeon/aster/compare/v1.0.0...v1.1.0
 [1.2.0]: https://github.com/youseonghyeon/aster/compare/v1.1.0...v1.2.0
-[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.2.0...HEAD
+[1.3.0]: https://github.com/youseonghyeon/aster/compare/v1.2.0...v1.3.0
+[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.3.0...HEAD
