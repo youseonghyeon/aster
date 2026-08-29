@@ -6,23 +6,12 @@ import {
   useReducer,
   useRef,
   useState,
-  type CSSProperties,
 } from "react";
-import { listen } from "@tauri-apps/api/event";
 import { AppHeader } from "./components/AppHeader";
 import { DocumentStage } from "./components/DocumentStage";
 import { PaneDivider } from "./components/PaneDivider";
-import {
-  lineSpacings,
-  readingFonts,
-  readingZoomLevels,
-  themes,
-  ReadingSettings,
-  type LineSpacing,
-  type ReadingFont,
-  type ReadingZoom,
-  type Theme,
-} from "./components/ReadingSettings";
+import { ReadingSettings } from "./features/reading/ReadingSettings";
+import { useReadingPreferences } from "./features/reading/useReadingPreferences";
 import {
   WorkspacePane,
   type PaneContent,
@@ -50,17 +39,6 @@ import {
 } from "./shared/app-events";
 import "./styles/base.css";
 import "./App.css";
-
-const themeStorageKey = "aster:theme:v1";
-const fontStorageKey = "aster:reading-font:v1";
-const lineSpacingStorageKey = "aster:line-spacing:v1";
-const readingZoomStorageKey = "aster:reading-zoom:v1";
-const scrollSyncStorageKey = "aster:scroll-sync:v1";
-
-const scrollSyncOptions = [{ value: "off" }, { value: "on" }] as const;
-
-type ScrollSyncPreference = (typeof scrollSyncOptions)[number]["value"];
-type ReadingZoomCommand = "in" | "out" | "reset";
 
 function isEventInsideStageSidebar(target: EventTarget | null) {
   return (
@@ -103,44 +81,6 @@ function restoreScrollProgress(
     progress.left * Math.max(0, element.scrollWidth - element.clientWidth);
 }
 
-function loadPreference<T extends string>(
-  storageKey: string,
-  options: readonly { value: T }[],
-  fallback: T,
-): T {
-  try {
-    const storedValue = localStorage.getItem(storageKey);
-    const isKnownValue = options.some((option) => option.value === storedValue);
-
-    return isKnownValue ? (storedValue as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function savePreference(storageKey: string, value: string) {
-  try {
-    localStorage.setItem(storageKey, value);
-  } catch {
-    // The setting still applies for this session when storage is unavailable.
-  }
-}
-
-function getSteppedReadingZoom(
-  currentZoom: ReadingZoom,
-  direction: -1 | 1,
-): ReadingZoom {
-  const currentIndex = readingZoomLevels.findIndex(
-    (option) => option.value === currentZoom,
-  );
-  const nextIndex = Math.min(
-    readingZoomLevels.length - 1,
-    Math.max(0, currentIndex + direction),
-  );
-
-  return readingZoomLevels[nextIndex].value;
-}
-
 function App() {
   const appEventsRef = useRef<AppEventChannel | null>(null);
   if (appEventsRef.current === null) {
@@ -167,6 +107,17 @@ function App() {
     reloadDocument: handleReloadExternalFile,
     dismissExternalFileNotice,
   } = documentSession;
+  const {
+    theme,
+    readingFont,
+    lineSpacing,
+    readingZoomStyle,
+    isScrollSyncEnabled,
+    selectTheme,
+    selectReadingFont,
+    selectLineSpacing,
+    toggleScrollSync,
+  } = useReadingPreferences();
   const [workspaceInteraction, dispatchWorkspaceInteraction] = useReducer(
     workspaceInteractionReducer,
     undefined,
@@ -187,22 +138,6 @@ function App() {
   const [isWorkspaceStacked, setIsWorkspaceStacked] = useState(() =>
     window.matchMedia("(max-width: 720px)").matches,
   );
-  const [theme, setTheme] = useState<Theme>(() =>
-    loadPreference(themeStorageKey, themes, "paper"),
-  );
-  const [readingFont, setReadingFont] = useState<ReadingFont>(() =>
-    loadPreference(fontStorageKey, readingFonts, "pretendard"),
-  );
-  const [lineSpacing, setLineSpacing] = useState<LineSpacing>(() =>
-    loadPreference(lineSpacingStorageKey, lineSpacings, "balanced"),
-  );
-  const [readingZoom, setReadingZoom] = useState<ReadingZoom>(() =>
-    loadPreference(readingZoomStorageKey, readingZoomLevels, "100"),
-  );
-  const [scrollSyncPreference, setScrollSyncPreference] =
-    useState<ScrollSyncPreference>(() =>
-      loadPreference(scrollSyncStorageKey, scrollSyncOptions, "off"),
-    );
   const workspaceRef = useRef<HTMLElement>(null);
   const dividerRef = useRef<HTMLDivElement>(null);
   const splitGuideRef = useRef<HTMLDivElement>(null);
@@ -276,16 +211,12 @@ function App() {
     leftPane === "editor" ? primaryPane : "preview";
   const rightPaneContent: PaneContent =
     leftPane === "editor" ? "preview" : primaryPane;
-  const readingZoomStyle = {
-    "--reading-font-size": `${(17 * Number(readingZoom)) / 100}px`,
-  } as CSSProperties;
   stageSidebarRef.current = stageSidebar;
   isSidebarInsetRef.current = isSidebarInset;
   isSettingsOpenRef.current = isSettingsOpen;
   isPanelLayoutMenuOpenRef.current = isPanelLayoutMenuOpen;
   isNotesOpenRef.current = isNotesOpen;
   isPreviewFocusModeRef.current = isPreviewFocusMode;
-  const isScrollSyncEnabled = scrollSyncPreference === "on";
   const isScrollSyncAvailable = !isNotesOpen && !isPreviewFocusMode;
   const { suppressScrollSyncRestore } = useScrollSync({
     enabled: isScrollSyncEnabled,
@@ -422,36 +353,6 @@ function App() {
   }, []);
   const closePanelLayoutMenu = useCallback(() => {
     dispatchWorkspaceInteraction({ type: "close-panel-layout-menu" });
-  }, []);
-
-  useEffect(() => {
-    let isDisposed = false;
-    let stopListening: (() => void) | undefined;
-
-    void listen<ReadingZoomCommand>("reading-zoom-requested", (event) => {
-      setReadingZoom((currentZoom) => {
-        const updatedZoom =
-          event.payload === "in"
-            ? getSteppedReadingZoom(currentZoom, 1)
-            : event.payload === "out"
-              ? getSteppedReadingZoom(currentZoom, -1)
-              : "100";
-
-        savePreference(readingZoomStorageKey, updatedZoom);
-        return updatedZoom;
-      });
-    }).then((unlisten) => {
-      if (isDisposed) {
-        unlisten();
-      } else {
-        stopListening = unlisten;
-      }
-    });
-
-    return () => {
-      isDisposed = true;
-      stopListening?.();
-    };
   }, []);
 
   useEffect(() => {
@@ -646,29 +547,6 @@ function App() {
       window.removeEventListener("keydown", handleSettingsKeyDown);
     };
   }, [isSettingsOpen]);
-
-  function selectTheme(nextTheme: Theme) {
-    setTheme(nextTheme);
-    savePreference(themeStorageKey, nextTheme);
-  }
-
-  function selectReadingFont(nextFont: ReadingFont) {
-    setReadingFont(nextFont);
-    savePreference(fontStorageKey, nextFont);
-  }
-
-  function selectLineSpacing(nextSpacing: LineSpacing) {
-    setLineSpacing(nextSpacing);
-    savePreference(lineSpacingStorageKey, nextSpacing);
-  }
-
-  function toggleScrollSync() {
-    setScrollSyncPreference((currentPreference) => {
-      const nextPreference = currentPreference === "on" ? "off" : "on";
-      savePreference(scrollSyncStorageKey, nextPreference);
-      return nextPreference;
-    });
-  }
 
   function requestSourceFocus(mode: "editor" | "notes") {
     const existingElement = contentElementsRef.current[mode];
