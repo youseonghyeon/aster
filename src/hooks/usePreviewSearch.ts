@@ -354,6 +354,8 @@ export function usePreviewSearch(
     text: "",
     segments: [],
   });
+  const [indexedContentRevision, setIndexedContentRevision] =
+    useState(contentRevision);
   const [renderRevision, setRenderRevision] = useState(0);
   const [scrollRevision, setScrollRevision] = useState(0);
   const [overlays, setOverlays] = useState<PreviewSearchOverlay[]>([]);
@@ -441,12 +443,14 @@ export function usePreviewSearch(
     }
 
     setTextIndex(createPreviewTextIndex(container));
+    setIndexedContentRevision(contentRevision);
   }, [container, contentRevision, renderRevision, session.isOpen]);
 
   useLayoutEffect(() => {
     if (
       !container ||
       !session.isOpen ||
+      indexedContentRevision !== contentRevision ||
       result.error ||
       result.matches.length === 0
     ) {
@@ -473,6 +477,8 @@ export function usePreviewSearch(
     }
   }, [
     container,
+    contentRevision,
+    indexedContentRevision,
     result.error,
     result.matches,
     session.currentIndex,
