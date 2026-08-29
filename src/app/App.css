@@ -492,7 +492,7 @@
   align-items: center;
   gap: 12px;
   padding: 0 22px;
-  color: var(--text-muted);
+  color: var(--text-strong);
   background: var(--header-background);
   border-bottom: 1px solid var(--border);
   font-size: 13px;
@@ -554,6 +554,13 @@
   stroke-width: 1.65;
 }
 
+.document-identity {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  line-height: 1.15;
+}
+
 .document-name {
   width: 100%;
   max-width: 560px;
@@ -565,6 +572,35 @@
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.document-save-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  color: var(--text-strong);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.document-save-status::before {
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  border-radius: 50%;
+  content: "";
+}
+
+.document-save-status[data-status="modified"]::before,
+.document-save-status[data-status="saving"]::before {
+  background: var(--accent-strong);
+}
+
+.document-save-status[data-status="conflict"]::before,
+.document-save-status[data-status="error"]::before {
+  background: var(--syntax-bracket-error);
 }
 
 .header-actions {
@@ -610,7 +646,8 @@
   fill: none;
 }
 
-.open-file-trigger svg {
+.open-file-trigger svg,
+.save-file-trigger svg {
   fill: none;
 }
 
@@ -1973,11 +2010,26 @@
   }
 
   .app-header {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 6px;
+    padding-inline: 8px;
   }
 
+  .header-leading {
+    gap: 4px;
+  }
+
+  .brand > :last-child,
+  .header-group-divider,
   .document-name {
     display: none;
+  }
+
+  .document-save-status {
+    max-width: 100%;
+    margin-top: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .workspace {

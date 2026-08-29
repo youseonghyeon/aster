@@ -1,8 +1,11 @@
 import type { ReactNode, Ref } from "react";
+import type { MarkdownSaveStatus } from "../features/documents/document-session-state";
 
 export type AppHeaderProps = {
   documentName: string;
   documentPath: string | null;
+  saveStatus: MarkdownSaveStatus;
+  recovered: boolean;
   isRecentDocumentsOpen: boolean;
   isOutlineOpen: boolean;
   isBusy: boolean;
@@ -14,6 +17,7 @@ export type AppHeaderProps = {
   onRecentDocumentsToggle: () => void;
   onOutlineToggle: () => void;
   onOpenFile: () => void;
+  onSaveFile: () => void;
   onSettingsToggle: () => void;
   settings: ReactNode;
 };
@@ -58,6 +62,15 @@ function OpenFileIcon() {
   );
 }
 
+function SaveFileIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M4 3.5h10.25L16 5.25V16.5H4z" />
+      <path d="M7 3.5v4h6v-4M7 16.5v-5h6v5" />
+    </svg>
+  );
+}
+
 function ReadingSettingsIcon() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -72,6 +85,8 @@ function ReadingSettingsIcon() {
 export function AppHeader({
   documentName,
   documentPath,
+  saveStatus,
+  recovered,
   isRecentDocumentsOpen,
   isOutlineOpen,
   isBusy,
@@ -83,9 +98,27 @@ export function AppHeader({
   onRecentDocumentsToggle,
   onOutlineToggle,
   onOpenFile,
+  onSaveFile,
   onSettingsToggle,
   settings,
 }: AppHeaderProps) {
+  const saveStatusLabel =
+    saveStatus === "saving"
+      ? "저장 중…"
+      : saveStatus === "modified"
+        ? recovered
+          ? "복구됨 · 저장되지 않음"
+          : "저장되지 않음"
+        : saveStatus === "conflict"
+          ? recovered
+            ? "복구됨 · 원본 변경"
+            : "원본 변경 충돌"
+          : saveStatus === "error"
+            ? "저장 오류"
+            : documentPath
+              ? "저장됨"
+              : "새 문서";
+
   return (
     <header className="app-header">
       <div className="header-leading">
@@ -123,10 +156,28 @@ export function AppHeader({
           </button>
         </nav>
       </div>
-      <span className="document-name" title={documentPath ?? documentName}>
-        {documentName}
-      </span>
+      <div className="document-identity" title={documentPath ?? documentName}>
+        <span className="document-name">{documentName}</span>
+        <span
+          className="document-save-status"
+          data-status={saveStatus}
+          role="status"
+          aria-live="polite"
+        >
+          {saveStatusLabel}
+        </span>
+      </div>
       <div className="header-actions">
+        <button
+          className="header-icon-button save-file-trigger"
+          type="button"
+          aria-label="Markdown 저장"
+          title="Markdown 저장 (⌘/Ctrl S)"
+          disabled={isBusy}
+          onClick={onSaveFile}
+        >
+          <SaveFileIcon />
+        </button>
         <button
           className="header-icon-button open-file-trigger"
           type="button"

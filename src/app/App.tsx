@@ -41,6 +41,8 @@ function App() {
       <AppHeader
         documentName={documents.document.name}
         documentPath={documents.document.path}
+        saveStatus={documents.document.saveStatus}
+        recovered={documents.document.recovered}
         isRecentDocumentsOpen={state.isRecentDocumentsOpen}
         isOutlineOpen={state.isOutlineOpen}
         isBusy={documents.isBusy}
@@ -52,6 +54,7 @@ function App() {
         onRecentDocumentsToggle={actions.toggleRecentDocuments}
         onOutlineToggle={actions.toggleOutline}
         onOpenFile={() => void documents.openFromPicker("picker")}
+        onSaveFile={() => void documents.saveDocument()}
         onSettingsToggle={actions.toggleSettings}
         settings={
           <ReadingSettings

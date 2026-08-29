@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { confirm, message, open } from "@tauri-apps/plugin-dialog";
+import { confirm, message, open, save } from "@tauri-apps/plugin-dialog";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
@@ -21,6 +21,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   confirm: vi.fn(),
   message: vi.fn(),
   open: vi.fn(),
+  save: vi.fn(),
 }));
 vi.mock("../components/SyntaxHighlightedCode", () => ({
   SyntaxHighlightedCode: ({ code }: { code: string }) => <pre>{code}</pre>,
@@ -64,6 +65,7 @@ describe("workspace regression contracts", () => {
     vi.mocked(confirm).mockReset();
     vi.mocked(message).mockReset();
     vi.mocked(open).mockReset();
+    vi.mocked(save).mockReset();
     vi.mocked(listen).mockReset();
     vi.mocked(listen).mockImplementation(async () => () => undefined);
     vi.mocked(message).mockResolvedValue("Ok");
@@ -398,7 +400,7 @@ describe("workspace regression contracts", () => {
 
   it("preserves edited Markdown when document switching is cancelled", async () => {
     vi.mocked(open).mockResolvedValue("/docs/next.md");
-    vi.mocked(confirm).mockResolvedValue(false);
+    vi.mocked(message).mockResolvedValue("취소");
     vi.mocked(invoke).mockImplementation(async (command) => {
       if (command === "read_markdown_file") {
         return {
@@ -418,7 +420,7 @@ describe("workspace regression contracts", () => {
     await user.type(editor, "# 현재 변경");
     await user.click(screen.getByRole("button", { name: "Markdown 파일 열기" }));
 
-    await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+    await waitFor(() => expect(message).toHaveBeenCalledOnce());
     expect(editor).toHaveValue("# 현재 변경");
     expect(screen.getByText("새 문서.md")).toBeInTheDocument();
   });
@@ -465,10 +467,63 @@ describe("workspace regression contracts", () => {
     expect(open).toHaveBeenCalledTimes(2);
   });
 
+  it("saves header edits through the revision-checked document command", async () => {
+    const format = { hasBom: false, lineEnding: "lf" };
+    let currentRevision = "r1";
+    vi.mocked(open).mockResolvedValue("/docs/save.md");
+    vi.mocked(invoke).mockImplementation(async (command) => {
+      if (command === "get_markdown_file_status") {
+        return { kind: "available", revision: currentRevision };
+      }
+      if (command === "read_markdown_file") {
+        return {
+          path: "/docs/save.md",
+          name: "save.md",
+          content: "# 원본",
+          revision: "r1",
+          format,
+        };
+      }
+      if (command === "save_markdown_file") {
+        currentRevision = "r2";
+        return {
+          kind: "saved",
+          document: {
+            path: "/docs/save.md",
+            name: "save.md",
+            content: "# 변경",
+            revision: "r2",
+            format,
+          },
+        };
+      }
+      return null;
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Markdown 파일 열기" }));
+    const editor = await screen.findByRole("textbox", { name: "마크다운 입력" });
+    await user.clear(editor);
+    await user.type(editor, "# 변경");
+    expect(screen.getByText("저장되지 않음")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Markdown 저장" }));
+
+    await waitFor(() => expect(screen.getByText("저장됨")).toBeInTheDocument());
+    expect(invoke).toHaveBeenCalledWith("save_markdown_file", {
+      request: {
+        path: "/docs/save.md",
+        content: "# 변경",
+        expectedRevision: "r1",
+        format,
+      },
+    });
+  });
+
   it("treats an edit made while the target is read as an unsaved change", async () => {
     let resolveRead: (value: unknown) => void = () => undefined;
     vi.mocked(open).mockResolvedValue("/docs/next.md");
-    vi.mocked(confirm).mockResolvedValue(false);
+    vi.mocked(message).mockResolvedValue("취소");
     vi.mocked(invoke).mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -490,13 +545,13 @@ describe("workspace regression contracts", () => {
       revision: "next-revision",
     });
 
-    await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+    await waitFor(() => expect(message).toHaveBeenCalledOnce());
     expect(editor).toHaveValue("# 읽는 동안 변경");
     expect(screen.getByText("새 문서.md")).toBeInTheDocument();
   });
 
   it("does not apply a target after Markdown changes during confirmation", async () => {
-    let resolveConfirmation: (value: boolean) => void = () => undefined;
+    let resolveConfirmation: (value: string) => void = () => undefined;
     vi.mocked(open).mockResolvedValue("/docs/next.md");
     vi.mocked(invoke).mockResolvedValue({
       path: "/docs/next.md",
@@ -504,7 +559,7 @@ describe("workspace regression contracts", () => {
       content: "# 다음 문서",
       revision: "next-revision",
     });
-    vi.mocked(confirm).mockImplementation(
+    vi.mocked(message).mockImplementation(
       () =>
         new Promise((resolve) => {
           resolveConfirmation = resolve;
@@ -517,9 +572,9 @@ describe("workspace regression contracts", () => {
     await user.type(editor, "# 확인 전 변경");
 
     await user.click(screen.getByRole("button", { name: "Markdown 파일 열기" }));
-    await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+    await waitFor(() => expect(message).toHaveBeenCalledOnce());
     await user.type(editor, " 추가 변경");
-    resolveConfirmation(true);
+    resolveConfirmation("저장 안 함");
 
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Markdown 파일 열기" })).toBeEnabled(),
@@ -631,6 +686,56 @@ describe("workspace regression contracts", () => {
     );
   });
 
+  it("routes the native Save menu shortcut through the document save transaction", async () => {
+    const format = { hasBom: false, lineEnding: "lf" };
+    vi.mocked(save).mockResolvedValue("/docs/native-save.md");
+    vi.mocked(invoke).mockImplementation(async (command) => {
+      if (command === "save_markdown_file") {
+        return {
+          kind: "saved",
+          document: {
+            path: "/docs/native-save.md",
+            name: "native-save.md",
+            content: "# 단축키 저장",
+            revision: "native-saved-revision",
+            format,
+          },
+        };
+      }
+      if (command === "get_markdown_file_status") {
+        return { kind: "available", revision: "native-saved-revision" };
+      }
+      return null;
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    const editor = screen.getByRole("textbox", { name: "마크다운 입력" });
+    await user.clear(editor);
+    await user.type(editor, "# 단축키 저장");
+    await waitFor(() =>
+      expect(
+        vi.mocked(listen).mock.calls.some(
+          ([event]) => event === "save-markdown-requested",
+        ),
+      ).toBe(true),
+    );
+    const nativeSaveHandler = vi.mocked(listen).mock.calls.find(
+      ([event]) => event === "save-markdown-requested",
+    )?.[1] as ((event: { payload: unknown }) => void) | undefined;
+
+    nativeSaveHandler?.({ payload: undefined });
+
+    await waitFor(() => expect(screen.getByText("저장됨")).toBeInTheDocument());
+    expect(invoke).toHaveBeenCalledWith("save_markdown_file", {
+      request: {
+        path: "/docs/native-save.md",
+        content: "# 단축키 저장",
+        expectedRevision: null,
+        format,
+      },
+    });
+  });
+
   it("cleans up every native listener registered during StrictMode remounts", async () => {
     const unlisteners: Array<ReturnType<typeof vi.fn>> = [];
     vi.mocked(listen).mockImplementation(async () => {
@@ -644,7 +749,7 @@ describe("workspace regression contracts", () => {
       </StrictMode>,
     );
 
-    await waitFor(() => expect(listen).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(listen).toHaveBeenCalledTimes(6));
     unmount();
     await waitFor(() =>
       expect(unlisteners.every((unlisten) => unlisten.mock.calls.length === 1)).toBe(true),
