@@ -1,9 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { confirm, message, open } from "@tauri-apps/plugin-dialog";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { untitledDocumentNoteStorageKey } from "./lib/document-session";
+import { recentDocumentsStorageKey } from "./lib/recent-documents";
 import { setViewportWidth } from "./test/setup";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -60,6 +64,8 @@ describe("workspace regression contracts", () => {
     vi.mocked(confirm).mockReset();
     vi.mocked(message).mockReset();
     vi.mocked(open).mockReset();
+    vi.mocked(listen).mockReset();
+    vi.mocked(listen).mockImplementation(async () => () => undefined);
     vi.mocked(message).mockResolvedValue("Ok");
   });
 
@@ -437,6 +443,214 @@ describe("workspace regression contracts", () => {
     await waitFor(() => expect(openButton).toBeEnabled());
   });
 
+  it("releases the open lock after the file picker is cancelled", async () => {
+    vi.mocked(open)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce("/docs/next.md");
+    vi.mocked(invoke).mockResolvedValue({
+      path: "/docs/next.md",
+      name: "next.md",
+      content: "# 다음 문서",
+      revision: "next-revision",
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    const openButton = screen.getByRole("button", { name: "Markdown 파일 열기" });
+
+    await user.click(openButton);
+    await waitFor(() => expect(openButton).toBeEnabled());
+    await user.click(openButton);
+
+    await waitFor(() => expect(screen.getByText("next.md")).toBeInTheDocument());
+    expect(open).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats an edit made while the target is read as an unsaved change", async () => {
+    let resolveRead: (value: unknown) => void = () => undefined;
+    vi.mocked(open).mockResolvedValue("/docs/next.md");
+    vi.mocked(confirm).mockResolvedValue(false);
+    vi.mocked(invoke).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRead = resolve;
+        }),
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const editor = screen.getByRole("textbox", { name: "마크다운 입력" });
+
+    await user.click(screen.getByRole("button", { name: "Markdown 파일 열기" }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce());
+    await user.clear(editor);
+    await user.type(editor, "# 읽는 동안 변경");
+    resolveRead({
+      path: "/docs/next.md",
+      name: "next.md",
+      content: "# 다음 문서",
+      revision: "next-revision",
+    });
+
+    await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+    expect(editor).toHaveValue("# 읽는 동안 변경");
+    expect(screen.getByText("새 문서.md")).toBeInTheDocument();
+  });
+
+  it("does not apply a target after Markdown changes during confirmation", async () => {
+    let resolveConfirmation: (value: boolean) => void = () => undefined;
+    vi.mocked(open).mockResolvedValue("/docs/next.md");
+    vi.mocked(invoke).mockResolvedValue({
+      path: "/docs/next.md",
+      name: "next.md",
+      content: "# 다음 문서",
+      revision: "next-revision",
+    });
+    vi.mocked(confirm).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveConfirmation = resolve;
+        }),
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const editor = screen.getByRole("textbox", { name: "마크다운 입력" });
+    await user.clear(editor);
+    await user.type(editor, "# 확인 전 변경");
+
+    await user.click(screen.getByRole("button", { name: "Markdown 파일 열기" }));
+    await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+    await user.type(editor, " 추가 변경");
+    resolveConfirmation(true);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Markdown 파일 열기" })).toBeEnabled(),
+    );
+    expect(editor).toHaveValue("# 확인 전 변경 추가 변경");
+    expect(screen.getByText("새 문서.md")).toBeInTheDocument();
+  });
+
+  it("flushes the latest note value before committing a document switch", async () => {
+    let resolveRead: (value: unknown) => void = () => undefined;
+    vi.mocked(open).mockResolvedValue("/docs/next.md");
+    vi.mocked(invoke).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRead = resolve;
+        }),
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "메모" }));
+    const noteEditor = screen.getByRole("textbox", {
+      name: "이 문서에 대한 개인 메모",
+    });
+    await user.type(noteEditor, "읽기 전 ");
+
+    await user.click(screen.getByRole("button", { name: "Markdown 파일 열기" }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledOnce());
+    await user.type(noteEditor, "읽기 중 메모");
+    resolveRead({
+      path: "/docs/next.md",
+      name: "next.md",
+      content: "# 다음 문서",
+      revision: "next-revision",
+    });
+
+    await waitFor(() => expect(screen.getByText("next.md")).toBeInTheDocument());
+    expect(localStorage.getItem(untitledDocumentNoteStorageKey)).toBe(
+      "읽기 전 읽기 중 메모",
+    );
+  });
+
+  it("stores the canonical opened path instead of its requested alias", async () => {
+    vi.mocked(open).mockResolvedValue("/docs/alias.md");
+    vi.mocked(invoke).mockResolvedValue({
+      path: "/canonical/guide.md",
+      name: "guide.md",
+      content: "# 안내서",
+      revision: "guide-revision",
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Markdown 파일 열기" }));
+
+    await waitFor(() => expect(screen.getByText("guide.md")).toBeInTheDocument());
+    expect(JSON.parse(localStorage.getItem(recentDocumentsStorageKey) ?? "[]")).toEqual([
+      { path: "/canonical/guide.md", name: "guide.md" },
+    ]);
+  });
+
+  it("closes recent documents and restores trigger focus for the current item", async () => {
+    vi.mocked(open).mockResolvedValue("/docs/current.md");
+    vi.mocked(invoke).mockResolvedValue({
+      path: "/docs/current.md",
+      name: "current.md",
+      content: "# 현재 문서",
+      revision: "current-revision",
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Markdown 파일 열기" }));
+    await waitFor(() => expect(screen.getByText("current.md")).toBeInTheDocument());
+
+    const recentTrigger = screen.getByRole("button", { name: "최근 문서 열기" });
+    await user.click(recentTrigger);
+    await user.click(screen.getByRole("button", { name: "current.md, 현재 문서" }));
+    await nextAnimationFrame();
+
+    expect(screen.queryByRole("heading", { name: "최근 문서" })).not.toBeInTheDocument();
+    expect(recentTrigger).toHaveFocus();
+    expect(
+      vi.mocked(invoke).mock.calls.filter(([command]) => command === "read_markdown_file"),
+    ).toHaveLength(1);
+  });
+
+  it("shares one synchronous open lock with native open requests", async () => {
+    let resolveOpen: (value: string | null) => void = () => undefined;
+    vi.mocked(open).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveOpen = resolve;
+        }),
+    );
+    render(<App />);
+    await waitFor(() =>
+      expect(vi.mocked(listen).mock.calls.some(([event]) => event === "open-markdown-requested")).toBe(true),
+    );
+    const nativeOpenHandler = vi.mocked(listen).mock.calls.find(
+      ([event]) => event === "open-markdown-requested",
+    )?.[1] as ((event: { payload: unknown }) => void) | undefined;
+
+    nativeOpenHandler?.({ payload: undefined });
+    nativeOpenHandler?.({ payload: undefined });
+
+    expect(open).toHaveBeenCalledOnce();
+    resolveOpen(null);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Markdown 파일 열기" })).toBeEnabled(),
+    );
+  });
+
+  it("cleans up every native listener registered during StrictMode remounts", async () => {
+    const unlisteners: Array<ReturnType<typeof vi.fn>> = [];
+    vi.mocked(listen).mockImplementation(async () => {
+      const unlisten = vi.fn();
+      unlisteners.push(unlisten);
+      return unlisten;
+    });
+    const { unmount } = render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(listen).toHaveBeenCalledTimes(4));
+    unmount();
+    await waitFor(() =>
+      expect(unlisteners.every((unlisten) => unlisten.mock.calls.length === 1)).toBe(true),
+    );
+  });
+
   it("keeps the current document when a Tauri read fails", async () => {
     vi.mocked(open).mockResolvedValue("/docs/broken.md");
     vi.mocked(invoke).mockRejectedValue(new Error("읽기 실패"));
@@ -453,5 +667,22 @@ describe("workspace regression contracts", () => {
     }));
     expect(editor).toHaveValue(originalValue);
     expect(screen.getByText("새 문서.md")).toBeInTheDocument();
+  });
+
+  it("releases the open lock when both reading and its error dialog fail", async () => {
+    vi.mocked(open)
+      .mockResolvedValueOnce("/docs/broken.md")
+      .mockResolvedValueOnce(null);
+    vi.mocked(invoke).mockRejectedValue(new Error("읽기 실패"));
+    vi.mocked(message).mockRejectedValue(new Error("대화상자 실패"));
+    const user = userEvent.setup();
+    render(<App />);
+    const openButton = screen.getByRole("button", { name: "Markdown 파일 열기" });
+
+    await user.click(openButton);
+    await waitFor(() => expect(openButton).toBeEnabled());
+    await user.click(openButton);
+
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(2));
   });
 });
