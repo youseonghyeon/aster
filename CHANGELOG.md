@@ -5,11 +5,19 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-30
+
 ### Added
 
 - Mermaid fenced code block을 현재 읽기 테마에 맞는 안전한 다이어그램으로 표시하는 미리보기
 - 큰 Mermaid 다이어그램을 항목별로 25%~200% 확대·축소하고 현재 미리보기 폭에 맞추는 조작기
 - 읽기 설정에서 Mermaid Flowchart 계열의 선을 곡선·직선·직각으로 바꾸고 다음 실행에도 복원하는 선택지
+- 같은 문서 제목과 상대 경로 Markdown을 Aster 안에서 열고 문서·읽기 위치를 뒤로·앞으로 이동하는 탐색 기록
+- 현재 Markdown 기준 상대 이미지를 안전하게 확인하고 외부 HTTP(S) 링크를 기본 브라우저에서 여는 미리보기 동작
+
+### Security
+
+- 상대 Markdown과 이미지 경로를 Rust에서 canonicalize하고 지원 확장자·파일 크기를 다시 검증하며 절대 파일 경로와 임의 URL scheme을 차단
 
 ## [1.3.0] - 2026-08-30
 
@@ -103,4 +111,5 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 [1.1.0]: https://github.com/youseonghyeon/aster/compare/v1.0.0...v1.1.0
 [1.2.0]: https://github.com/youseonghyeon/aster/compare/v1.1.0...v1.2.0
 [1.3.0]: https://github.com/youseonghyeon/aster/compare/v1.2.0...v1.3.0
-[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.3.0...HEAD
+[1.4.0]: https://github.com/youseonghyeon/aster/compare/v1.3.0...v1.4.0
+[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.4.0...HEAD
