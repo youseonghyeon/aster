@@ -71,6 +71,41 @@
     "Malgun Gothic", sans-serif;
 }
 
+.app-shell.is-starting {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.startup-document-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-family: var(--reading-font);
+  font-size: 14px;
+}
+
+.startup-document-pulse {
+  width: 8px;
+  height: 8px;
+  background: var(--brand);
+  border-radius: 50%;
+  animation: startup-document-pulse 900ms ease-in-out infinite alternate;
+}
+
+@keyframes startup-document-pulse {
+  to {
+    opacity: 0.35;
+    transform: scale(0.75);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startup-document-pulse {
+    animation: none;
+  }
+}
+
 .app-shell[data-font="noto-serif"] {
   --reading-font:
     "Noto Serif KR Variable", "Noto Serif KR", "AppleMyungjo", "Batang", serif;

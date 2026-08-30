@@ -115,9 +115,11 @@ describe("document session controller", () => {
       wrapper,
     });
 
+    expect(result.current.isRestoringStartupDocument).toBe(true);
     await waitFor(() => expect(result.current.document.path).toBe(firstFile.path));
     expect(result.current.document.markdown).toBe(firstFile.content);
     expect(result.current.isBusy).toBe(false);
+    expect(result.current.isRestoringStartupDocument).toBe(false);
     expect(readMarkdownFile).toHaveBeenCalledOnce();
     expect(readMarkdownFile).toHaveBeenCalledWith("/docs/requested-alias.md");
     expect(localStorage.getItem(lastOpenedDocumentStorageKey)).toBe(
@@ -144,6 +146,7 @@ describe("document session controller", () => {
     expect(result.current.document.path).toBeNull();
     expect(result.current.document.markdown).toContain("읽기 좋은 마크다운 뷰어");
     expect(result.current.isBusy).toBe(false);
+    expect(result.current.isRestoringStartupDocument).toBe(false);
     expect(showMarkdownMessage).toHaveBeenCalledWith("파일 없음", {
       title: "파일을 열 수 없습니다",
       kind: "error",

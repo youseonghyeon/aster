@@ -24,28 +24,50 @@ export function useLastOpenedDocument({
   const [initialStoredDocumentPath] = useState(() =>
     loadInitialDocumentPath(fallbackDocumentPath),
   );
+  const [isRestoring, setIsRestoring] = useState(
+    () => initialStoredDocumentPath !== null && isDesktopRuntime(),
+  );
   const restoreCheckedRef = useRef(false);
+  const openDocumentRef = useRef(openDocument);
+  openDocumentRef.current = openDocument;
 
   useEffect(() => {
-    if (restoreCheckedRef.current || !isDesktopRuntime()) return;
+    if (!isRestoring || restoreCheckedRef.current || !isDesktopRuntime()) {
+      return;
+    }
     if (!initialStoredDocumentPath) return;
+    let disposed = false;
 
     const restoreTimer = window.setTimeout(() => {
       if (restoreCheckedRef.current) return;
       restoreCheckedRef.current = true;
-      void openDocument(initialStoredDocumentPath, "startup").then((outcome) => {
-        if (outcome === "failed") clearLastOpenedDocumentPath();
-      }).catch((error) => {
-        console.error("마지막 문서를 복원하지 못했습니다:", error);
-      });
+      void (async () => {
+        try {
+          const outcome = await openDocumentRef.current(
+            initialStoredDocumentPath,
+            "startup",
+          );
+          if (outcome === "failed") clearLastOpenedDocumentPath();
+        } catch (error) {
+          console.error("마지막 문서를 복원하지 못했습니다:", error);
+        } finally {
+          if (!disposed) setIsRestoring(false);
+        }
+      })();
     }, 0);
 
-    return () => window.clearTimeout(restoreTimer);
-  }, [initialStoredDocumentPath, openDocument]);
+    return () => {
+      disposed = true;
+      window.clearTimeout(restoreTimer);
+    };
+  }, [initialStoredDocumentPath, isRestoring]);
 
   useEffect(() => {
     if (documentPath) saveLastOpenedDocumentPath(documentPath);
   }, [documentPath]);
 
-  return { hasStoredDocument: initialStoredDocumentPath !== null };
+  return {
+    hasStoredDocument: initialStoredDocumentPath !== null,
+    isRestoring,
+  };
 }

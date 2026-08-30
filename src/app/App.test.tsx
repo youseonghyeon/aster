@@ -10,9 +10,11 @@ import { untitledDocumentNoteStorageKey } from "../features/documents/document-s
 import { recentDocumentsStorageKey } from "../features/documents/recent-documents";
 import { setViewportWidth } from "../test/setup";
 
+const mockedRuntime = vi.hoisted(() => ({ desktop: false }));
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
-  isTauri: () => false,
+  isTauri: () => mockedRuntime.desktop,
 }));
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async () => () => undefined),
@@ -60,6 +62,7 @@ async function flushSearchFrames() {
 
 describe("workspace regression contracts", () => {
   beforeEach(() => {
+    mockedRuntime.desktop = false;
     setViewportWidth(1440);
     vi.mocked(invoke).mockReset();
     vi.mocked(confirm).mockReset();
@@ -69,6 +72,65 @@ describe("workspace regression contracts", () => {
     vi.mocked(listen).mockReset();
     vi.mocked(listen).mockImplementation(async () => () => undefined);
     vi.mocked(message).mockResolvedValue("Ok");
+  });
+
+  it("hides the default document while restoring the startup document", async () => {
+    mockedRuntime.desktop = true;
+    localStorage.setItem(
+      recentDocumentsStorageKey,
+      JSON.stringify([{ path: "/docs/restored.md", name: "restored.md" }]),
+    );
+    let resolveRead: (value: unknown) => void = () => undefined;
+    vi.mocked(invoke).mockImplementation((command) => {
+      if (command === "read_markdown_file") {
+        return new Promise((resolve) => {
+          resolveRead = resolve;
+        });
+      }
+      if (command === "load_recovery_draft") return Promise.resolve(null);
+      if (command === "watch_markdown_file") {
+        return Promise.resolve({ token: 1, path: "/docs/restored.md" });
+      }
+      if (command === "get_markdown_file_status") {
+        return Promise.resolve({
+          kind: "available",
+          revision: "restored-revision",
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    render(<App />);
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "마지막 문서를 여는 중…",
+    );
+    expect(
+      screen.queryByRole("textbox", { name: "마크다운 입력" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "읽기 좋은 마크다운 뷰어" }),
+    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("read_markdown_file", {
+        path: "/docs/restored.md",
+      }),
+    );
+
+    act(() =>
+      resolveRead({
+        path: "/docs/restored.md",
+        name: "restored.md",
+        content: "# 복원된 문서",
+        revision: "restored-revision",
+        format: { hasBom: false, lineEnding: "lf" },
+      }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("restored.md")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("마지막 문서를 여는 중…")).not.toBeInTheDocument();
   });
 
   it("keeps an inset outline open while reading settings toggle", async () => {

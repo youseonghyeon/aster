@@ -283,7 +283,7 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
     };
   }, [flushCurrentNote, reserveDiscardFence]);
   useDocumentCloseGuard(decideClose);
-  const { hasStoredDocument } = useLastOpenedDocument({
+  const { hasStoredDocument, isRestoring } = useLastOpenedDocument({
     documentPath: state.document.path,
     fallbackDocumentPath: state.recent.documents[0]?.path ?? null,
     openDocument,
@@ -434,6 +434,7 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
       state.operation?.kind === "reload" || state.operation?.kind === "external",
     isSaving: state.operation?.kind === "save" || state.document.saveStatus === "saving",
     isBusy: state.operation !== null,
+    isRestoringStartupDocument: isRestoring,
     editMarkdown,
     editNote,
     saveDocument,
