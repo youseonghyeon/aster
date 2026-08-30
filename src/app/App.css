@@ -787,7 +787,8 @@
 
 .mermaid-curve-option {
   height: 48px;
-  grid-template-rows: 22px auto;
+  grid-template-rows: 20px max-content;
+  align-content: center;
   gap: 2px;
   color: var(--text-muted);
   font: inherit;
