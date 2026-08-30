@@ -681,7 +681,10 @@
   top: calc(100% + 20px);
   right: 0;
   width: min(286px, calc(100vw - 24px));
+  max-height: calc(100vh - 76px);
   padding: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   color: var(--text-strong);
   background: var(--control-background);
   border: 1px solid var(--border-strong);
@@ -728,6 +731,69 @@
   font-size: 11px;
   font-weight: 680;
   letter-spacing: 0.02em;
+}
+
+.mermaid-curve-help {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.settings-label-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.settings-help-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  color: var(--text-faint);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.settings-help-button:hover,
+.settings-help-button[aria-expanded="true"] {
+  color: var(--accent-hover);
+  background: var(--table-row-hover);
+  border-color: var(--accent-soft);
+}
+
+.settings-help-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.settings-help-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.settings-help-note {
+  min-width: 0;
+  padding: 9px 10px;
+  color: var(--text-subtle);
+  background: var(--table-row-hover);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  user-select: text;
 }
 
 .theme-options,

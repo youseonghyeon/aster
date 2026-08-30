@@ -71,4 +71,75 @@ describe("reading settings", () => {
     expect(onMermaidCurveChange).toHaveBeenCalledTimes(callsAfterEnter + 1);
     expect(onMermaidCurveChange).toHaveBeenLastCalledWith("straight");
   });
+
+  it("explains the Mermaid curve scope with an accessible disclosure", async () => {
+    const user = userEvent.setup();
+    render(
+      <ReadingSettings
+        theme="paper"
+        readingFont="pretendard"
+        lineSpacing="balanced"
+        mermaidCurve="curved"
+        onThemeChange={vi.fn()}
+        onReadingFontChange={vi.fn()}
+        onLineSpacingChange={vi.fn()}
+        onMermaidCurveChange={vi.fn()}
+      />,
+    );
+
+    const helpButton = screen.getByRole("button", {
+      name: "다이어그램 선 도움말",
+    });
+    const fontButton = screen.getByRole("button", { name: "글꼴" });
+    const curvedButton = screen.getByRole("button", { name: "곡선" });
+
+    expect(helpButton).toHaveAttribute("aria-expanded", "false");
+    expect(helpButton).toHaveAttribute(
+      "aria-controls",
+      "mermaid-curve-help-note",
+    );
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+
+    await user.click(helpButton);
+    expect(helpButton).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "Flowchart 계열(Flowchart·Swimlanes)의 연결선에 적용됩니다.",
+    );
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "Sequence·ER처럼 자체 선 형식을 사용하는 다이어그램은 바뀌지 않습니다.",
+    );
+
+    await user.tab();
+    expect(curvedButton).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(helpButton).toHaveAttribute("aria-expanded", "false");
+    expect(helpButton).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    expect(helpButton).toHaveAttribute("aria-expanded", "true");
+    await user.click(curvedButton);
+    expect(helpButton).toHaveAttribute("aria-expanded", "false");
+
+    helpButton.focus();
+    await user.keyboard(" ");
+    expect(helpButton).toHaveAttribute("aria-expanded", "true");
+
+    fontButton.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("listbox", { name: "글꼴 선택" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(
+      screen.queryByRole("listbox", { name: "글꼴 선택" }),
+    ).not.toBeInTheDocument();
+    expect(helpButton).toHaveAttribute("aria-expanded", "true");
+    expect(fontButton).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(helpButton).toHaveAttribute("aria-expanded", "false");
+    expect(helpButton).toHaveFocus();
+    await user.keyboard(" ");
+    expect(helpButton).toHaveAttribute("aria-expanded", "true");
+    await user.click(document.body);
+    expect(helpButton).toHaveAttribute("aria-expanded", "false");
+  });
 });

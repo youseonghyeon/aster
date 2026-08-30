@@ -55,6 +55,88 @@ function MermaidCurveGlyph({
   );
 }
 
+function MermaidCurveHelp() {
+  const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handleOutsidePointerDown(event: globalThis.PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !rootRef.current?.contains(event.target)
+      ) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleEscape(event: globalThis.KeyboardEvent) {
+      const settingsPopover = rootRef.current?.closest(
+        "#reading-settings-popover",
+      );
+      if (
+        event.key !== "Escape" ||
+        !(event.target instanceof Node) ||
+        !settingsPopover?.contains(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      setIsOpen(false);
+      buttonRef.current?.focus();
+    }
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("pointerdown", handleOutsidePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isOpen]);
+
+  return (
+    <div ref={rootRef} className="mermaid-curve-help">
+      <div className="settings-label-row">
+        <span id="mermaid-curve-setting-label" className="settings-label">
+          다이어그램 선
+        </span>
+        <button
+          ref={buttonRef}
+          type="button"
+          className="settings-help-button"
+          aria-label="다이어그램 선 도움말"
+          aria-expanded={isOpen}
+          aria-controls="mermaid-curve-help-note"
+          title="다이어그램 선 도움말"
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.25" />
+            <path d="M6.35 6.25a1.75 1.75 0 1 1 2.65 1.5C8.35 8.1 8 8.5 8 9.15" />
+            <path d="M8 11.55h.01" />
+          </svg>
+        </button>
+      </div>
+      <div
+        id="mermaid-curve-help-note"
+        className="settings-help-note"
+        role="note"
+        hidden={!isOpen}
+      >
+        Flowchart 계열(Flowchart·Swimlanes)의 연결선에 적용됩니다.
+        Sequence·ER처럼 자체 선 형식을 사용하는 다이어그램은 바뀌지
+        않습니다.
+      </div>
+    </div>
+  );
+}
+
 function SelectChevronIcon() {
   return (
     <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -292,9 +374,7 @@ export function ReadingSettings({
       </div>
 
       <div className="settings-group">
-        <span id="mermaid-curve-setting-label" className="settings-label">
-          다이어그램 선
-        </span>
+        <MermaidCurveHelp />
         <div
           className="mermaid-curve-options"
           role="group"
