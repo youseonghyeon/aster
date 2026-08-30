@@ -371,7 +371,7 @@ export function useDocumentNavigation({
       path: string,
       source: Extract<
         DocumentOpenSource,
-        "folder" | "recent" | "link" | "history"
+        "folder" | "recent" | "link" | "history" | "startup"
       > = "recent",
       scopedReader?: () => Promise<OpenedMarkdownFile>,
     ) => {

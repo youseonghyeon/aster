@@ -139,7 +139,14 @@ export function AppHeader({
             className="header-icon-button history-trigger"
             type="button"
             aria-label="뒤로 이동"
-            title="뒤로 이동"
+            title={
+              isBusy
+                ? "문서를 처리하는 동안 뒤로 이동할 수 없습니다"
+                : canGoBack
+                  ? "뒤로 이동"
+                  : "뒤로 이동할 기록 없음"
+            }
+            data-disabled-reason={isBusy ? "busy" : !canGoBack ? "empty" : undefined}
             disabled={isBusy || !canGoBack}
             onClick={onGoBack}
           >
@@ -149,7 +156,16 @@ export function AppHeader({
             className="header-icon-button history-trigger"
             type="button"
             aria-label="앞으로 이동"
-            title="앞으로 이동"
+            title={
+              isBusy
+                ? "문서를 처리하는 동안 앞으로 이동할 수 없습니다"
+                : canGoForward
+                  ? "앞으로 이동"
+                  : "앞으로 이동할 기록 없음"
+            }
+            data-disabled-reason={
+              isBusy ? "busy" : !canGoForward ? "empty" : undefined
+            }
             disabled={isBusy || !canGoForward}
             onClick={onGoForward}
           >

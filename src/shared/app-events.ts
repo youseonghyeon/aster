@@ -2,6 +2,7 @@ export type DocumentOpenSource =
   | "folder"
   | "picker"
   | "native"
+  | "startup"
   | "recent"
   | "link"
   | "history";

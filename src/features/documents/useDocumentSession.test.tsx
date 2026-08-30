@@ -1,4 +1,5 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { StrictMode, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAppEventChannel } from "../../shared/app-events";
 import {
@@ -14,6 +15,11 @@ import {
   showMarkdownMessage,
 } from "./markdown-files";
 import { useDocumentSession } from "./useDocumentSession";
+import {
+  lastOpenedDocumentStorageKey,
+  saveLastOpenedDocumentPath,
+} from "./last-opened-document";
+import { saveRecentDocuments } from "./recent-documents";
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async () => () => undefined),
@@ -89,6 +95,59 @@ describe("document session controller", () => {
     localStorage.clear();
     mockedExternalStatus.desktop = false;
     mockedExternalStatus.state = null;
+  });
+
+  it("restores the last opened document once on desktop startup", async () => {
+    mockedExternalStatus.desktop = true;
+    saveRecentDocuments([
+      { path: "/docs/requested-alias.md", name: "requested-alias.md" },
+    ]);
+    vi.mocked(readMarkdownFile).mockResolvedValue(firstFile);
+    vi.mocked(loadRecoveryDraft).mockResolvedValue(null);
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <StrictMode>{children}</StrictMode>
+    );
+    const events = createAppEventChannel();
+    const settled = vi.fn();
+    events.subscribe("document-open-settled", settled);
+
+    const { result } = renderHook(() => useDocumentSession({ events }), {
+      wrapper,
+    });
+
+    await waitFor(() => expect(result.current.document.path).toBe(firstFile.path));
+    expect(result.current.document.markdown).toBe(firstFile.content);
+    expect(result.current.isBusy).toBe(false);
+    expect(readMarkdownFile).toHaveBeenCalledOnce();
+    expect(readMarkdownFile).toHaveBeenCalledWith("/docs/requested-alias.md");
+    expect(localStorage.getItem(lastOpenedDocumentStorageKey)).toBe(
+      firstFile.path,
+    );
+    expect(settled).toHaveBeenCalledWith({
+      source: "startup",
+      outcome: "opened",
+    });
+  });
+
+  it("clears an unavailable startup document and keeps the default document", async () => {
+    mockedExternalStatus.desktop = true;
+    saveLastOpenedDocumentPath("/docs/missing.md");
+    vi.mocked(readMarkdownFile).mockRejectedValue(new Error("파일 없음"));
+    vi.mocked(loadRecoveryDraft).mockResolvedValue(null);
+    const { result } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+
+    await waitFor(() =>
+      expect(localStorage.getItem(lastOpenedDocumentStorageKey)).toBe(""),
+    );
+    expect(result.current.document.path).toBeNull();
+    expect(result.current.document.markdown).toContain("읽기 좋은 마크다운 뷰어");
+    expect(result.current.isBusy).toBe(false);
+    expect(showMarkdownMessage).toHaveBeenCalledWith("파일 없음", {
+      title: "파일을 열 수 없습니다",
+      kind: "error",
+    });
   });
 
   it("emits exactly one settled event for cancelled and busy picker outcomes", async () => {

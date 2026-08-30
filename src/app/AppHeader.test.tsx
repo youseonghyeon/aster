@@ -2,9 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AppHeader, type AppHeaderProps } from "./AppHeader";
 
-function renderHeader(
-  options: Partial<Pick<AppHeaderProps, "documentPath" | "saveStatus" | "recovered">>,
-) {
+function renderHeader(options: Partial<AppHeaderProps>) {
   const props: AppHeaderProps = {
     documentName: "guide.md",
     documentPath: "/docs/guide.md",
@@ -67,7 +65,38 @@ describe("AppHeader document status", () => {
   it("exposes disabled history controls until navigation is available", () => {
     renderHeader({});
 
-    expect(screen.getByRole("button", { name: "뒤로 이동" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "앞으로 이동" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "뒤로 이동" })).toMatchObject({
+      disabled: true,
+      title: "뒤로 이동할 기록 없음",
+    });
+    expect(screen.getByRole("button", { name: "뒤로 이동" })).toHaveAttribute(
+      "data-disabled-reason",
+      "empty",
+    );
+    expect(screen.getByRole("button", { name: "앞으로 이동" })).toMatchObject({
+      disabled: true,
+      title: "앞으로 이동할 기록 없음",
+    });
+    expect(screen.getByRole("button", { name: "앞으로 이동" })).toHaveAttribute(
+      "data-disabled-reason",
+      "empty",
+    );
+  });
+
+  it("distinguishes busy history controls from an empty history", () => {
+    renderHeader({ isBusy: true, canGoBack: true, canGoForward: true });
+
+    expect(screen.getByRole("button", { name: "뒤로 이동" })).toHaveAttribute(
+      "title",
+      "문서를 처리하는 동안 뒤로 이동할 수 없습니다",
+    );
+    expect(screen.getByRole("button", { name: "앞으로 이동" })).toHaveAttribute(
+      "title",
+      "문서를 처리하는 동안 앞으로 이동할 수 없습니다",
+    );
+    expect(screen.getByRole("button", { name: "뒤로 이동" })).toHaveAttribute(
+      "data-disabled-reason",
+      "busy",
+    );
   });
 });

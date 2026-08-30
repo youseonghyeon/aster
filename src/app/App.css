@@ -664,7 +664,7 @@
   fill: none;
 }
 
-.header-icon-button:hover,
+.header-icon-button:hover:not(:disabled),
 .header-icon-button[aria-pressed="true"],
 .outline-trigger[aria-expanded="true"],
 .recent-documents-trigger[aria-expanded="true"],
@@ -682,6 +682,10 @@
 .header-icon-button:disabled {
   cursor: wait;
   opacity: 0.5;
+}
+
+.history-trigger[data-disabled-reason="empty"] {
+  cursor: default;
 }
 
 .settings-popover {

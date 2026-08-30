@@ -32,6 +32,7 @@ import {
   type OpenedMarkdownFile,
 } from "./markdown-files";
 import { useDocumentCloseGuard } from "./useDocumentCloseGuard";
+import { useLastOpenedDocument } from "./useLastOpenedDocument";
 import { useDocumentNavigation } from "./useDocumentNavigation";
 import { useDocumentPersistence } from "./useDocumentPersistence";
 import { useDocumentRecovery } from "./useDocumentRecovery";
@@ -282,10 +283,16 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
     };
   }, [flushCurrentNote, reserveDiscardFence]);
   useDocumentCloseGuard(decideClose);
+  const { hasStoredDocument } = useLastOpenedDocument({
+    documentPath: state.document.path,
+    fallbackDocumentPath: state.recent.documents[0]?.path ?? null,
+    openDocument,
+  });
 
   useEffect(() => {
     if (initialRecoveryCheckedRef.current || !isDesktopRuntime()) return;
     initialRecoveryCheckedRef.current = true;
+    if (hasStoredDocument) return;
     const initial = stateRef.current.document;
     void loadDraft(initial.draftIdentity)
       .then(async (draft) => {
@@ -301,7 +308,7 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
         }
       })
       .catch((error) => console.error("새 문서 복구 초안을 확인하지 못했습니다:", error));
-  }, [discardDraft, dispatch, loadDraft]);
+  }, [discardDraft, dispatch, hasStoredDocument, loadDraft]);
 
   const editMarkdown = useCallback(
     (value: string) => dispatch({ type: "edit-markdown", value }),
