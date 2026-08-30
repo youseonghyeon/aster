@@ -369,7 +369,10 @@ export function useDocumentNavigation({
   const openDocument = useCallback(
     async (
       path: string,
-      source: Extract<DocumentOpenSource, "folder" | "recent"> = "recent",
+      source: Extract<
+        DocumentOpenSource,
+        "folder" | "recent" | "link" | "history"
+      > = "recent",
       scopedReader?: () => Promise<OpenedMarkdownFile>,
     ) => {
       if (path === stateRef.current.document.path) {

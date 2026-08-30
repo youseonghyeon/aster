@@ -13,6 +13,8 @@ function renderHeader(
     isDocumentBrowserOpen: false,
     isOutlineOpen: false,
     isBusy: false,
+    canGoBack: false,
+    canGoForward: false,
     isSettingsOpen: false,
     documentBrowserButtonRef: null,
     outlineButtonRef: null,
@@ -21,6 +23,8 @@ function renderHeader(
     onDocumentBrowserToggle: vi.fn(),
     onOutlineToggle: vi.fn(),
     onOpenFile: vi.fn(),
+    onGoBack: vi.fn(),
+    onGoForward: vi.fn(),
     onSettingsToggle: vi.fn(),
     settings: null,
     ...options,
@@ -58,5 +62,12 @@ describe("AppHeader document status", () => {
       screen.queryByRole("button", { name: "Markdown 저장" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("저장되지 않음");
+  });
+
+  it("exposes disabled history controls until navigation is available", () => {
+    renderHeader({});
+
+    expect(screen.getByRole("button", { name: "뒤로 이동" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "앞으로 이동" })).toBeDisabled();
   });
 });

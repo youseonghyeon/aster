@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MarkdownPreview } from "./MarkdownPreview";
 
@@ -69,5 +69,24 @@ describe("MarkdownPreview", () => {
       "typescript",
     );
     expect(screen.queryByTestId("mermaid-diagram")).not.toBeInTheDocument();
+  });
+
+  it("adds stable heading aliases and delegates links without WebView navigation", () => {
+    const onLinkActivate = vi.fn();
+    render(
+      <MarkdownPreview
+        content={"## 소개\n\n## 소개\n\n[다음](./next.md#%EC%86%8C%EA%B0%9C)"}
+        appearanceKey="paper"
+        mermaidCurve="curved"
+        onLinkActivate={onLinkActivate}
+      />,
+    );
+
+    const headings = screen.getAllByRole("heading", { name: "소개" });
+    expect(headings[0]).toHaveAttribute("data-markdown-anchor", "소개");
+    expect(headings[1]).toHaveAttribute("data-markdown-anchor", "소개-1");
+    expect(fireEvent.click(screen.getByRole("link", { name: "다음" }))).toBe(false);
+    expect(onLinkActivate).toHaveBeenCalledOnce();
+    expect(onLinkActivate).toHaveBeenCalledWith("./next.md#%EC%86%8C%EA%B0%9C");
   });
 });

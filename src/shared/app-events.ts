@@ -1,4 +1,10 @@
-export type DocumentOpenSource = "folder" | "picker" | "native" | "recent";
+export type DocumentOpenSource =
+  | "folder"
+  | "picker"
+  | "native"
+  | "recent"
+  | "link"
+  | "history";
 export type DocumentOpenOutcome =
   | "opened"
   | "current"

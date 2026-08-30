@@ -9,6 +9,8 @@ export type AppHeaderProps = {
   isDocumentBrowserOpen: boolean;
   isOutlineOpen: boolean;
   isBusy: boolean;
+  canGoBack: boolean;
+  canGoForward: boolean;
   isSettingsOpen: boolean;
   documentBrowserButtonRef: Ref<HTMLButtonElement>;
   outlineButtonRef: Ref<HTMLButtonElement>;
@@ -17,6 +19,8 @@ export type AppHeaderProps = {
   onDocumentBrowserToggle: () => void;
   onOutlineToggle: () => void;
   onOpenFile: () => void;
+  onGoBack: () => void;
+  onGoForward: () => void;
   onSettingsToggle: () => void;
   settings: ReactNode;
 };
@@ -61,6 +65,14 @@ function OpenFileIcon() {
   );
 }
 
+function HistoryArrowIcon({ direction }: { direction: "back" | "forward" }) {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path d={direction === "back" ? "m11.75 4.5-5.5 5.5 5.5 5.5" : "m8.25 4.5 5.5 5.5-5.5 5.5"} />
+    </svg>
+  );
+}
+
 function ReadingSettingsIcon() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -80,6 +92,8 @@ export function AppHeader({
   isDocumentBrowserOpen,
   isOutlineOpen,
   isBusy,
+  canGoBack,
+  canGoForward,
   isSettingsOpen,
   documentBrowserButtonRef,
   outlineButtonRef,
@@ -88,6 +102,8 @@ export function AppHeader({
   onDocumentBrowserToggle,
   onOutlineToggle,
   onOpenFile,
+  onGoBack,
+  onGoForward,
   onSettingsToggle,
   settings,
 }: AppHeaderProps) {
@@ -118,6 +134,28 @@ export function AppHeader({
           <span>Aster</span>
         </div>
         <span className="header-group-divider" aria-hidden="true" />
+        <nav className="history-navigation" aria-label="문서 이동 기록">
+          <button
+            className="header-icon-button history-trigger"
+            type="button"
+            aria-label="뒤로 이동"
+            title="뒤로 이동"
+            disabled={isBusy || !canGoBack}
+            onClick={onGoBack}
+          >
+            <HistoryArrowIcon direction="back" />
+          </button>
+          <button
+            className="header-icon-button history-trigger"
+            type="button"
+            aria-label="앞으로 이동"
+            title="앞으로 이동"
+            disabled={isBusy || !canGoForward}
+            onClick={onGoForward}
+          >
+            <HistoryArrowIcon direction="forward" />
+          </button>
+        </nav>
         <nav className="stage-navigation" aria-label="문서 탐색">
           <button
             ref={documentBrowserButtonRef}

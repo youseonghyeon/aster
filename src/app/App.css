@@ -524,10 +524,15 @@
   background: var(--border);
 }
 
-.stage-navigation {
+.stage-navigation,
+.history-navigation {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.history-navigation {
+  gap: 0;
 }
 
 .brand-mark {
@@ -643,6 +648,10 @@
 }
 
 .settings-trigger svg {
+  fill: none;
+}
+
+.history-trigger svg {
   fill: none;
 }
 
@@ -2266,6 +2275,22 @@
 .markdown-body img {
   max-width: 100%;
   border-radius: 8px;
+}
+
+.markdown-image-placeholder {
+  display: inline-flex;
+  min-height: 32px;
+  padding: 7px 10px;
+  align-items: center;
+  color: var(--text-muted);
+  background: var(--control-background);
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  font-size: 0.88em;
+}
+
+.markdown-image-placeholder.is-error {
+  color: var(--syntax-bracket-error);
 }
 
 @media (max-width: 1100px) {

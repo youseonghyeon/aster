@@ -22,6 +22,7 @@ import {
 } from "../../components/SourceSearchHighlights";
 import type { PaneContent } from "./workspace-types";
 import type { MermaidCurvePreference } from "../../lib/mermaid-curve";
+import type { RelativeImageResolver } from "../../components/RelativeMarkdownImage";
 
 export type NoteSaveStatus = "saved" | "saving" | "error";
 
@@ -32,6 +33,7 @@ type WorkspacePaneProps = {
   note: string;
   noteSaveStatus: NoteSaveStatus;
   previewMarkdown: string;
+  previewDocumentPath: string | null;
   previewAppearanceKey: string;
   mermaidCurve: MermaidCurvePreference;
   isPreviewUpdating: boolean;
@@ -55,6 +57,8 @@ type WorkspacePaneProps = {
     element: HTMLTextAreaElement | HTMLDivElement | null,
   ) => void;
   onPreviewFocusModeToggle: () => void;
+  onLinkActivate: (href: string) => void | Promise<void>;
+  resolveRelativeImage: RelativeImageResolver;
 };
 
 function PreviewFocusIcon({ isActive }: { isActive: boolean }) {
@@ -76,6 +80,7 @@ export function WorkspacePane({
   note,
   noteSaveStatus,
   previewMarkdown,
+  previewDocumentPath,
   previewAppearanceKey,
   mermaidCurve,
   isPreviewUpdating,
@@ -93,6 +98,8 @@ export function WorkspacePane({
   onSearchInputElementChange,
   onContentElementChange,
   onPreviewFocusModeToggle,
+  onLinkActivate,
+  resolveRelativeImage,
 }: WorkspacePaneProps) {
   const isEditor = activePane === "editor";
   const isNotes = activePane === "notes";
@@ -411,7 +418,9 @@ export function WorkspacePane({
         <div
           ref={handlePreviewElementChange}
           className={`preview-scroll${isPreviewUpdating ? " is-updating" : ""}`}
+          data-document-path={previewDocumentPath ?? ""}
           aria-busy={isPreviewUpdating}
+          inert={isPreviewUpdating || undefined}
           aria-label="미리보기 내용"
           tabIndex={0}
           onFocus={() => onSearchAreaActivate("preview")}
@@ -421,6 +430,8 @@ export function WorkspacePane({
             content={previewMarkdown}
             appearanceKey={previewAppearanceKey}
             mermaidCurve={mermaidCurve}
+            onLinkActivate={onLinkActivate}
+            resolveRelativeImage={resolveRelativeImage}
           />
           {previewSearchResult.overlays.length > 0 ? (
             <div className="preview-search-overlays" aria-hidden="true">

@@ -14,6 +14,7 @@ import {
   type AppEventChannel,
 } from "../shared/app-events";
 import { AppStageSidebar } from "./AppStageSidebar";
+import { useLinkNavigationController } from "./useLinkNavigationController";
 import "../styles/base.css";
 import "./App.css";
 
@@ -27,6 +28,7 @@ function App() {
   const reading = useReadingPreferences();
   const workspace = useWorkspaceController({
     events,
+    documentPath: documents.document.path,
     markdown: documents.document.markdown,
     isScrollSyncEnabled: reading.isScrollSyncEnabled,
   });
@@ -34,6 +36,13 @@ function App() {
     isActive: workspace.state.stageSidebar === "files",
   });
   const { state, search, elements, divider, actions } = workspace;
+  const navigation = useLinkNavigationController({
+    events,
+    documentPath: documents.document.path,
+    previewDocumentPath: state.previewDocumentPath,
+    previewElement: workspace.navigation.previewElement,
+    openDocument: documents.openDocument,
+  });
 
   return (
     <div
@@ -51,6 +60,8 @@ function App() {
         isDocumentBrowserOpen={state.isDocumentBrowserOpen}
         isOutlineOpen={state.isOutlineOpen}
         isBusy={documents.isBusy}
+        canGoBack={navigation.canGoBack}
+        canGoForward={navigation.canGoForward}
         isSettingsOpen={state.isSettingsOpen}
         documentBrowserButtonRef={elements.documentBrowserButton}
         outlineButtonRef={elements.outlineButton}
@@ -61,6 +72,8 @@ function App() {
         }
         onOutlineToggle={actions.toggleOutline}
         onOpenFile={() => void documents.openFromPicker("picker")}
+        onGoBack={() => void navigation.goBack()}
+        onGoForward={() => void navigation.goForward()}
         onSettingsToggle={actions.toggleSettings}
         settings={
           <ReadingSettings
@@ -115,6 +128,7 @@ function App() {
             note={documents.note.value}
             noteSaveStatus={documents.note.saveStatus}
             previewMarkdown={state.previewMarkdown}
+            previewDocumentPath={state.previewDocumentPath}
             previewAppearanceKey={`${reading.theme}:${reading.readingFont}:${reading.readingZoom}`}
             mermaidCurve={reading.mermaidCurve}
             isPreviewUpdating={state.isPreviewUpdating}
@@ -134,6 +148,8 @@ function App() {
             onSearchInputElementChange={elements.searchInput}
             onContentElementChange={elements.content}
             onPreviewFocusModeToggle={actions.togglePreviewFocusMode}
+            onLinkActivate={navigation.activateLink}
+            resolveRelativeImage={navigation.resolveRelativeImage}
           />
           <PaneDivider
             dividerRef={elements.divider}
@@ -161,6 +177,7 @@ function App() {
             note={documents.note.value}
             noteSaveStatus={documents.note.saveStatus}
             previewMarkdown={state.previewMarkdown}
+            previewDocumentPath={state.previewDocumentPath}
             previewAppearanceKey={`${reading.theme}:${reading.readingFont}:${reading.readingZoom}`}
             mermaidCurve={reading.mermaidCurve}
             isPreviewUpdating={state.isPreviewUpdating}
@@ -180,6 +197,8 @@ function App() {
             onSearchInputElementChange={elements.searchInput}
             onContentElementChange={elements.content}
             onPreviewFocusModeToggle={actions.togglePreviewFocusMode}
+            onLinkActivate={navigation.activateLink}
+            resolveRelativeImage={navigation.resolveRelativeImage}
           />
           {documents.visibleExternalFileState ? (
             <ExternalFileNotice

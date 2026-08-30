@@ -30,12 +30,14 @@ const oppositePane: Record<PaneKind, PaneKind> = {
 
 type UseWorkspaceControllerOptions = {
   events: AppEventChannel;
+  documentPath: string | null;
   markdown: string;
   isScrollSyncEnabled: boolean;
 };
 
 export function useWorkspaceController({
   events,
+  documentPath,
   markdown,
   isScrollSyncEnabled,
 }: UseWorkspaceControllerOptions) {
@@ -122,12 +124,17 @@ export function useWorkspaceController({
     resetSearchSessions,
   } = useWorkspaceSearch(dismissNonPersistentStageSidebar);
 
-  const previewMarkdown = useDeferredValue(markdown);
+  const documentPreview = useDeferredValue(
+    useMemo(() => ({ markdown, path: documentPath }), [documentPath, markdown]),
+  );
+  const previewMarkdown = documentPreview.markdown;
+  const previewDocumentPath = documentPreview.path;
   const isOutlineOpen = stageSidebar === "outline";
   const isFilesOpen = stageSidebar === "files";
   const isRecentDocumentsOpen = stageSidebar === "recent";
   const isDocumentBrowserOpen = isFilesOpen || isRecentDocumentsOpen;
-  const isPreviewUpdating = markdown !== previewMarkdown;
+  const isPreviewUpdating =
+    markdown !== previewMarkdown || documentPath !== previewDocumentPath;
   const outlineItems = useMemo(
     () => (isOutlineOpen ? getMarkdownOutline(previewMarkdown) : []),
     [isOutlineOpen, previewMarkdown],
@@ -455,6 +462,7 @@ export function useWorkspaceController({
       leftPaneContent,
       rightPaneContent,
       previewMarkdown,
+      previewDocumentPath,
       isPreviewUpdating,
     },
     outline: { items: outlineItems, activeHeadingId },
@@ -477,6 +485,9 @@ export function useWorkspaceController({
       previewScroll: setPreviewScrollElement,
       searchInput: handleSearchInputElementChange,
       content: handleContentElementChange,
+    },
+    navigation: {
+      previewElement: previewScrollElement,
     },
     divider: {
       onKeyDown: handleDividerKeyDown,

@@ -2,6 +2,7 @@ mod close_guard;
 mod document_io;
 mod file_watch;
 mod folder_tree;
+mod linked_resources;
 mod recovery;
 
 use close_guard::{CloseGuardState, ResolveCloseRequest};
@@ -95,6 +96,30 @@ async fn read_folder_markdown(
     tauri::async_runtime::spawn_blocking(move || state.read_markdown(root_path, relative_path))
         .await
         .map_err(|error| format!("Markdown 읽기 작업을 완료하지 못했습니다: {error}"))?
+}
+
+#[tauri::command]
+async fn resolve_relative_markdown_path(
+    document_path: String,
+    relative_path: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        linked_resources::resolve_relative_markdown_path(document_path, relative_path)
+    })
+    .await
+    .map_err(|error| format!("상대 Markdown 경로 확인 작업을 완료하지 못했습니다: {error}"))?
+}
+
+#[tauri::command]
+async fn read_relative_image(
+    document_path: String,
+    relative_path: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        linked_resources::read_relative_image(document_path, relative_path)
+    })
+    .await
+    .map_err(|error| format!("상대 이미지 읽기 작업을 완료하지 못했습니다: {error}"))?
 }
 
 #[tauri::command]
@@ -255,6 +280,8 @@ pub fn run() {
             close_folder,
             open_folder_image,
             read_folder_markdown,
+            resolve_relative_markdown_path,
+            read_relative_image,
             watch_markdown_file,
             unwatch_markdown_file,
             save_recovery_draft,
