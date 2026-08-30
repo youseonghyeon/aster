@@ -128,8 +128,14 @@ describe("workspace regression contracts", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText("restored.md")).toBeInTheDocument(),
+      expect(
+        screen.getByRole("textbox", { name: "마크다운 입력" }),
+      ).toHaveValue("# 복원된 문서"),
     );
+    expect(
+      screen.getByRole("heading", { name: "복원된 문서" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("restored.md")).toBeInTheDocument();
     expect(screen.queryByText("마지막 문서를 여는 중…")).not.toBeInTheDocument();
   });
 
