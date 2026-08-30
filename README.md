@@ -24,6 +24,7 @@ macOS에서는 DMG를 열고 Aster를 Applications 폴더로 드래그하면 됩
 | 테마 | 밝게, 종이, Solarized, 세피아, Nord, Dracula, Gruvbox, 야간 |
 | 글꼴 | Pretendard, Noto Sans KR, Noto Serif KR, 시스템 고딕 |
 | 행간 | 1.4, 1.5, 1.72, 1.9 |
+| 다이어그램 선 | 곡선, 직선, 직각 |
 | 확대 | 80%부터 150%까지 단계 조절 |
 
 ```ts
@@ -87,7 +88,7 @@ const aster = {
 - 인라인 코드와 코드 블록
 - 언어별 구문 강조
 - 중첩 괄호를 구분하는 테마별 레인보우 색상
-- Mermaid fenced code block의 테마 대응 다이어그램 미리보기와 항목별 확대·축소·너비 맞춤
+- Mermaid fenced code block의 테마 대응 다이어그램 미리보기, 곡선·직선·직각 선 설정과 항목별 확대·축소·너비 맞춤
 - 긴 표를 위한 내용 기반 열 너비와 가로 스크롤
 - 한글 줄바꿈과 문장 가독성을 고려한 본문 폭
 

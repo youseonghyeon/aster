@@ -11,12 +11,14 @@ import {
   lineSpacings,
   loadReadingPreference,
   readingFonts,
+  mermaidCurveOptions,
   readingPreferenceStorageKeys,
   readingZoomLevels,
   saveReadingPreference,
   scrollSyncOptions,
   themes,
   type LineSpacing,
+  type MermaidCurvePreference,
   type ReadingFont,
   type ReadingZoom,
   type ReadingZoomCommand,
@@ -40,6 +42,13 @@ export function useReadingPreferences() {
       readingPreferenceStorageKeys.lineSpacing,
       lineSpacings,
       "balanced",
+    ),
+  );
+  const [mermaidCurve, setMermaidCurve] = useState<MermaidCurvePreference>(() =>
+    loadReadingPreference(
+      readingPreferenceStorageKeys.mermaidCurve,
+      mermaidCurveOptions,
+      "curved",
     ),
   );
   const [readingZoom, setReadingZoom] = useState<ReadingZoom>(() =>
@@ -73,6 +82,16 @@ export function useReadingPreferences() {
       nextSpacing,
     );
   }, []);
+  const selectMermaidCurve = useCallback(
+    (nextCurve: MermaidCurvePreference) => {
+      setMermaidCurve(nextCurve);
+      saveReadingPreference(
+        readingPreferenceStorageKeys.mermaidCurve,
+        nextCurve,
+      );
+    },
+    [],
+  );
   const toggleScrollSync = useCallback(() => {
     setScrollSyncPreference((currentPreference) => {
       const nextPreference = currentPreference === "on" ? "off" : "on";
@@ -129,12 +148,14 @@ export function useReadingPreferences() {
     theme,
     readingFont,
     lineSpacing,
+    mermaidCurve,
     readingZoom,
     readingZoomStyle,
     isScrollSyncEnabled: scrollSyncPreference === "on",
     selectTheme,
     selectReadingFont,
     selectLineSpacing,
+    selectMermaidCurve,
     toggleScrollSync,
   };
 }

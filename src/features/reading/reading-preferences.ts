@@ -1,3 +1,8 @@
+import {
+  mermaidCurvePreferences,
+  type MermaidCurvePreference,
+} from "../../lib/mermaid-curve";
+
 export const themes = [
   { value: "snow", label: "밝게" },
   { value: "paper", label: "종이" },
@@ -23,6 +28,15 @@ export const lineSpacings = [
   { value: "relaxed", label: "여유 1.9" },
 ] as const;
 
+export const mermaidCurveOptions = [
+  { value: mermaidCurvePreferences[0], label: "곡선" },
+  { value: mermaidCurvePreferences[1], label: "직선" },
+  { value: mermaidCurvePreferences[2], label: "직각" },
+] as const satisfies readonly {
+  value: MermaidCurvePreference;
+  label: string;
+}[];
+
 export const readingZoomLevels = [
   { value: "80" },
   { value: "90" },
@@ -40,6 +54,7 @@ export const readingPreferenceStorageKeys = {
   theme: "aster:theme:v1",
   font: "aster:reading-font:v1",
   lineSpacing: "aster:line-spacing:v1",
+  mermaidCurve: "aster:mermaid-curve:v1",
   zoom: "aster:reading-zoom:v1",
   scrollSync: "aster:scroll-sync:v1",
 } as const;
@@ -47,6 +62,7 @@ export const readingPreferenceStorageKeys = {
 export type Theme = (typeof themes)[number]["value"];
 export type ReadingFont = (typeof readingFonts)[number]["value"];
 export type LineSpacing = (typeof lineSpacings)[number]["value"];
+export type { MermaidCurvePreference } from "../../lib/mermaid-curve";
 export type ReadingZoom = (typeof readingZoomLevels)[number]["value"];
 export type ScrollSyncPreference =
   (typeof scrollSyncOptions)[number]["value"];

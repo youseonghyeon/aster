@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import type { MermaidThemeTokens } from "../lib/mermaid-renderer";
+import type { MermaidCurvePreference } from "../lib/mermaid-curve";
 import {
   calculateFitMermaidZoomPercent,
   captureScrollViewportCenter,
@@ -17,12 +18,18 @@ import {
   type ScrollViewportCenter,
 } from "../lib/mermaid-zoom";
 import { notifyPreviewLayoutChange } from "../lib/preview-layout-events";
+import {
+  capturePreviewScrollAnchor,
+  restorePreviewScrollAnchor,
+  type PreviewScrollAnchorSnapshot,
+} from "../lib/preview-scroll-anchor";
 import { MermaidZoomControls } from "./MermaidZoomControls";
 
 type MermaidDiagramProps = {
   source: string;
   sourceOffset?: string | number;
   appearanceKey: string;
+  curve: MermaidCurvePreference;
 };
 
 type MermaidDiagramState = {
@@ -33,6 +40,7 @@ type MermaidDiagramState = {
   revision: number;
   renderedSource: string | null;
   renderedAppearanceKey: string | null;
+  renderedCurve: MermaidCurvePreference | null;
 };
 
 const fallbackTheme: MermaidThemeTokens = {
@@ -132,10 +140,13 @@ export const MermaidDiagram = memo(function MermaidDiagram({
   source,
   sourceOffset,
   appearanceKey,
+  curve,
 }: MermaidDiagramProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const pendingCenterRef = useRef<ScrollViewportCenter | null>(null);
+  const pendingOuterAnchorRef =
+    useRef<PreviewScrollAnchorSnapshot | null>(null);
   const zoomPercentRef = useRef(100);
   const [zoomPercent, setZoomPercent] = useState(100);
   zoomPercentRef.current = zoomPercent;
@@ -147,6 +158,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({
     revision: 0,
     renderedSource: null,
     renderedAppearanceKey: null,
+    renderedCurve: null,
   });
 
   useEffect(() => {
@@ -167,12 +179,14 @@ export const MermaidDiagram = memo(function MermaidDiagram({
         renderMermaidDiagram({
           source,
           theme: readMermaidThemeTokens(wrapper),
+          curve,
           signal: controller.signal,
         }),
       )
       .then((svg) => {
         if (controller.signal.aborted) return;
         if (wrapper.querySelector(".mermaid-diagram-canvas svg")) {
+          pendingOuterAnchorRef.current = capturePreviewScrollAnchor(wrapper);
           pendingCenterRef.current = captureScrollViewportCenter(
             readViewportMetrics(wrapper),
           );
@@ -185,6 +199,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({
           revision: current.revision + 1,
           renderedSource: source,
           renderedAppearanceKey: appearanceKey,
+          renderedCurve: curve,
         }));
       })
       .catch((error: unknown) => {
@@ -202,11 +217,12 @@ export const MermaidDiagram = memo(function MermaidDiagram({
           revision: current.revision + 1,
           renderedSource: source,
           renderedAppearanceKey: appearanceKey,
+          renderedCurve: curve,
         }));
       });
 
     return () => controller.abort();
-  }, [appearanceKey, source]);
+  }, [appearanceKey, curve, source]);
 
   useLayoutEffect(() => {
     const wrapper = wrapperRef.current;
@@ -222,6 +238,12 @@ export const MermaidDiagram = memo(function MermaidDiagram({
       wrapper.scrollTop = offsets.top;
       wrapper.scrollLeft = offsets.left;
       pendingCenterRef.current = null;
+    }
+
+    const pendingOuterAnchor = pendingOuterAnchorRef.current;
+    if (pendingOuterAnchor) {
+      restorePreviewScrollAnchor(pendingOuterAnchor);
+      pendingOuterAnchorRef.current = null;
     }
 
     if (wrapper && canvas) notifyPreviewLayoutChange(wrapper);
@@ -269,7 +291,8 @@ export const MermaidDiagram = memo(function MermaidDiagram({
   const isRenderingCurrentDiagram =
     !state.isLoading &&
     state.renderedSource === source &&
-    state.renderedAppearanceKey === appearanceKey;
+    state.renderedAppearanceKey === appearanceKey &&
+    state.renderedCurve === curve;
   const isBusy = !isRenderingCurrentDiagram;
   const statusMessage = state.error
     ? "다이어그램을 표시하지 못했습니다. 아래 Mermaid 문법을 확인하세요."

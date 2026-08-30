@@ -11,12 +11,14 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getMarkdownHeadingId } from "../lib/markdown-outline";
 import { rehypeMarkdownSourceOffsets } from "../lib/markdown-source-offsets";
+import type { MermaidCurvePreference } from "../lib/mermaid-curve";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { SyntaxHighlightedCode } from "./SyntaxHighlightedCode";
 
 const markdownPlugins = [remarkGfm];
 const markdownRehypePlugins = [rehypeMarkdownSourceOffsets];
 const MarkdownAppearanceContext = createContext("");
+const MermaidCurveContext = createContext<MermaidCurvePreference>("curved");
 
 type MarkdownHeadingProps = HTMLAttributes<HTMLHeadingElement> & {
   node?: {
@@ -61,6 +63,7 @@ const markdownComponents = {
   h6: MarkdownHeading6,
   pre: function MarkdownCodeBlock({ node, children, ...preProps }) {
     const appearanceKey = useContext(MarkdownAppearanceContext);
+    const mermaidCurve = useContext(MermaidCurveContext);
     void node;
     const sourceOffset = (
       preProps as typeof preProps & { "data-source-offset"?: string | number }
@@ -87,6 +90,7 @@ const markdownComponents = {
               source={code}
               sourceOffset={sourceOffset}
               appearanceKey={appearanceKey}
+              curve={mermaidCurve}
             />
           );
         }
@@ -134,21 +138,25 @@ const markdownComponents = {
 export const MarkdownPreview = memo(function MarkdownPreview({
   content,
   appearanceKey,
+  mermaidCurve,
 }: {
   content: string;
   appearanceKey: string;
+  mermaidCurve: MermaidCurvePreference;
 }) {
   return (
     <MarkdownAppearanceContext value={appearanceKey}>
-      <article className="markdown-body">
-        <ReactMarkdown
-          remarkPlugins={markdownPlugins}
-          rehypePlugins={markdownRehypePlugins}
-          components={markdownComponents}
-        >
-          {content}
-        </ReactMarkdown>
-      </article>
+      <MermaidCurveContext value={mermaidCurve}>
+        <article className="markdown-body">
+          <ReactMarkdown
+            remarkPlugins={markdownPlugins}
+            rehypePlugins={markdownRehypePlugins}
+            components={markdownComponents}
+          >
+            {content}
+          </ReactMarkdown>
+        </article>
+      </MermaidCurveContext>
     </MarkdownAppearanceContext>
   );
 });

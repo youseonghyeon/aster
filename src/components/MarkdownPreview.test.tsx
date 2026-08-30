@@ -20,16 +20,19 @@ vi.mock("./MermaidDiagram", () => ({
     source,
     sourceOffset,
     appearanceKey,
+    curve,
   }: {
     source: string;
     sourceOffset?: string | number;
     appearanceKey: string;
+    curve: string;
   }) => (
     <div
       data-testid="mermaid-diagram"
       data-source={source}
       data-source-offset={sourceOffset}
       data-appearance={appearanceKey}
+      data-curve={curve}
     />
   ),
 }));
@@ -40,12 +43,14 @@ describe("MarkdownPreview", () => {
       <MarkdownPreview
         content={"앞 문단\n\n```mermaid\nflowchart LR\nA --> B\n```"}
         appearanceKey="night"
+        mermaidCurve="straight"
       />,
     );
 
     const diagram = screen.getByTestId("mermaid-diagram");
     expect(diagram).toHaveAttribute("data-source", "flowchart LR\nA --> B");
     expect(diagram).toHaveAttribute("data-appearance", "night");
+    expect(diagram).toHaveAttribute("data-curve", "straight");
     expect(diagram).toHaveAttribute("data-source-offset", "6");
     expect(screen.queryByTestId("syntax-code")).not.toBeInTheDocument();
   });
@@ -55,6 +60,7 @@ describe("MarkdownPreview", () => {
       <MarkdownPreview
         content={"```typescript\nconst ready = true;\n```"}
         appearanceKey="paper"
+        mermaidCurve="curved"
       />,
     );
 

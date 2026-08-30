@@ -67,9 +67,11 @@ function App() {
             theme={reading.theme}
             readingFont={reading.readingFont}
             lineSpacing={reading.lineSpacing}
+            mermaidCurve={reading.mermaidCurve}
             onThemeChange={reading.selectTheme}
             onReadingFontChange={reading.selectReadingFont}
             onLineSpacingChange={reading.selectLineSpacing}
+            onMermaidCurveChange={reading.selectMermaidCurve}
           />
         }
       />
@@ -114,6 +116,7 @@ function App() {
             noteSaveStatus={documents.note.saveStatus}
             previewMarkdown={state.previewMarkdown}
             previewAppearanceKey={`${reading.theme}:${reading.readingFont}:${reading.readingZoom}`}
+            mermaidCurve={reading.mermaidCurve}
             isPreviewUpdating={state.isPreviewUpdating}
             isPreviewFocusMode={state.isPreviewFocusMode}
             isHiddenByPreviewFocus={
@@ -159,6 +162,7 @@ function App() {
             noteSaveStatus={documents.note.saveStatus}
             previewMarkdown={state.previewMarkdown}
             previewAppearanceKey={`${reading.theme}:${reading.readingFont}:${reading.readingZoom}`}
+            mermaidCurve={reading.mermaidCurve}
             isPreviewUpdating={state.isPreviewUpdating}
             isPreviewFocusMode={state.isPreviewFocusMode}
             isHiddenByPreviewFocus={

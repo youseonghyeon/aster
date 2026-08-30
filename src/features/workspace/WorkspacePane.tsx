@@ -21,6 +21,7 @@ import {
   type SourceSearchHighlightsHandle,
 } from "../../components/SourceSearchHighlights";
 import type { PaneContent } from "./workspace-types";
+import type { MermaidCurvePreference } from "../../lib/mermaid-curve";
 
 export type NoteSaveStatus = "saved" | "saving" | "error";
 
@@ -32,6 +33,7 @@ type WorkspacePaneProps = {
   noteSaveStatus: NoteSaveStatus;
   previewMarkdown: string;
   previewAppearanceKey: string;
+  mermaidCurve: MermaidCurvePreference;
   isPreviewUpdating: boolean;
   isPreviewFocusMode: boolean;
   isHiddenByPreviewFocus: boolean;
@@ -75,6 +77,7 @@ export function WorkspacePane({
   noteSaveStatus,
   previewMarkdown,
   previewAppearanceKey,
+  mermaidCurve,
   isPreviewUpdating,
   isPreviewFocusMode,
   isHiddenByPreviewFocus,
@@ -417,6 +420,7 @@ export function WorkspacePane({
           <MarkdownPreview
             content={previewMarkdown}
             appearanceKey={previewAppearanceKey}
+            mermaidCurve={mermaidCurve}
           />
           {previewSearchResult.overlays.length > 0 ? (
             <div className="preview-search-overlays" aria-hidden="true">

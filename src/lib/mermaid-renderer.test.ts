@@ -58,11 +58,13 @@ describe("mermaid renderer", () => {
     await renderMermaidDiagram({
       source: "flowchart LR\nA --> B",
       theme,
+      curve: "curved",
       signal: new AbortController().signal,
     });
     await renderMermaidDiagram({
       source: "sequenceDiagram\nA->>B: hello",
       theme,
+      curve: "curved",
       signal: new AbortController().signal,
     });
 
@@ -102,11 +104,13 @@ describe("mermaid renderer", () => {
     const firstResult = renderMermaidDiagram({
       source: "broken",
       theme: { ...theme, accent: "#123456" },
+      curve: "straight",
       signal: new AbortController().signal,
     });
     const secondResult = renderMermaidDiagram({
       source: "flowchart LR\nA --> B",
       theme: { ...theme, accent: "#123456" },
+      curve: "straight",
       signal: new AbortController().signal,
     });
 
@@ -124,12 +128,14 @@ describe("mermaid renderer", () => {
     const firstRequest = renderMermaidDiagram({
       source: "flowchart LR\nA --> B",
       theme: { ...theme, accent: "#654321" },
+      curve: "curved",
       signal: new AbortController().signal,
     });
     const staleController = new AbortController();
     const staleRequest = renderMermaidDiagram({
       source: "flowchart LR\nB --> C",
       theme: { ...theme, accent: "#654321" },
+      curve: "curved",
       signal: staleController.signal,
     });
     staleController.abort();
@@ -148,8 +154,38 @@ describe("mermaid renderer", () => {
       renderMermaidDiagram({
         source: "flowchart LR\nA --> B",
         theme,
+        curve: "curved",
         signal: new AbortController().signal,
       }),
     ).rejects.toThrow("Mermaid returned invalid SVG");
+  });
+
+  it("reinitializes when only the curve preference changes", async () => {
+    const { renderMermaidDiagram } = await import("./mermaid-renderer");
+    render.mockResolvedValue({ svg: "<svg></svg>" });
+    const uniqueTheme = { ...theme, accent: "#246810" };
+
+    await renderMermaidDiagram({
+      source: "flowchart LR\nA --> B",
+      theme: uniqueTheme,
+      curve: "curved",
+      signal: new AbortController().signal,
+    });
+    await renderMermaidDiagram({
+      source: "flowchart LR\nA --> B",
+      theme: uniqueTheme,
+      curve: "orthogonal",
+      signal: new AbortController().signal,
+    });
+    await renderMermaidDiagram({
+      source: "flowchart LR\nA --> B",
+      theme: uniqueTheme,
+      curve: "orthogonal",
+      signal: new AbortController().signal,
+    });
+
+    expect(initialize).toHaveBeenCalledTimes(2);
+    expect(initialize.mock.calls[0][0].flowchart.curve).toBe("basis");
+    expect(initialize.mock.calls[1][0].flowchart.curve).toBe("stepAfter");
   });
 });

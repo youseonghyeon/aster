@@ -19,6 +19,7 @@ describe("reading preference controller", () => {
     localStorage.setItem(readingPreferenceStorageKeys.theme, "night");
     localStorage.setItem(readingPreferenceStorageKeys.font, "noto-serif");
     localStorage.setItem(readingPreferenceStorageKeys.lineSpacing, "relaxed");
+    localStorage.setItem(readingPreferenceStorageKeys.mermaidCurve, "straight");
     localStorage.setItem(readingPreferenceStorageKeys.scrollSync, "on");
     const { result } = renderHook(() => useReadingPreferences());
 
@@ -26,6 +27,7 @@ describe("reading preference controller", () => {
       theme: "night",
       readingFont: "noto-serif",
       lineSpacing: "relaxed",
+      mermaidCurve: "straight",
       isScrollSyncEnabled: true,
     });
 
@@ -33,6 +35,7 @@ describe("reading preference controller", () => {
       result.current.selectTheme("paper");
       result.current.selectReadingFont("system");
       result.current.selectLineSpacing("compact");
+      result.current.selectMermaidCurve("orthogonal");
       result.current.toggleScrollSync();
     });
 
@@ -45,6 +48,9 @@ describe("reading preference controller", () => {
     expect(
       localStorage.getItem(readingPreferenceStorageKeys.lineSpacing),
     ).toBe("compact");
+    expect(
+      localStorage.getItem(readingPreferenceStorageKeys.mermaidCurve),
+    ).toBe("orthogonal");
     expect(
       localStorage.getItem(readingPreferenceStorageKeys.scrollSync),
     ).toBe("off");
@@ -84,9 +90,13 @@ describe("reading preference controller", () => {
       });
     const { result } = renderHook(() => useReadingPreferences());
 
-    act(() => result.current.selectTheme("dracula"));
+    act(() => {
+      result.current.selectTheme("dracula");
+      result.current.selectMermaidCurve("straight");
+    });
 
     expect(result.current.theme).toBe("dracula");
+    expect(result.current.mermaidCurve).toBe("straight");
     storageWrite.mockRestore();
   });
 });

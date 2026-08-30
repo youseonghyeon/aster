@@ -87,6 +87,7 @@ describe("MermaidDiagram", () => {
         source="flowchart LR\nA --> B"
         sourceOffset={12}
         appearanceKey="paper"
+        curve="curved"
       />,
     );
 
@@ -124,7 +125,13 @@ describe("MermaidDiagram", () => {
     renderMermaidDiagram.mockResolvedValueOnce(
       '<svg viewBox="0 0 1000 400"><text>배율 테스트</text></svg>',
     );
-    render(<MermaidDiagram source="flowchart LR" appearanceKey="paper" />);
+    render(
+      <MermaidDiagram
+        source="flowchart LR"
+        appearanceKey="paper"
+        curve="curved"
+      />,
+    );
     await screen.findByText("배율 테스트");
 
     const region = screen.getByRole<HTMLElement>("region", {
@@ -186,13 +193,13 @@ describe("MermaidDiagram", () => {
         ),
     );
     const { rerender } = render(
-      <MermaidDiagram source="A" appearanceKey="paper" />,
+      <MermaidDiagram source="A" appearanceKey="paper" curve="curved" />,
     );
     await screen.findByText("첫 SVG");
     rerender(
       <>
-        <MermaidDiagram source="A" appearanceKey="paper" />
-        <MermaidDiagram source="B" appearanceKey="paper" />
+        <MermaidDiagram source="A" appearanceKey="paper" curve="curved" />
+        <MermaidDiagram source="B" appearanceKey="paper" curve="curved" />
       </>,
     );
     await screen.findByText("둘째 SVG");
@@ -222,7 +229,13 @@ describe("MermaidDiagram", () => {
     renderMermaidDiagram.mockResolvedValueOnce(
       '<svg viewBox="0 0 900 400"><text>중심</text></svg>',
     );
-    render(<MermaidDiagram source="flowchart LR" appearanceKey="paper" />);
+    render(
+      <MermaidDiagram
+        source="flowchart LR"
+        appearanceKey="paper"
+        curve="curved"
+      />,
+    );
     await screen.findByText("중심");
     const region = screen.getByRole<HTMLElement>("region", {
       name: "Mermaid 다이어그램",
@@ -246,6 +259,7 @@ describe("MermaidDiagram", () => {
       <MermaidDiagram
         source="flowchart LR\nA --> B"
         appearanceKey="paper"
+        curve="curved"
       />,
     );
     await screen.findByText("이전");
@@ -261,6 +275,7 @@ describe("MermaidDiagram", () => {
       <MermaidDiagram
         source="flowchart LR\nA --> B"
         appearanceKey="night"
+        curve="curved"
       />,
     );
     await waitFor(() => expect(region).toHaveAttribute("aria-busy", "true"));
@@ -293,6 +308,82 @@ describe("MermaidDiagram", () => {
     expect(screen.getByRole("button", { name: "다이어그램 확대" })).toBeEnabled();
   });
 
+  it("keeps nested and preview positions while the curve rerenders", async () => {
+    const second = deferred<string>();
+    renderMermaidDiagram
+      .mockResolvedValueOnce(
+        '<svg viewBox="0 0 900 400"><text>곡선 다이어그램</text></svg>',
+      )
+      .mockReturnValueOnce(second.promise);
+    const view = (curve: "curved" | "orthogonal") => (
+      <div className="preview-scroll" data-testid="preview-scroll">
+        <MermaidDiagram
+          source="flowchart LR\nA --> B"
+          sourceOffset={12}
+          appearanceKey="paper"
+          curve={curve}
+        />
+        <p data-source-offset="200">뒤쪽 기준점</p>
+      </div>
+    );
+    const { rerender } = render(view("curved"));
+    await screen.findByText("곡선 다이어그램");
+
+    const preview = screen.getByTestId("preview-scroll");
+    const anchor = screen.getByText("뒤쪽 기준점");
+    const diagram = screen.getByRole("region", {
+      name: "Mermaid 다이어그램",
+    }).parentElement as HTMLElement;
+    const region = screen.getByRole<HTMLElement>("region", {
+      name: "Mermaid 다이어그램",
+    });
+    Object.defineProperty(preview, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ top: 0 }),
+    });
+    Object.defineProperty(diagram, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ top: -500 }),
+    });
+    Object.defineProperty(anchor, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        top:
+          (screen.queryByText("직각 다이어그램") ? 140 : 80) -
+          preview.scrollTop,
+      }),
+    });
+    setScrollableDiagramMetrics(region);
+    fireEvent.click(screen.getByRole("button", { name: "다이어그램 확대" }));
+    region.scrollTop = 140;
+    region.scrollLeft = 365;
+    preview.scrollTop = 100;
+
+    rerender(view("orthogonal"));
+    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "true"));
+    expect(screen.getByText("곡선 다이어그램")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "다이어그램 확대" })).toBeDisabled();
+    expect(renderMermaidDiagram).toHaveBeenLastCalledWith(
+      expect.objectContaining({ curve: "orthogonal" }),
+    );
+
+    await act(async () => {
+      second.resolve(
+        '<svg viewBox="0 0 1000 500"><text>직각 다이어그램</text></svg>',
+      );
+      await second.promise;
+    });
+    await screen.findByText("직각 다이어그램");
+
+    expect(region.querySelector("svg")).toHaveStyle({
+      width: "1100px",
+      height: "550px",
+    });
+    expect(region.scrollTop).toBeCloseTo(195, 5);
+    expect(region.scrollLeft).toBeCloseTo(420, 5);
+    expect(preview.scrollTop).toBe(160);
+  });
+
   it("discards a stale result after the source changes", async () => {
     const first = deferred<string>();
     const second = deferred<string>();
@@ -300,13 +391,15 @@ describe("MermaidDiagram", () => {
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise);
     const { rerender } = render(
-      <MermaidDiagram source="old" appearanceKey="paper" />,
+      <MermaidDiagram source="old" appearanceKey="paper" curve="curved" />,
     );
     expect(
       screen.queryByRole("group", { name: "다이어그램 확대 및 축소" }),
     ).not.toBeInTheDocument();
     await waitFor(() => expect(renderMermaidDiagram).toHaveBeenCalledTimes(1));
-    rerender(<MermaidDiagram source="new" appearanceKey="paper" />);
+    rerender(
+      <MermaidDiagram source="new" appearanceKey="paper" curve="curved" />,
+    );
     await waitFor(() => expect(renderMermaidDiagram).toHaveBeenCalledTimes(2));
 
     await act(async () => {
@@ -324,7 +417,13 @@ describe("MermaidDiagram", () => {
 
   it("shows the original source with actionable guidance after an error", async () => {
     renderMermaidDiagram.mockRejectedValueOnce(new Error("parse failed"));
-    render(<MermaidDiagram source="not a diagram" appearanceKey="paper" />);
+    render(
+      <MermaidDiagram
+        source="not a diagram"
+        appearanceKey="paper"
+        curve="curved"
+      />,
+    );
 
     expect(
       await screen.findByText(

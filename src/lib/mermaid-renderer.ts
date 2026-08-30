@@ -1,4 +1,8 @@
 import type { Mermaid, MermaidConfig } from "mermaid";
+import {
+  getMermaidFlowchartCurve,
+  type MermaidCurvePreference,
+} from "./mermaid-curve";
 
 export type MermaidThemeTokens = {
   background: string;
@@ -17,12 +21,13 @@ export type MermaidThemeTokens = {
 type MermaidRenderRequest = {
   source: string;
   theme: MermaidThemeTokens;
+  curve: MermaidCurvePreference;
   signal: AbortSignal;
 };
 
 let mermaidImport: Promise<Mermaid> | null = null;
 let renderQueue: Promise<void> = Promise.resolve();
-let initializedThemeSignature: string | null = null;
+let initializedConfigSignature: string | null = null;
 let renderSequence = 0;
 
 function loadMermaid() {
@@ -72,6 +77,7 @@ function createSecureKeys(mermaid: Mermaid) {
 function createMermaidConfig(
   mermaid: Mermaid,
   theme: MermaidThemeTokens,
+  curve: MermaidCurvePreference,
 ): MermaidConfig {
   return {
     startOnLoad: false,
@@ -84,6 +90,9 @@ function createMermaidConfig(
     darkMode: theme.darkMode,
     fontFamily: theme.fontFamily,
     secure: createSecureKeys(mermaid),
+    flowchart: {
+      curve: getMermaidFlowchartCurve(curve),
+    },
     themeVariables: {
       darkMode: theme.darkMode,
       background: theme.background,
@@ -158,6 +167,7 @@ function removeDiagramLinks(svg: string) {
 export function renderMermaidDiagram({
   source,
   theme,
+  curve,
   signal,
 }: MermaidRenderRequest): Promise<string> {
   return enqueue(async () => {
@@ -165,10 +175,10 @@ export function renderMermaidDiagram({
     const mermaid = await loadMermaid();
     throwIfAborted(signal);
 
-    const themeSignature = JSON.stringify(theme);
-    if (initializedThemeSignature !== themeSignature) {
-      mermaid.initialize(createMermaidConfig(mermaid, theme));
-      initializedThemeSignature = themeSignature;
+    const configSignature = JSON.stringify({ theme, curve });
+    if (initializedConfigSignature !== configSignature) {
+      mermaid.initialize(createMermaidConfig(mermaid, theme, curve));
+      initializedConfigSignature = configSignature;
     }
 
     const renderId = `aster-mermaid-${Date.now().toString(36)}-${++renderSequence}`;

@@ -6,9 +6,11 @@ import {
 } from "react";
 import {
   lineSpacings,
+  mermaidCurveOptions,
   readingFonts,
   themes,
   type LineSpacing,
+  type MermaidCurvePreference,
   type ReadingFont,
   type Theme,
 } from "./reading-preferences";
@@ -17,9 +19,11 @@ type ReadingSettingsProps = {
   theme: Theme;
   readingFont: ReadingFont;
   lineSpacing: LineSpacing;
+  mermaidCurve: MermaidCurvePreference;
   onThemeChange: (theme: Theme) => void;
   onReadingFontChange: (font: ReadingFont) => void;
   onLineSpacingChange: (spacing: LineSpacing) => void;
+  onMermaidCurveChange: (curve: MermaidCurvePreference) => void;
 };
 
 function LineSpacingGlyph() {
@@ -29,6 +33,25 @@ function LineSpacingGlyph() {
       <span />
       <span />
     </span>
+  );
+}
+
+function MermaidCurveGlyph({
+  curve,
+}: {
+  curve: MermaidCurvePreference;
+}) {
+  const path =
+    curve === "curved"
+      ? "M2 15 C12 15 12 5 21 5 S30 15 40 5"
+      : curve === "straight"
+        ? "M2 15 L40 5"
+        : "M2 15 H21 V5 H40";
+
+  return (
+    <svg viewBox="0 0 42 20" aria-hidden="true">
+      <path d={path} />
+    </svg>
   );
 }
 
@@ -197,9 +220,11 @@ export function ReadingSettings({
   theme,
   readingFont,
   lineSpacing,
+  mermaidCurve,
   onThemeChange,
   onReadingFontChange,
   onLineSpacingChange,
+  onMermaidCurveChange,
 }: ReadingSettingsProps) {
   return (
     <div
@@ -261,6 +286,33 @@ export function ReadingSettings({
               onClick={() => onLineSpacingChange(spacingOption.value)}
             >
               <LineSpacingGlyph />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="settings-group">
+        <span id="mermaid-curve-setting-label" className="settings-label">
+          다이어그램 선
+        </span>
+        <div
+          className="mermaid-curve-options"
+          role="group"
+          aria-labelledby="mermaid-curve-setting-label"
+        >
+          {mermaidCurveOptions.map((curveOption) => (
+            <button
+              key={curveOption.value}
+              type="button"
+              className="mermaid-curve-option"
+              data-curve={curveOption.value}
+              aria-label={curveOption.label}
+              aria-pressed={mermaidCurve === curveOption.value}
+              title={curveOption.label}
+              onClick={() => onMermaidCurveChange(curveOption.value)}
+            >
+              <MermaidCurveGlyph curve={curveOption.value} />
+              <span aria-hidden="true">{curveOption.label}</span>
             </button>
           ))}
         </div>

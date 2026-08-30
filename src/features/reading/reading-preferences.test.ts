@@ -3,6 +3,7 @@ import {
   getSteppedReadingZoom,
   loadReadingPreference,
   readingPreferenceStorageKeys,
+  mermaidCurveOptions,
   themes,
 } from "./reading-preferences";
 
@@ -48,5 +49,19 @@ describe("reading preference policies", () => {
     expect(getSteppedReadingZoom("80", -1)).toBe("80");
     expect(getSteppedReadingZoom("100", 1)).toBe("110");
     expect(getSteppedReadingZoom("150", 1)).toBe("150");
+  });
+
+  it("falls back to the curved diagram preference for unknown values", () => {
+    localStorage.setItem(
+      readingPreferenceStorageKeys.mermaidCurve,
+      "unsupported",
+    );
+    expect(
+      loadReadingPreference(
+        readingPreferenceStorageKeys.mermaidCurve,
+        mermaidCurveOptions,
+        "curved",
+      ),
+    ).toBe("curved");
   });
 });
