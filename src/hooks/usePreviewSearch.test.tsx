@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { SearchSession } from "../lib/text-search";
+import { notifyPreviewLayoutChange } from "../lib/preview-layout-events";
 import {
   createPreviewTextIndex,
   usePreviewSearch,
@@ -116,6 +117,57 @@ describe("preview search indexing", () => {
     preview.remove();
   });
 
+  it("repositions fallback highlights after a diagram-only layout change", async () => {
+    const preview = createPreview("<svg><text>새 레이블</text></svg>");
+    Object.defineProperty(preview, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        top: 0,
+        right: 1000,
+        bottom: 1000,
+        left: 0,
+        width: 1000,
+        height: 1000,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+    });
+    let rangeTop = 120;
+    const getClientRects = vi
+      .spyOn(Range.prototype, "getClientRects")
+      .mockImplementation(
+        () =>
+          [
+            {
+              top: rangeTop,
+              right: 180,
+              bottom: rangeTop + 20,
+              left: 80,
+              width: 100,
+              height: 20,
+              x: 80,
+              y: rangeTop,
+              toJSON: () => ({}),
+            },
+          ] as unknown as DOMRectList,
+      );
+    preview.scrollTop = 143;
+    const { result } = renderHook(() =>
+      usePreviewSearch(preview, "revision-1", searchSession),
+    );
+    await waitFor(() => expect(result.current.overlays[0]?.top).toBe(263));
+    const scrollTopAfterNavigation = preview.scrollTop;
+
+    rangeTop = 220;
+    act(() => notifyPreviewLayoutChange(preview));
+    await waitFor(() => expect(result.current.overlays[0]?.top).toBe(363));
+    expect(preview.scrollTop).toBe(scrollTopAfterNavigation);
+
+    getClientRects.mockRestore();
+    preview.remove();
+  });
+
   it("waits for a pending search before navigating to its first result", async () => {
     const query = "찾을 문장";
     const preview = createPreview(`<p>${query}</p>`);
@@ -129,11 +181,35 @@ describe("preview search indexing", () => {
     await waitFor(() => expect(result.current.isPending).toBe(true));
     expect(preview.scrollTop).toBe(143);
 
+    act(() => notifyPreviewLayoutChange(preview));
+
     pendingQueries.delete(query);
     rerender({ revision: "revision-1" });
 
     await waitFor(() => expect(result.current.matches).toHaveLength(1));
     expect(preview.scrollTop).not.toBe(143);
+    preview.remove();
+  });
+
+  it("navigates again after a layout change and reopening the same search", async () => {
+    const preview = createPreview("<svg><text>새 레이블</text></svg>");
+    const { result, rerender } = renderHook(
+      ({ session }) => usePreviewSearch(preview, "revision-1", session),
+      { initialProps: { session: searchSession } },
+    );
+    await waitFor(() => expect(result.current.matches).toHaveLength(1));
+
+    act(() => notifyPreviewLayoutChange(preview));
+    rerender({ session: { ...searchSession, isOpen: false } });
+    await waitFor(() => expect(result.current.matches).toHaveLength(0));
+    preview.scrollTop = 143;
+    pendingQueries.add(searchSession.query);
+    rerender({ session: searchSession });
+    await waitFor(() => expect(result.current.isPending).toBe(true));
+    pendingQueries.delete(searchSession.query);
+    rerender({ session: searchSession });
+
+    await waitFor(() => expect(preview.scrollTop).not.toBe(143));
     preview.remove();
   });
 });

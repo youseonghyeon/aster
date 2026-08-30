@@ -1,4 +1,11 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MermaidDiagram, readMermaidThemeTokens } from "./MermaidDiagram";
 
@@ -18,6 +25,28 @@ function deferred<T>() {
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
+}
+
+function setScrollableDiagramMetrics(
+  region: HTMLElement,
+  canvasPadding = 40,
+) {
+  Object.defineProperties(region, {
+    clientWidth: { configurable: true, value: 300 },
+    clientHeight: { configurable: true, value: 200 },
+    scrollWidth: {
+      configurable: true,
+      get: () =>
+        Number.parseFloat(region.querySelector("svg")?.style.width || "0") +
+        canvasPadding,
+    },
+    scrollHeight: {
+      configurable: true,
+      get: () =>
+        Number.parseFloat(region.querySelector("svg")?.style.height || "0") +
+        canvasPadding,
+    },
+  });
 }
 
 describe("MermaidDiagram", () => {
@@ -49,7 +78,7 @@ describe("MermaidDiagram", () => {
     shell.remove();
   });
 
-  it("shows a rendered SVG in an accessible, intrinsically sized region", async () => {
+  it("shows an accessible SVG with per-diagram zoom controls", async () => {
     renderMermaidDiagram.mockResolvedValueOnce(
       '<svg viewBox="0 0 920.2 410.1"><title>읽기 흐름</title><text>완료</text></svg>',
     );
@@ -71,12 +100,144 @@ describe("MermaidDiagram", () => {
       "aria-label",
       "Mermaid 다이어그램: 읽기 흐름",
     );
-    expect(region).toHaveAttribute("data-source-offset", "12");
+    expect(region).not.toHaveAttribute("data-source-offset");
+    expect(region.parentElement).toHaveAttribute("data-source-offset", "12");
     expect(svg).toHaveStyle({ width: "921px", height: "411px" });
     expect(svg).toHaveAttribute("focusable", "false");
+
+    const controls = screen.getByRole("group", {
+      name: "다이어그램 확대 및 축소",
+    });
+    expect(controls).toHaveAttribute("data-preview-search-ignore", "true");
+    expect(controls).toHaveAttribute("aria-busy", "false");
+    expect(screen.getByRole("button", { name: "다이어그램 축소" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "100% — 100%로 재설정" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "다이어그램 확대" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "현재 폭에 한 번 맞춤" }),
+    ).toBeEnabled();
   });
 
-  it("keeps the previous SVG and scroll position while appearance rerenders", async () => {
+  it("zooms, resets, and fits an individual diagram", async () => {
+    renderMermaidDiagram.mockResolvedValueOnce(
+      '<svg viewBox="0 0 1000 400"><text>배율 테스트</text></svg>',
+    );
+    render(<MermaidDiagram source="flowchart LR" appearanceKey="paper" />);
+    await screen.findByText("배율 테스트");
+
+    const region = screen.getByRole<HTMLElement>("region", {
+      name: "Mermaid 다이어그램",
+    });
+    const canvas = region.querySelector<HTMLElement>(".mermaid-diagram-canvas");
+    expect(canvas).not.toBeNull();
+    Object.defineProperty(region, "clientWidth", {
+      configurable: true,
+      value: 520,
+    });
+    canvas?.style.setProperty("padding-left", "20px");
+    canvas?.style.setProperty("padding-right", "20px");
+
+    fireEvent.click(screen.getByRole("button", { name: "다이어그램 확대" }));
+    expect(region.querySelector("svg")).toHaveStyle({
+      width: "1100px",
+      height: "440px",
+    });
+    expect(
+      screen.getByRole("button", { name: "110% — 100%로 재설정" }),
+    ).toBeEnabled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "110% — 100%로 재설정" }),
+    );
+    expect(region.querySelector("svg")).toHaveStyle({
+      width: "1000px",
+      height: "400px",
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "현재 폭에 한 번 맞춤" }),
+    );
+    expect(region.querySelector("svg")).toHaveStyle({
+      width: "480px",
+      height: "192px",
+    });
+    expect(
+      screen.getByRole("button", { name: "48% — 100%로 재설정" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "현재 폭에 한 번 맞춤" }),
+    );
+    expect(region.querySelector("svg")).toHaveStyle({
+      width: "480px",
+      height: "192px",
+    });
+  });
+
+  it("keeps zoom state independent between diagrams", async () => {
+    renderMermaidDiagram.mockImplementation(
+      ({ source: currentSource }: { source: string }) =>
+        Promise.resolve(
+          currentSource === "A"
+            ? '<svg viewBox="0 0 500 300"><title>첫 번째</title><text>첫 SVG</text></svg>'
+            : '<svg viewBox="0 0 600 300"><title>두 번째</title><text>둘째 SVG</text></svg>',
+        ),
+    );
+    const { rerender } = render(
+      <MermaidDiagram source="A" appearanceKey="paper" />,
+    );
+    await screen.findByText("첫 SVG");
+    rerender(
+      <>
+        <MermaidDiagram source="A" appearanceKey="paper" />
+        <MermaidDiagram source="B" appearanceKey="paper" />
+      </>,
+    );
+    await screen.findByText("둘째 SVG");
+    const firstRegion = screen.getByRole("region", {
+      name: "Mermaid 다이어그램: 첫 번째",
+    });
+    const secondRegion = screen.getByRole("region", {
+      name: "Mermaid 다이어그램: 두 번째",
+    });
+
+    fireEvent.click(
+      within(firstRegion.parentElement as HTMLElement).getByRole("button", {
+        name: "다이어그램 확대",
+      }),
+    );
+
+    expect(firstRegion.querySelector("svg")).toHaveStyle({ width: "550px" });
+    expect(secondRegion.querySelector("svg")).toHaveStyle({ width: "600px" });
+    expect(
+      within(secondRegion.parentElement as HTMLElement).getByRole("button", {
+        name: "100% — 100%로 재설정",
+      }),
+    ).toBeDisabled();
+  });
+
+  it("preserves the visible center when zoom changes", async () => {
+    renderMermaidDiagram.mockResolvedValueOnce(
+      '<svg viewBox="0 0 900 400"><text>중심</text></svg>',
+    );
+    render(<MermaidDiagram source="flowchart LR" appearanceKey="paper" />);
+    await screen.findByText("중심");
+    const region = screen.getByRole<HTMLElement>("region", {
+      name: "Mermaid 다이어그램",
+    });
+    setScrollableDiagramMetrics(region);
+    region.scrollLeft = 320;
+    region.scrollTop = 120;
+
+    fireEvent.click(screen.getByRole("button", { name: "다이어그램 확대" }));
+
+    expect(region.scrollLeft).toBe(365);
+    expect(region.scrollTop).toBe(140);
+  });
+
+  it("keeps zoom and the visible center while appearance rerenders", async () => {
     const second = deferred<string>();
     renderMermaidDiagram
       .mockResolvedValueOnce('<svg viewBox="0 0 900 400"><text>이전</text></svg>')
@@ -91,8 +252,10 @@ describe("MermaidDiagram", () => {
     const region = screen.getByRole<HTMLElement>("region", {
       name: "Mermaid 다이어그램",
     });
-    region.scrollTop = 37;
-    region.scrollLeft = 81;
+    setScrollableDiagramMetrics(region);
+    fireEvent.click(screen.getByRole("button", { name: "다이어그램 확대" }));
+    region.scrollTop = 140;
+    region.scrollLeft = 365;
 
     rerender(
       <MermaidDiagram
@@ -105,6 +268,13 @@ describe("MermaidDiagram", () => {
       screen.getByRole("region", { name: "Mermaid 다이어그램" }),
     ).toBe(region);
     expect(screen.getByText("이전")).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "다이어그램 확대 및 축소" }),
+    ).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "다이어그램 확대" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "110% — 100%로 재설정" }),
+    ).toBeDisabled();
 
     await act(async () => {
       second.resolve('<svg viewBox="0 0 1000 500"><text>새 테마</text></svg>');
@@ -114,8 +284,13 @@ describe("MermaidDiagram", () => {
     expect(
       screen.getByRole("region", { name: "Mermaid 다이어그램" }),
     ).toBe(region);
-    expect(region.scrollTop).toBe(37);
-    expect(region.scrollLeft).toBe(81);
+    expect(region.querySelector("svg")).toHaveStyle({
+      width: "1100px",
+      height: "550px",
+    });
+    expect(region.scrollTop).toBeCloseTo(195, 5);
+    expect(region.scrollLeft).toBeCloseTo(420, 5);
+    expect(screen.getByRole("button", { name: "다이어그램 확대" })).toBeEnabled();
   });
 
   it("discards a stale result after the source changes", async () => {
@@ -127,6 +302,9 @@ describe("MermaidDiagram", () => {
     const { rerender } = render(
       <MermaidDiagram source="old" appearanceKey="paper" />,
     );
+    expect(
+      screen.queryByRole("group", { name: "다이어그램 확대 및 축소" }),
+    ).not.toBeInTheDocument();
     await waitFor(() => expect(renderMermaidDiagram).toHaveBeenCalledTimes(1));
     rerender(<MermaidDiagram source="new" appearanceKey="paper" />);
     await waitFor(() => expect(renderMermaidDiagram).toHaveBeenCalledTimes(2));
@@ -158,6 +336,13 @@ describe("MermaidDiagram", () => {
         "다이어그램을 표시하지 못했습니다. 아래 Mermaid 문법을 확인하세요.",
       ),
     ).toHaveAttribute("aria-atomic", "true");
+    expect(screen.getByRole("region", { name: "Mermaid 다이어그램" })).toHaveAttribute(
+      "aria-busy",
+      "false",
+    );
     expect(screen.getByText("not a diagram")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "다이어그램 확대 및 축소" }),
+    ).not.toBeInTheDocument();
   });
 });

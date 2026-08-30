@@ -1,11 +1,23 @@
 import {
   memo,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
 import type { MermaidThemeTokens } from "../lib/mermaid-renderer";
+import {
+  calculateFitMermaidZoomPercent,
+  captureScrollViewportCenter,
+  getNextMermaidZoomPercent,
+  getScrollOffsetsForViewportCenter,
+  getZoomedMermaidSvgSize,
+  parseMermaidSvgViewBox,
+  type ScrollViewportCenter,
+} from "../lib/mermaid-zoom";
+import { notifyPreviewLayoutChange } from "../lib/preview-layout-events";
+import { MermaidZoomControls } from "./MermaidZoomControls";
 
 type MermaidDiagramProps = {
   source: string;
@@ -19,6 +31,8 @@ type MermaidDiagramState = {
   error: boolean;
   isLoading: boolean;
   revision: number;
+  renderedSource: string | null;
+  renderedAppearanceKey: string | null;
 };
 
 const fallbackTheme: MermaidThemeTokens = {
@@ -86,29 +100,27 @@ export function readMermaidThemeTokens(element: HTMLElement) {
   } satisfies MermaidThemeTokens;
 }
 
-function normalizeSvgSize(container: HTMLElement) {
+function applySvgSize(container: HTMLElement, zoomPercent: number) {
   const svg = container.querySelector<SVGSVGElement>("svg");
-  const viewBox = svg
-    ?.getAttribute("viewBox")
-    ?.trim()
-    .split(/[\s,]+/u)
-    .map(Number);
+  const baseSize = parseMermaidSvgViewBox(svg?.getAttribute("viewBox"));
+  if (!svg || !baseSize) return;
 
-  if (
-    !svg ||
-    viewBox?.length !== 4 ||
-    !Number.isFinite(viewBox[2]) ||
-    !Number.isFinite(viewBox[3]) ||
-    viewBox[2] <= 0 ||
-    viewBox[3] <= 0
-  ) {
-    return;
-  }
-
-  svg.style.width = `${Math.ceil(viewBox[2])}px`;
-  svg.style.height = `${Math.ceil(viewBox[3])}px`;
+  const size = getZoomedMermaidSvgSize(baseSize, zoomPercent);
+  svg.style.width = `${size.width}px`;
+  svg.style.height = `${size.height}px`;
   svg.style.maxWidth = "none";
   svg.setAttribute("focusable", "false");
+}
+
+function readViewportMetrics(element: HTMLElement) {
+  return {
+    scrollLeft: element.scrollLeft,
+    scrollTop: element.scrollTop,
+    scrollWidth: element.scrollWidth,
+    scrollHeight: element.scrollHeight,
+    clientWidth: element.clientWidth,
+    clientHeight: element.clientHeight,
+  };
 }
 
 function getMermaidAccessibleTitle(svg: string) {
@@ -123,13 +135,18 @@ export const MermaidDiagram = memo(function MermaidDiagram({
 }: MermaidDiagramProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
-  const pendingScrollRef = useRef<{ top: number; left: number } | null>(null);
+  const pendingCenterRef = useRef<ScrollViewportCenter | null>(null);
+  const zoomPercentRef = useRef(100);
+  const [zoomPercent, setZoomPercent] = useState(100);
+  zoomPercentRef.current = zoomPercent;
   const [state, setState] = useState<MermaidDiagramState>({
     svg: null,
     accessibleTitle: null,
     error: false,
     isLoading: true,
     revision: 0,
+    renderedSource: null,
+    renderedAppearanceKey: null,
   });
 
   useEffect(() => {
@@ -155,16 +172,19 @@ export const MermaidDiagram = memo(function MermaidDiagram({
       )
       .then((svg) => {
         if (controller.signal.aborted) return;
-        pendingScrollRef.current = {
-          top: wrapper.scrollTop,
-          left: wrapper.scrollLeft,
-        };
+        if (wrapper.querySelector(".mermaid-diagram-canvas svg")) {
+          pendingCenterRef.current = captureScrollViewportCenter(
+            readViewportMetrics(wrapper),
+          );
+        }
         setState((current) => ({
           svg,
           accessibleTitle: getMermaidAccessibleTitle(svg),
           error: false,
           isLoading: false,
           revision: current.revision + 1,
+          renderedSource: source,
+          renderedAppearanceKey: appearanceKey,
         }));
       })
       .catch((error: unknown) => {
@@ -174,16 +194,14 @@ export const MermaidDiagram = memo(function MermaidDiagram({
         ) {
           return;
         }
-        pendingScrollRef.current = {
-          top: wrapper.scrollTop,
-          left: wrapper.scrollLeft,
-        };
         setState((current) => ({
           svg: null,
           accessibleTitle: null,
           error: true,
           isLoading: false,
           revision: current.revision + 1,
+          renderedSource: source,
+          renderedAppearanceKey: appearanceKey,
         }));
       });
 
@@ -193,17 +211,66 @@ export const MermaidDiagram = memo(function MermaidDiagram({
   useLayoutEffect(() => {
     const wrapper = wrapperRef.current;
     const canvas = canvasRef.current;
-    if (canvas) normalizeSvgSize(canvas);
+    if (canvas) applySvgSize(canvas, zoomPercent);
 
-    const pendingScroll = pendingScrollRef.current;
-    if (wrapper && pendingScroll) {
-      wrapper.scrollTop = pendingScroll.top;
-      wrapper.scrollLeft = pendingScroll.left;
-      pendingScrollRef.current = null;
+    const pendingCenter = pendingCenterRef.current;
+    if (wrapper && pendingCenter) {
+      const offsets = getScrollOffsetsForViewportCenter(
+        pendingCenter,
+        readViewportMetrics(wrapper),
+      );
+      wrapper.scrollTop = offsets.top;
+      wrapper.scrollLeft = offsets.left;
+      pendingCenterRef.current = null;
     }
-  }, [state.revision]);
+
+    if (wrapper && canvas) notifyPreviewLayoutChange(wrapper);
+  }, [state.revision, zoomPercent]);
+
+  const commitZoom = useCallback((nextZoomPercent: number) => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper || zoomPercentRef.current === nextZoomPercent) return;
+
+    pendingCenterRef.current = captureScrollViewportCenter(
+      readViewportMetrics(wrapper),
+    );
+    zoomPercentRef.current = nextZoomPercent;
+    setZoomPercent(nextZoomPercent);
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    commitZoom(getNextMermaidZoomPercent(zoomPercent, -1));
+  }, [commitZoom, zoomPercent]);
+
+  const handleReset = useCallback(() => commitZoom(100), [commitZoom]);
+
+  const handleZoomIn = useCallback(() => {
+    commitZoom(getNextMermaidZoomPercent(zoomPercent, 1));
+  }, [commitZoom, zoomPercent]);
+
+  const handleFitWidth = useCallback(() => {
+    const wrapper = wrapperRef.current;
+    const canvas = canvasRef.current;
+    const svg = canvas?.querySelector<SVGSVGElement>("svg");
+    const baseSize = parseMermaidSvgViewBox(svg?.getAttribute("viewBox"));
+    if (!wrapper || !canvas || !baseSize) return;
+
+    const style = window.getComputedStyle(canvas);
+    const fitPercent = calculateFitMermaidZoomPercent({
+      baseWidth: baseSize.width,
+      viewportWidth: wrapper.clientWidth,
+      paddingLeft: Number.parseFloat(style.paddingLeft),
+      paddingRight: Number.parseFloat(style.paddingRight),
+    });
+    if (fitPercent !== null) commitZoom(fitPercent);
+  }, [commitZoom]);
 
   const hasVisibleSvg = state.svg !== null && !state.error;
+  const isRenderingCurrentDiagram =
+    !state.isLoading &&
+    state.renderedSource === source &&
+    state.renderedAppearanceKey === appearanceKey;
+  const isBusy = !isRenderingCurrentDiagram;
   const statusMessage = state.error
     ? "다이어그램을 표시하지 못했습니다. 아래 Mermaid 문법을 확인하세요."
     : !hasVisibleSvg && state.isLoading
@@ -220,36 +287,50 @@ export const MermaidDiagram = memo(function MermaidDiagram({
 
   return (
     <div
-      ref={wrapperRef}
-      className="mermaid-diagram-scroll"
-      role="region"
-      aria-label={accessibleName}
-      aria-busy={state.isLoading}
-      tabIndex={0}
+      className={`mermaid-diagram${hasVisibleSvg ? " is-ready" : ""}`}
       data-source-offset={sourceOffset}
     >
-      <p
-        className={statusClassName}
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        data-preview-search-ignore="true"
-      >
-        {statusMessage}
-      </p>
       {hasVisibleSvg ? (
-        <div
-          ref={canvasRef}
-          className="mermaid-diagram-canvas"
-          dangerouslySetInnerHTML={{ __html: state.svg ?? "" }}
+        <MermaidZoomControls
+          zoomPercent={zoomPercent}
+          disabled={isBusy}
+          onZoomOut={handleZoomOut}
+          onReset={handleReset}
+          onZoomIn={handleZoomIn}
+          onFitWidth={handleFitWidth}
         />
-      ) : state.error ? (
-        <div className="mermaid-diagram-error">
-          <pre className="mermaid-diagram-source" translate="no">
-            <code className="language-mermaid">{source}</code>
-          </pre>
-        </div>
       ) : null}
+      <div
+        ref={wrapperRef}
+        className="mermaid-diagram-scroll"
+        role="region"
+        aria-label={accessibleName}
+        aria-busy={isBusy}
+        tabIndex={0}
+      >
+        <p
+          className={statusClassName}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-preview-search-ignore="true"
+        >
+          {statusMessage}
+        </p>
+        {hasVisibleSvg ? (
+          <div
+            ref={canvasRef}
+            className="mermaid-diagram-canvas"
+            dangerouslySetInnerHTML={{ __html: state.svg ?? "" }}
+          />
+        ) : state.error ? (
+          <div className="mermaid-diagram-error">
+            <pre className="mermaid-diagram-source" translate="no">
+              <code className="language-mermaid">{source}</code>
+            </pre>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 });

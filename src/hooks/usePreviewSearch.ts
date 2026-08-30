@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { normalizeSearchIndex, type SearchSession } from "../lib/text-search";
+import { previewLayoutChangeEvent } from "../lib/preview-layout-events";
 import { useTextSearch } from "./useTextSearch";
 
 const matchHighlightName = "aster-preview-search-match";
@@ -401,8 +402,6 @@ export function usePreviewSearch(
   const [scrollRevision, setScrollRevision] = useState(0);
   const [overlays, setOverlays] = useState<PreviewSearchOverlay[]>([]);
   const lastHandledNavigationKeyRef = useRef("");
-  const currentNavigationKeyRef = useRef("");
-  const suppressedRenderNavigationKeyRef = useRef("");
   const options = useMemo(
     () => ({
       isCaseSensitive: session.isCaseSensitive,
@@ -416,7 +415,6 @@ export function usePreviewSearch(
     options,
   );
   const navigationKey = `${session.isOpen}:${session.query}:${session.isCaseSensitive}:${session.isRegex}:${session.currentIndex}`;
-  currentNavigationKeyRef.current = navigationKey;
 
   useEffect(() => {
     if (!container || !session.isOpen) {
@@ -430,11 +428,7 @@ export function usePreviewSearch(
     }
 
     let scheduledFrame: number | null = null;
-    const scheduleReindex = (suppressNavigation: boolean) => {
-      if (suppressNavigation) {
-        suppressedRenderNavigationKeyRef.current =
-          currentNavigationKeyRef.current;
-      }
+    const scheduleReindex = () => {
       if (scheduledFrame !== null) {
         return;
       }
@@ -444,13 +438,14 @@ export function usePreviewSearch(
         setRenderRevision((revision) => revision + 1);
       });
     };
-    const mutationObserver = new MutationObserver(() => scheduleReindex(true));
-    const resizeObserver = new ResizeObserver(() => scheduleReindex(false));
+    const mutationObserver = new MutationObserver(scheduleReindex);
+    const resizeObserver = new ResizeObserver(scheduleReindex);
     const handleScroll = () => {
       if (!canUseCustomHighlights()) {
         setScrollRevision((revision) => revision + 1);
       }
     };
+    const handlePreviewLayoutChange = scheduleReindex;
     mutationObserver.observe(markdownBody, {
       childList: true,
       characterData: true,
@@ -458,6 +453,10 @@ export function usePreviewSearch(
     });
     resizeObserver.observe(markdownBody);
     container.addEventListener("scroll", handleScroll, true);
+    container.addEventListener(
+      previewLayoutChangeEvent,
+      handlePreviewLayoutChange,
+    );
 
     return () => {
       if (scheduledFrame !== null) {
@@ -466,6 +465,10 @@ export function usePreviewSearch(
       mutationObserver.disconnect();
       resizeObserver.disconnect();
       container.removeEventListener("scroll", handleScroll, true);
+      container.removeEventListener(
+        previewLayoutChangeEvent,
+        handlePreviewLayoutChange,
+      );
     };
   }, [container, session.isOpen]);
 
@@ -498,10 +501,6 @@ export function usePreviewSearch(
     if (result.isPending) return;
 
     lastHandledNavigationKeyRef.current = navigationKey;
-    if (suppressedRenderNavigationKeyRef.current === navigationKey) {
-      suppressedRenderNavigationKeyRef.current = "";
-      return;
-    }
     if (result.error || result.matches.length === 0) return;
 
     const activeIndex = normalizeSearchIndex(
