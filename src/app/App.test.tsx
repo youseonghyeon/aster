@@ -82,7 +82,7 @@ describe("workspace regression contracts", () => {
     expect(screen.getByRole("dialog", { name: "읽기 설정" })).toBeInTheDocument();
   });
 
-  it("closes diagram help before closing reading settings with Escape", async () => {
+  it("dismisses focused diagram help before closing reading settings", async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -91,28 +91,12 @@ describe("workspace regression contracts", () => {
     const helpButton = screen.getByRole("button", {
       name: "다이어그램 선 도움말",
     });
-    await user.click(helpButton);
-
-    expect(screen.getByRole("note")).toBeInTheDocument();
-    const fontButton = screen.getByRole("button", { name: "글꼴" });
-    fontButton.focus();
-    await user.keyboard("{ArrowDown}");
-    expect(screen.getByRole("listbox", { name: "글꼴 선택" })).toBeInTheDocument();
+    await user.hover(helpButton);
     await user.keyboard("{Escape}");
-    expect(
-      screen.queryByRole("listbox", { name: "글꼴 선택" }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole("note")).toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "읽기 설정" })).toBeInTheDocument();
-    expect(fontButton).toHaveFocus();
 
-    helpButton.focus();
-    await user.tab();
-    expect(screen.getByRole("button", { name: "곡선" })).toHaveFocus();
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(helpButton).not.toHaveAttribute("data-tooltip-visible");
     expect(screen.getByRole("dialog", { name: "읽기 설정" })).toBeInTheDocument();
-    expect(helpButton).toHaveFocus();
+    expect(settingsButton).toHaveFocus();
 
     await user.keyboard("{Escape}");
     expect(

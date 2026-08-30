@@ -681,10 +681,7 @@
   top: calc(100% + 20px);
   right: 0;
   width: min(286px, calc(100vw - 24px));
-  max-height: calc(100vh - 76px);
   padding: 18px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   color: var(--text-strong);
   background: var(--control-background);
   border: 1px solid var(--border-strong);
@@ -734,37 +731,39 @@
 }
 
 .mermaid-curve-help {
-  display: grid;
-  gap: 7px;
-  min-width: 0;
-}
-
-.settings-label-row {
-  display: flex;
+  position: relative;
+  display: inline-flex;
+  width: max-content;
+  height: 20px;
   align-items: center;
-  gap: 4px;
-  min-width: 0;
+  justify-self: start;
+  gap: 3px;
 }
 
 .settings-help-button {
+  position: relative;
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   place-items: center;
   color: var(--text-faint);
   background: transparent;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: 50%;
   cursor: pointer;
   touch-action: manipulation;
 }
 
+.settings-help-button::before {
+  position: absolute;
+  inset: -2px;
+  content: "";
+}
+
 .settings-help-button:hover,
-.settings-help-button[aria-expanded="true"] {
-  color: var(--accent-hover);
-  background: var(--table-row-hover);
-  border-color: var(--accent-soft);
+.settings-help-button:focus {
+  color: var(--accent);
 }
 
 .settings-help-button:focus-visible {
@@ -773,8 +772,8 @@
 }
 
 .settings-help-button svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -782,18 +781,39 @@
   stroke-width: 1.5;
 }
 
-.settings-help-note {
-  min-width: 0;
-  padding: 9px 10px;
+.settings-help-tooltip {
+  position: absolute;
+  z-index: 1;
+  top: calc(50% - 5px);
+  left: calc(100% + 6px);
+  width: 160px;
+  padding: 4px 8px;
   color: var(--text-subtle);
-  background: var(--table-row-hover);
-  border: 1px solid var(--border-soft);
-  border-left: 3px solid var(--accent);
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.5;
+  background: var(--control-background);
+  border: 1px solid var(--border-strong);
+  border-color: color-mix(
+    in srgb,
+    var(--text-faint) 75%,
+    var(--control-background)
+  );
+  border-radius: 7px;
+  box-shadow:
+    0 3px 10px rgba(23, 26, 24, 0.14),
+    0 1px 3px rgba(23, 26, 24, 0.1);
+  font-size: 11px;
+  line-height: 1.45;
   overflow-wrap: anywhere;
-  user-select: text;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-50%);
+  word-break: keep-all;
+  visibility: hidden;
+}
+
+.settings-help-button[data-tooltip-visible="true"]
+  + .settings-help-tooltip {
+  opacity: 1;
+  visibility: visible;
 }
 
 .theme-options,
