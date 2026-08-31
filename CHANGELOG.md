@@ -5,6 +5,8 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-31
+
 ### Added
 
 - Mermaid 다이어그램을 선택하면 현재 테마를 유지한 큰 보기에서 버튼이나 `Command+휠`로 확대·축소하고, 여유 공간을 둔 캔버스를 마우스로 끌어 이동하며 살펴볼 수 있는 모달
@@ -126,4 +128,5 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 [1.2.0]: https://github.com/youseonghyeon/aster/compare/v1.1.0...v1.2.0
 [1.3.0]: https://github.com/youseonghyeon/aster/compare/v1.2.0...v1.3.0
 [1.4.0]: https://github.com/youseonghyeon/aster/compare/v1.3.0...v1.4.0
-[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.4.0...HEAD
+[1.5.0]: https://github.com/youseonghyeon/aster/compare/v1.4.0...v1.5.0
+[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.5.0...HEAD
