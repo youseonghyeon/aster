@@ -1,4 +1,3 @@
-import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import type {
   AppEventChannel,
@@ -37,10 +36,19 @@ import { useDocumentNavigation } from "./useDocumentNavigation";
 import { useDocumentPersistence } from "./useDocumentPersistence";
 import { useDocumentRecovery } from "./useDocumentRecovery";
 import { useExternalFileStatus } from "./useExternalFileStatus";
+import { useDocumentNativeCommands } from "./useDocumentNativeCommands";
 
-type UseDocumentSessionOptions = { events: AppEventChannel };
+type UseDocumentSessionOptions = {
+  events: AppEventChannel;
+  isBlockingModalOpen?: () => boolean;
+};
 
-export function useDocumentSession({ events }: UseDocumentSessionOptions) {
+const isNoBlockingModalOpen = () => false;
+
+export function useDocumentSession({
+  events,
+  isBlockingModalOpen = isNoBlockingModalOpen,
+}: UseDocumentSessionOptions) {
   const [state, reducerDispatch] = useReducer(
     documentSessionReducer,
     undefined,
@@ -354,35 +362,11 @@ export function useDocumentSession({ events }: UseDocumentSessionOptions) {
     state.note.value,
   ]);
 
-  useEffect(() => {
-    let disposed = false;
-    const listeners: Array<() => void> = [];
-    const register = (
-      eventName: string,
-      listener: () => void,
-    ) => {
-      void listen(eventName, listener)
-        .then((unlisten) => {
-          if (disposed) unlisten();
-          else listeners.push(unlisten);
-        })
-        .catch((error) => {
-          if (!disposed) {
-            console.error(`${eventName} 이벤트를 연결하지 못했습니다.`, error);
-          }
-        });
-    };
-    register("open-markdown-requested", () =>
-      void openFromPickerRef.current("native"),
-    );
-    register("save-markdown-requested", () =>
-      void saveDocumentRef.current(),
-    );
-    return () => {
-      disposed = true;
-      listeners.forEach((unlisten) => unlisten());
-    };
-  }, []);
+  useDocumentNativeCommands({
+    isBlockingModalOpen,
+    openFromPickerRef,
+    saveDocumentRef,
+  });
 
   useEffect(
     () =>

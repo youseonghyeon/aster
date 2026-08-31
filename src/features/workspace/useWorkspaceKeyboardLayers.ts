@@ -4,6 +4,7 @@ import { getEscapeOwner, type StageSidebar } from "./workspace-interactions";
 import type { SearchSessions } from "./useWorkspaceSearch";
 
 type UseWorkspaceKeyboardLayersOptions = {
+  isBlockingModalOpen: () => boolean;
   stageSidebar: StageSidebar;
   isSettingsOpen: boolean;
   stageSidebarRef: RefObject<StageSidebar>;
@@ -33,6 +34,7 @@ function isEventInsideStageSidebar(target: EventTarget | null) {
 }
 
 export function useWorkspaceKeyboardLayers({
+  isBlockingModalOpen,
   stageSidebar,
   isSettingsOpen,
   stageSidebarRef,
@@ -55,6 +57,7 @@ export function useWorkspaceKeyboardLayers({
 }: UseWorkspaceKeyboardLayersOptions) {
   useEffect(() => {
     function handleNoteShortcut(event: globalThis.KeyboardEvent) {
+      if (isBlockingModalOpen()) return;
       if (
         (!event.metaKey && !event.ctrlKey) ||
         !event.shiftKey ||
@@ -68,10 +71,11 @@ export function useWorkspaceKeyboardLayers({
     }
     window.addEventListener("keydown", handleNoteShortcut);
     return () => window.removeEventListener("keydown", handleNoteShortcut);
-  }, [isPreviewFocusModeRef, onToggleNotes]);
+  }, [isBlockingModalOpen, isPreviewFocusModeRef, onToggleNotes]);
 
   useEffect(() => {
     function handleSearchShortcut(event: globalThis.KeyboardEvent) {
+      if (isBlockingModalOpen()) return;
       const isFindShortcut =
         (event.metaKey || event.ctrlKey) &&
         !event.shiftKey &&
@@ -120,6 +124,7 @@ export function useWorkspaceKeyboardLayers({
     return () => window.removeEventListener("keydown", handleSearchShortcut);
   }, [
     isPanelLayoutMenuOpenRef,
+    isBlockingModalOpen,
     isPreviewFocusModeRef,
     isSettingsOpenRef,
     isSidebarInsetRef,
@@ -136,6 +141,7 @@ export function useWorkspaceKeyboardLayers({
   useEffect(() => {
     if (!stageSidebar) return;
     function handleSidebarKeyDown(event: globalThis.KeyboardEvent) {
+      if (isBlockingModalOpen()) return;
       const activeArea = isPreviewFocusModeRef.current
         ? "preview"
         : lastSearchAreaRef.current;
@@ -164,6 +170,7 @@ export function useWorkspaceKeyboardLayers({
     return () => window.removeEventListener("keydown", handleSidebarKeyDown);
   }, [
     isPanelLayoutMenuOpenRef,
+    isBlockingModalOpen,
     isPreviewFocusModeRef,
     isSettingsOpenRef,
     isSidebarInsetRef,
@@ -177,6 +184,7 @@ export function useWorkspaceKeyboardLayers({
   useEffect(() => {
     if (!isSettingsOpen) return;
     function handleOutsidePointerDown(event: globalThis.PointerEvent) {
+      if (isBlockingModalOpen()) return;
       if (
         event.target instanceof Node &&
         !settingsRef.current?.contains(event.target)
@@ -185,6 +193,7 @@ export function useWorkspaceKeyboardLayers({
       }
     }
     function handleSettingsKeyDown(event: globalThis.KeyboardEvent) {
+      if (isBlockingModalOpen()) return;
       if (event.key !== "Escape") return;
       event.preventDefault();
       onCloseSettings();
@@ -198,6 +207,7 @@ export function useWorkspaceKeyboardLayers({
     };
   }, [
     isSettingsOpen,
+    isBlockingModalOpen,
     onCloseSettings,
     settingsButtonRef,
     settingsRef,

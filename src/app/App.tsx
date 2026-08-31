@@ -5,18 +5,33 @@ import {
   createAppEventChannel,
   type AppEventChannel,
 } from "../shared/app-events";
+import {
+  BlockingModalProvider,
+  createBlockingModalController,
+  type BlockingModalController,
+} from "../shared/blocking-modal";
 import { AppWorkspace } from "./AppWorkspace";
 import "../styles/base.css";
 import "./App.css";
 
 function App() {
   const appEventsRef = useRef<AppEventChannel | null>(null);
+  const blockingModalRef = useRef<BlockingModalController | null>(null);
   if (appEventsRef.current === null) {
     appEventsRef.current = createAppEventChannel();
   }
+  if (blockingModalRef.current === null) {
+    blockingModalRef.current = createBlockingModalController();
+  }
   const events = appEventsRef.current;
-  const documents = useDocumentSession({ events });
-  const reading = useReadingPreferences();
+  const blockingModal = blockingModalRef.current;
+  const documents = useDocumentSession({
+    events,
+    isBlockingModalOpen: blockingModal.isOpen,
+  });
+  const reading = useReadingPreferences({
+    isBlockingModalOpen: blockingModal.isOpen,
+  });
 
   if (documents.isRestoringStartupDocument) {
     return (
@@ -39,7 +54,16 @@ function App() {
     );
   }
 
-  return <AppWorkspace events={events} documents={documents} reading={reading} />;
+  return (
+    <BlockingModalProvider controller={blockingModal}>
+      <AppWorkspace
+        events={events}
+        documents={documents}
+        reading={reading}
+        isBlockingModalOpen={blockingModal.isOpen}
+      />
+    </BlockingModalProvider>
+  );
 }
 
 export default App;

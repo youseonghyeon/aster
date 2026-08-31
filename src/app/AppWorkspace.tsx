@@ -16,18 +16,21 @@ type AppWorkspaceProps = {
   events: AppEventChannel;
   documents: ReturnType<typeof useDocumentSession>;
   reading: ReturnType<typeof useReadingPreferences>;
+  isBlockingModalOpen: () => boolean;
 };
 
 export function AppWorkspace({
   events,
   documents,
   reading,
+  isBlockingModalOpen,
 }: AppWorkspaceProps) {
   const workspace = useWorkspaceController({
     events,
     documentPath: documents.document.path,
     markdown: documents.document.markdown,
     isScrollSyncEnabled: reading.isScrollSyncEnabled,
+    isBlockingModalOpen,
   });
   const folderBrowser = useFolderBrowser({
     isActive: workspace.state.stageSidebar === "files",

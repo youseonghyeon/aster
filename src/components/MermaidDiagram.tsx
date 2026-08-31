@@ -3,8 +3,10 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
+  type KeyboardEvent,
 } from "react";
 import type { MermaidThemeTokens } from "../lib/mermaid-renderer";
 import type { MermaidCurvePreference } from "../lib/mermaid-curve";
@@ -13,7 +15,7 @@ import {
   captureScrollViewportCenter,
   getNextMermaidZoomPercent,
   getScrollOffsetsForViewportCenter,
-  getZoomedMermaidSvgSize,
+  getZoomedMermaidSvgMarkup,
   parseMermaidSvgViewBox,
   type ScrollViewportCenter,
 } from "../lib/mermaid-zoom";
@@ -24,6 +26,7 @@ import {
   type PreviewScrollAnchorSnapshot,
 } from "../lib/preview-scroll-anchor";
 import { MermaidZoomControls } from "./MermaidZoomControls";
+import { MermaidDiagramDialog } from "./MermaidDiagramDialog";
 
 type MermaidDiagramProps = {
   source: string;
@@ -108,18 +111,6 @@ export function readMermaidThemeTokens(element: HTMLElement) {
   } satisfies MermaidThemeTokens;
 }
 
-function applySvgSize(container: HTMLElement, zoomPercent: number) {
-  const svg = container.querySelector<SVGSVGElement>("svg");
-  const baseSize = parseMermaidSvgViewBox(svg?.getAttribute("viewBox"));
-  if (!svg || !baseSize) return;
-
-  const size = getZoomedMermaidSvgSize(baseSize, zoomPercent);
-  svg.style.width = `${size.width}px`;
-  svg.style.height = `${size.height}px`;
-  svg.style.maxWidth = "none";
-  svg.setAttribute("focusable", "false");
-}
-
 function readViewportMetrics(element: HTMLElement) {
   return {
     scrollLeft: element.scrollLeft,
@@ -144,11 +135,13 @@ export const MermaidDiagram = memo(function MermaidDiagram({
 }: MermaidDiagramProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const largeViewReturnFocusRef = useRef<HTMLElement | null>(null);
   const pendingCenterRef = useRef<ScrollViewportCenter | null>(null);
   const pendingOuterAnchorRef =
     useRef<PreviewScrollAnchorSnapshot | null>(null);
   const zoomPercentRef = useRef(100);
   const [zoomPercent, setZoomPercent] = useState(100);
+  const [isLargeViewOpen, setIsLargeViewOpen] = useState(false);
   zoomPercentRef.current = zoomPercent;
   const [state, setState] = useState<MermaidDiagramState>({
     svg: null,
@@ -160,6 +153,13 @@ export const MermaidDiagram = memo(function MermaidDiagram({
     renderedAppearanceKey: null,
     renderedCurve: null,
   });
+  const zoomedSvg = useMemo(
+    () =>
+      state.svg === null
+        ? null
+        : getZoomedMermaidSvgMarkup(state.svg, zoomPercent),
+    [state.svg, zoomPercent],
+  );
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -227,7 +227,6 @@ export const MermaidDiagram = memo(function MermaidDiagram({
   useLayoutEffect(() => {
     const wrapper = wrapperRef.current;
     const canvas = canvasRef.current;
-    if (canvas) applySvgSize(canvas, zoomPercent);
 
     const pendingCenter = pendingCenterRef.current;
     if (wrapper && pendingCenter) {
@@ -287,6 +286,30 @@ export const MermaidDiagram = memo(function MermaidDiagram({
     if (fitPercent !== null) commitZoom(fitPercent);
   }, [commitZoom]);
 
+  const handleOpenLargeView = useCallback(() => {
+    largeViewReturnFocusRef.current = canvasRef.current;
+    setIsLargeViewOpen(true);
+  }, []);
+
+  const handleCanvasKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      handleOpenLargeView();
+    },
+    [handleOpenLargeView],
+  );
+
+  const handleCloseLargeView = useCallback(() => {
+    setIsLargeViewOpen(false);
+    const returnFocusElement = largeViewReturnFocusRef.current;
+    window.requestAnimationFrame(() => {
+      if (returnFocusElement?.isConnected) {
+        returnFocusElement.focus({ preventScroll: true });
+      }
+    });
+  }, []);
+
   const hasVisibleSvg = state.svg !== null && !state.error;
   const isRenderingCurrentDiagram =
     !state.isLoading &&
@@ -343,8 +366,14 @@ export const MermaidDiagram = memo(function MermaidDiagram({
         {hasVisibleSvg ? (
           <div
             ref={canvasRef}
-            className="mermaid-diagram-canvas"
-            dangerouslySetInnerHTML={{ __html: state.svg ?? "" }}
+            className={`mermaid-diagram-canvas${isBusy ? "" : " is-openable"}`}
+            role={isBusy ? undefined : "button"}
+            tabIndex={isBusy ? undefined : 0}
+            aria-label={isBusy ? undefined : `${accessibleName} 크게 보기`}
+            title={isBusy ? undefined : "다이어그램 크게 보기"}
+            onClick={isBusy ? undefined : handleOpenLargeView}
+            onKeyDown={isBusy ? undefined : handleCanvasKeyDown}
+            dangerouslySetInnerHTML={{ __html: zoomedSvg ?? "" }}
           />
         ) : state.error ? (
           <div className="mermaid-diagram-error">
@@ -354,6 +383,13 @@ export const MermaidDiagram = memo(function MermaidDiagram({
           </div>
         ) : null}
       </div>
+      {isLargeViewOpen && hasVisibleSvg ? (
+        <MermaidDiagramDialog
+          svg={state.svg ?? ""}
+          accessibleTitle={state.accessibleTitle}
+          onClose={handleCloseLargeView}
+        />
+      ) : null}
     </div>
   );
 });

@@ -1,5 +1,6 @@
 import {
   act,
+  createEvent,
   fireEvent,
   render,
   screen,
@@ -119,6 +120,247 @@ describe("MermaidDiagram", () => {
     expect(
       screen.getByRole("button", { name: "현재 폭에 한 번 맞춤" }),
     ).toBeEnabled();
+    expect(
+      screen.getByRole("button", {
+        name: "Mermaid 다이어그램: 읽기 흐름 크게 보기",
+      }),
+    ).toHaveClass("mermaid-diagram-canvas", "is-openable");
+    expect(screen.queryByText("크게 보기")).not.toBeInTheDocument();
+  });
+
+  it("opens a modal large view without changing the inline zoom state", async () => {
+    renderMermaidDiagram.mockResolvedValueOnce(
+      '<svg viewBox="0 0 1000 400"><title>큰 읽기 흐름</title><text>확대 대상</text></svg>',
+    );
+    render(
+      <MermaidDiagram
+        source="flowchart LR\nA --> B"
+        appearanceKey="paper"
+        curve="curved"
+      />,
+    );
+    await screen.findByText("확대 대상");
+
+    const inlineRegion = screen.getByRole("region", {
+      name: "Mermaid 다이어그램: 큰 읽기 흐름",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "다이어그램 확대" }));
+    const inlineSvg = inlineRegion.querySelector<SVGSVGElement>("svg");
+    const inlineSizeBeforeOpen = {
+      width: inlineSvg?.style.width,
+      height: inlineSvg?.style.height,
+    };
+    expect(inlineSizeBeforeOpen).toEqual({
+      width: "1100px",
+      height: "440px",
+    });
+    const openCanvas = screen.getByRole("button", {
+      name: "Mermaid 다이어그램: 큰 읽기 흐름 크게 보기",
+    });
+    fireEvent.keyDown(openCanvas, { key: "Enter" });
+
+    const dialog = screen.getByRole("dialog", { name: "큰 읽기 흐름" });
+    expect(dialog).toHaveAttribute("open");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAttribute("data-preview-search-ignore", "true");
+    const largeRegion = within(dialog).getByRole("region", {
+      name: "큰 보기: 큰 읽기 흐름",
+    });
+    expect(largeRegion.querySelector("svg")).toHaveStyle({
+      width: "1000px",
+      height: "400px",
+    });
+
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "다이어그램 확대" }),
+    );
+    expect(largeRegion.querySelector("svg")).toHaveStyle({
+      width: "1100px",
+      height: "440px",
+    });
+    const inlineSvgAfterDialogUpdate =
+      inlineRegion.querySelector<SVGSVGElement>("svg");
+    expect(inlineSvgAfterDialogUpdate?.style.width).toBe(
+      inlineSizeBeforeOpen.width,
+    );
+    expect(inlineSvgAfterDialogUpdate?.style.height).toBe(
+      inlineSizeBeforeOpen.height,
+    );
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(openCanvas).toHaveFocus());
+  });
+
+  it("opens from the canvas, blocks key propagation, and closes from the backdrop", async () => {
+    renderMermaidDiagram.mockResolvedValueOnce(
+      '<svg viewBox="0 0 600 300"><text>캔버스 열기</text></svg>',
+    );
+    render(
+      <MermaidDiagram source="flowchart LR" appearanceKey="paper" curve="curved" />,
+    );
+    await screen.findByText("캔버스 열기");
+
+    const inlineCanvas = document.querySelector<HTMLElement>(
+      ".mermaid-diagram-canvas",
+    );
+    expect(inlineCanvas).toHaveClass("is-openable");
+    fireEvent.click(inlineCanvas as HTMLElement);
+
+    const dialog = screen.getByRole("dialog");
+    const windowKeyDown = vi.fn();
+    window.addEventListener("keydown", windowKeyDown);
+    fireEvent.keyDown(dialog, { key: "f", metaKey: true });
+    expect(windowKeyDown).not.toHaveBeenCalled();
+    window.removeEventListener("keydown", windowKeyDown);
+
+    fireEvent.click(dialog);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("pans an overflowing large view with a primary pointer drag", async () => {
+    renderMermaidDiagram.mockResolvedValueOnce(
+      '<svg viewBox="0 0 1000 600" width="100%" style="max-width: 1000px"><text>드래그 이동</text></svg>',
+    );
+    render(
+      <MermaidDiagram source="flowchart LR" appearanceKey="paper" curve="curved" />,
+    );
+    await screen.findByText("드래그 이동");
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Mermaid 다이어그램 크게 보기",
+      }),
+    );
+    const dialog = screen.getByRole("dialog");
+    const largeRegion = within(dialog).getByRole<HTMLElement>("region", {
+      name: "큰 보기: Mermaid 다이어그램",
+    });
+    const largeCanvas = largeRegion.querySelector<HTMLElement>(
+      ".mermaid-diagram-dialog-canvas",
+    );
+    expect(largeCanvas).not.toBeNull();
+    Object.defineProperties(largeRegion, {
+      clientWidth: { configurable: true, value: 300 },
+      clientHeight: { configurable: true, value: 200 },
+      scrollWidth: { configurable: true, value: 1000 },
+      scrollHeight: { configurable: true, value: 600 },
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "다이어그램 확대" }),
+    );
+    expect(largeRegion.querySelector("svg")).toHaveStyle({
+      width: "1100px",
+      height: "660px",
+    });
+    largeRegion.scrollLeft = 120;
+    largeRegion.scrollTop = 80;
+    const svgBeforePointerDown = largeRegion.querySelector("svg");
+
+    fireEvent.pointerDown(largeCanvas as HTMLElement, {
+      pointerId: 7,
+      button: 0,
+      isPrimary: true,
+      clientX: 220,
+      clientY: 160,
+    });
+    expect(largeCanvas).toHaveClass("is-dragging");
+    expect(largeRegion.querySelector("svg")).toBe(svgBeforePointerDown);
+    expect(largeRegion.querySelector("svg")).toHaveStyle({
+      width: "1100px",
+      height: "660px",
+    });
+    expect(largeRegion.scrollLeft).toBe(120);
+    expect(largeRegion.scrollTop).toBe(80);
+    expect(
+      within(dialog).getByRole("button", {
+        name: "110% — 100%로 재설정",
+      }),
+    ).toBeEnabled();
+
+    fireEvent.pointerMove(largeCanvas as HTMLElement, {
+      pointerId: 7,
+      buttons: 1,
+      isPrimary: true,
+      clientX: 150,
+      clientY: 100,
+    });
+    expect(largeRegion.scrollLeft).toBe(190);
+    expect(largeRegion.scrollTop).toBe(140);
+    const svgBeforePointerUp = largeRegion.querySelector("svg");
+
+    fireEvent.pointerUp(largeCanvas as HTMLElement, {
+      pointerId: 7,
+      button: 0,
+      isPrimary: true,
+      clientX: 150,
+      clientY: 100,
+    });
+    expect(largeCanvas).not.toHaveClass("is-dragging");
+    expect(largeRegion.querySelector("svg")).toBe(svgBeforePointerUp);
+    expect(largeRegion.scrollLeft).toBe(190);
+    expect(largeRegion.scrollTop).toBe(140);
+  });
+
+  it("zooms the large view with Command and wheel without consuming a plain wheel", async () => {
+    renderMermaidDiagram.mockResolvedValueOnce(
+      '<svg viewBox="0 0 1000 600"><text>휠 확대</text></svg>',
+    );
+    render(
+      <MermaidDiagram source="flowchart LR" appearanceKey="paper" curve="curved" />,
+    );
+    await screen.findByText("휠 확대");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Mermaid 다이어그램 크게 보기" }),
+    );
+    const dialog = screen.getByRole("dialog");
+    const largeRegion = within(dialog).getByRole<HTMLElement>("region");
+
+    const zoomInWheel = createEvent.wheel(largeRegion, {
+      bubbles: true,
+      cancelable: true,
+      deltaY: -80,
+      metaKey: true,
+    });
+    fireEvent(largeRegion, zoomInWheel);
+    expect(zoomInWheel.defaultPrevented).toBe(true);
+    expect(
+      within(dialog).getByRole("button", {
+        name: "110% — 100%로 재설정",
+      }),
+    ).toBeEnabled();
+    expect(largeRegion.querySelector("svg")).toHaveStyle({
+      width: "1100px",
+      height: "660px",
+    });
+
+    const plainWheel = createEvent.wheel(largeRegion, {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 80,
+    });
+    fireEvent(largeRegion, plainWheel);
+    expect(plainWheel.defaultPrevented).toBe(false);
+    expect(
+      within(dialog).getByRole("button", {
+        name: "110% — 100%로 재설정",
+      }),
+    ).toBeEnabled();
+
+    const zoomOutWheel = createEvent.wheel(largeRegion, {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 80,
+      metaKey: true,
+    });
+    fireEvent(largeRegion, zoomOutWheel);
+    expect(zoomOutWheel.defaultPrevented).toBe(true);
+    expect(
+      within(dialog).getByRole("button", {
+        name: "100% — 100%로 재설정",
+      }),
+    ).toBeDisabled();
   });
 
   it("zooms, resets, and fits an individual diagram", async () => {

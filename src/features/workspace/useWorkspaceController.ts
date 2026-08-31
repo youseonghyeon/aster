@@ -33,13 +33,17 @@ type UseWorkspaceControllerOptions = {
   documentPath: string | null;
   markdown: string;
   isScrollSyncEnabled: boolean;
+  isBlockingModalOpen?: () => boolean;
 };
+
+const isNoBlockingModalOpen = () => false;
 
 export function useWorkspaceController({
   events,
   documentPath,
   markdown,
   isScrollSyncEnabled,
+  isBlockingModalOpen = isNoBlockingModalOpen,
 }: UseWorkspaceControllerOptions) {
   const [interaction, dispatch] = useReducer(
     workspaceInteractionReducer,
@@ -425,6 +429,7 @@ export function useWorkspaceController({
   }, [dismissNonPersistentStageSidebar, lastSearchAreaRef]);
 
   useWorkspaceKeyboardLayers({
+    isBlockingModalOpen,
     stageSidebar,
     isSettingsOpen,
     stageSidebarRef,

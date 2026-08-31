@@ -82,6 +82,20 @@ describe("reading preference controller", () => {
     await waitFor(() => expect(unlisten).toHaveBeenCalledOnce());
   });
 
+  it("ignores native reading zoom while a blocking modal is open", async () => {
+    const { result } = renderHook(() =>
+      useReadingPreferences({ isBlockingModalOpen: () => true }),
+    );
+    await waitFor(() => expect(listen).toHaveBeenCalled());
+    const handler = vi.mocked(listen).mock.calls[0][1] as (event: {
+      payload: "in" | "out" | "reset";
+    }) => void;
+
+    act(() => handler({ payload: "in" }));
+    expect(result.current.readingZoom).toBe("100");
+    expect(localStorage.getItem(readingPreferenceStorageKeys.zoom)).toBeNull();
+  });
+
   it("keeps session state when preference storage fails", () => {
     const storageWrite = vi
       .spyOn(Storage.prototype, "setItem")

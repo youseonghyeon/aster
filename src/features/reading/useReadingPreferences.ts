@@ -26,7 +26,13 @@ import {
   type Theme,
 } from "./reading-preferences";
 
-export function useReadingPreferences() {
+const isNoBlockingModalOpen = () => false;
+
+export function useReadingPreferences({
+  isBlockingModalOpen = isNoBlockingModalOpen,
+}: {
+  isBlockingModalOpen?: () => boolean;
+} = {}) {
   const [theme, setTheme] = useState<Theme>(() =>
     loadReadingPreference(readingPreferenceStorageKeys.theme, themes, "paper"),
   );
@@ -107,6 +113,7 @@ export function useReadingPreferences() {
     let disposed = false;
     let stopListening: (() => void) | undefined;
     void listen<ReadingZoomCommand>("reading-zoom-requested", (event) => {
+      if (isBlockingModalOpen()) return;
       setReadingZoom((currentZoom) => {
         const updatedZoom =
           event.payload === "in"
@@ -134,7 +141,7 @@ export function useReadingPreferences() {
       disposed = true;
       stopListening?.();
     };
-  }, []);
+  }, [isBlockingModalOpen]);
 
   const readingZoomStyle = useMemo(
     () =>

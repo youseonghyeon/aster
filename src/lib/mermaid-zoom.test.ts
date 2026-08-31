@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateContainMermaidZoomPercent,
   calculateFitMermaidZoomPercent,
   captureScrollViewportCenter,
   getNextMermaidZoomPercent,
   getScrollOffsetsForViewportCenter,
+  getZoomedMermaidSvgMarkup,
   getZoomedMermaidSvgSize,
   parseMermaidSvgViewBox,
 } from "./mermaid-zoom";
@@ -30,6 +32,21 @@ describe("Mermaid zoom calculations", () => {
     expect(
       getZoomedMermaidSvgSize({ width: 920.2, height: 410.1 }, 110),
     ).toEqual({ width: 1013, height: 452 });
+  });
+
+  it("renders zoom dimensions into SVG markup as persistent state", () => {
+    const markup = getZoomedMermaidSvgMarkup(
+      '<svg viewBox="0 0 1000 600" width="100%" style="max-width: 1000px"><text>diagram</text></svg>',
+      110,
+    );
+    const container = document.createElement("div");
+    container.innerHTML = markup;
+    const svg = container.querySelector("svg");
+
+    expect(svg).not.toBeNull();
+    expect(svg).toHaveStyle({ width: "1100px", height: "660px" });
+    expect(svg).toHaveStyle({ maxWidth: "none" });
+    expect(svg).toHaveAttribute("focusable", "false");
   });
 
   it("fits once within the viewport including canvas padding", () => {
@@ -71,6 +88,57 @@ describe("Mermaid zoom calculations", () => {
         viewportWidth: 0,
         paddingLeft: 20,
         paddingRight: 20,
+      }),
+    ).toBeNull();
+  });
+
+  it("contains a diagram within both large-view dimensions", () => {
+    expect(
+      calculateContainMermaidZoomPercent({
+        baseWidth: 1000,
+        baseHeight: 800,
+        viewportWidth: 900,
+        viewportHeight: 500,
+        paddingLeft: 20,
+        paddingRight: 20,
+        paddingTop: 20,
+        paddingBottom: 20,
+      }),
+    ).toBe(57);
+    expect(
+      calculateContainMermaidZoomPercent({
+        baseWidth: 200,
+        baseHeight: 100,
+        viewportWidth: 900,
+        viewportHeight: 500,
+        paddingLeft: 20,
+        paddingRight: 20,
+        paddingTop: 20,
+        paddingBottom: 20,
+      }),
+    ).toBe(100);
+    expect(
+      calculateContainMermaidZoomPercent({
+        baseWidth: 8000,
+        baseHeight: 5000,
+        viewportWidth: 500,
+        viewportHeight: 300,
+        paddingLeft: 20,
+        paddingRight: 20,
+        paddingTop: 20,
+        paddingBottom: 20,
+      }),
+    ).toBe(25);
+    expect(
+      calculateContainMermaidZoomPercent({
+        baseWidth: 1000,
+        baseHeight: 800,
+        viewportWidth: 0,
+        viewportHeight: 500,
+        paddingLeft: 20,
+        paddingRight: 20,
+        paddingTop: 20,
+        paddingBottom: 20,
       }),
     ).toBeNull();
   });

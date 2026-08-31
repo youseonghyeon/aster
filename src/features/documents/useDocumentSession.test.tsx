@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { StrictMode, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -81,6 +82,7 @@ function deferred<T>() {
 
 describe("document session controller", () => {
   beforeEach(() => {
+    vi.mocked(listen).mockClear();
     vi.mocked(chooseMarkdownFilePath).mockReset();
     vi.mocked(chooseMarkdownSavePath).mockReset();
     vi.mocked(chooseLeaveDocumentDecision).mockReset();
@@ -95,6 +97,35 @@ describe("document session controller", () => {
     localStorage.clear();
     mockedExternalStatus.desktop = false;
     mockedExternalStatus.state = null;
+  });
+
+  it("ignores native open and save requests while a blocking modal is open", async () => {
+    const events = createAppEventChannel();
+    renderHook(() =>
+      useDocumentSession({ events, isBlockingModalOpen: () => true }),
+    );
+    await waitFor(() =>
+      expect(
+        vi.mocked(listen).mock.calls.some(
+          ([eventName]) => eventName === "open-markdown-requested",
+        ),
+      ).toBe(true),
+    );
+    const openHandler = vi.mocked(listen).mock.calls.find(
+      ([eventName]) => eventName === "open-markdown-requested",
+    )?.[1] as (() => void) | undefined;
+    const saveHandler = vi.mocked(listen).mock.calls.find(
+      ([eventName]) => eventName === "save-markdown-requested",
+    )?.[1] as (() => void) | undefined;
+
+    act(() => {
+      openHandler?.();
+      saveHandler?.();
+    });
+
+    expect(chooseMarkdownFilePath).not.toHaveBeenCalled();
+    expect(chooseMarkdownSavePath).not.toHaveBeenCalled();
+    expect(saveMarkdownFile).not.toHaveBeenCalled();
   });
 
   it("restores the last opened document once on desktop startup", async () => {

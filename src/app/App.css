@@ -2179,6 +2179,157 @@
   overflow: visible;
 }
 
+.markdown-body .mermaid-diagram-canvas.is-openable {
+  cursor: zoom-in;
+}
+
+.markdown-body .mermaid-diagram-canvas.is-openable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.markdown-body .mermaid-diagram-dialog {
+  width: min(1600px, calc(100vw - 32px));
+  height: calc(100vh - 32px);
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  color: var(--text-body);
+  background: var(--preview-background);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  box-shadow:
+    0 24px 80px rgba(13, 16, 15, 0.28),
+    0 4px 18px rgba(13, 16, 15, 0.18);
+  overflow: hidden;
+}
+
+.markdown-body .mermaid-diagram-dialog::backdrop {
+  background: rgba(20, 24, 22, 0.48);
+}
+
+.app-shell:is(
+    [data-theme="night"],
+    [data-theme="nord"],
+    [data-theme="dracula"],
+    [data-theme="gruvbox"]
+  )
+  .mermaid-diagram-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.markdown-body .mermaid-diagram-dialog[open] {
+  display: block;
+}
+
+.markdown-body .mermaid-diagram-dialog-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.markdown-body .mermaid-diagram-dialog-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px 10px 16px;
+  background: var(--control-background);
+  border-bottom: 1px solid var(--border);
+}
+
+.markdown-body .mermaid-diagram-dialog-header h2 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-heading);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.markdown-body
+  .mermaid-diagram-dialog-header
+  .mermaid-diagram-controls {
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.markdown-body .mermaid-diagram-dialog-close {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  color: var(--text-muted);
+  background: var(--preview-background);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.markdown-body .mermaid-diagram-dialog-close:hover {
+  color: var(--text-heading);
+  background: var(--inline-code-background);
+  border-color: var(--accent-soft);
+}
+
+.markdown-body .mermaid-diagram-dialog-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.markdown-body .mermaid-diagram-dialog-close svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.6;
+}
+
+.markdown-body .mermaid-diagram-dialog-scroll {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--preview-background);
+}
+
+.markdown-body .mermaid-diagram-dialog-scroll:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  outline: 0;
+}
+
+.markdown-body .mermaid-diagram-dialog-canvas {
+  display: grid;
+  width: max-content;
+  min-width: 100%;
+  min-height: 100%;
+  padding: clamp(40px, 6vw, 72px);
+  place-items: center;
+  cursor: grab;
+  user-select: none;
+}
+
+.markdown-body .mermaid-diagram-dialog-canvas.is-dragging {
+  cursor: grabbing;
+}
+
+.markdown-body .mermaid-diagram-dialog-canvas svg {
+  display: block;
+  overflow: visible;
+}
+
 .markdown-body .mermaid-diagram-status.is-loading {
   min-height: 7em;
   margin: 0;
@@ -2230,6 +2381,24 @@
 
   .markdown-body .mermaid-diagram-control-button.is-fit {
     min-width: max-content;
+  }
+
+  .markdown-body .mermaid-diagram-dialog-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .markdown-body
+    .mermaid-diagram-dialog-header
+    .mermaid-diagram-controls {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  .markdown-body .mermaid-diagram-dialog-close {
+    grid-column: 2;
+    grid-row: 1;
   }
 }
 

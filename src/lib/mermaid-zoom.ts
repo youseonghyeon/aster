@@ -53,6 +53,29 @@ export function getZoomedMermaidSvgSize(
   };
 }
 
+export function getZoomedMermaidSvgMarkup(
+  svgMarkup: string,
+  zoomPercent: number,
+) {
+  const svgDocument = new DOMParser().parseFromString(
+    svgMarkup,
+    "image/svg+xml",
+  );
+  const svg = svgDocument.querySelector<SVGSVGElement>("svg");
+  const baseSize = parseMermaidSvgViewBox(svg?.getAttribute("viewBox"));
+  if (!svg || !baseSize) return svgMarkup;
+
+  const size = getZoomedMermaidSvgSize(baseSize, zoomPercent);
+  const originalStyle = svg.getAttribute("style")?.trim();
+  const zoomStyle = `width: ${size.width}px; height: ${size.height}px; max-width: none;`;
+  svg.setAttribute(
+    "style",
+    originalStyle ? `${originalStyle}; ${zoomStyle}` : zoomStyle,
+  );
+  svg.setAttribute("focusable", "false");
+  return new XMLSerializer().serializeToString(svg);
+}
+
 export function getNextMermaidZoomPercent(
   current: number,
   direction: -1 | 1,
@@ -114,6 +137,17 @@ type FitMermaidZoomOptions = {
   paddingRight: number;
 };
 
+type ContainMermaidZoomOptions = {
+  baseWidth: number;
+  baseHeight: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  paddingLeft: number;
+  paddingRight: number;
+  paddingTop: number;
+  paddingBottom: number;
+};
+
 export function calculateFitMermaidZoomPercent({
   baseWidth,
   viewportWidth,
@@ -148,6 +182,63 @@ export function calculateFitMermaidZoomPercent({
     zoomPercent > minimumMermaidZoomPercent &&
     Math.ceil((baseWidth * zoomPercent) / 100) + horizontalPadding >
       viewportWidth
+  ) {
+    zoomPercent -= 1;
+  }
+
+  return zoomPercent;
+}
+
+export function calculateContainMermaidZoomPercent({
+  baseWidth,
+  baseHeight,
+  viewportWidth,
+  viewportHeight,
+  paddingLeft,
+  paddingRight,
+  paddingTop,
+  paddingBottom,
+}: ContainMermaidZoomOptions): number | null {
+  if (
+    !Number.isFinite(baseWidth) ||
+    !Number.isFinite(baseHeight) ||
+    !Number.isFinite(viewportWidth) ||
+    !Number.isFinite(viewportHeight) ||
+    baseWidth <= 0 ||
+    baseHeight <= 0 ||
+    viewportWidth <= 0 ||
+    viewportHeight <= 0
+  ) {
+    return null;
+  }
+
+  const horizontalPadding =
+    Math.max(0, Number.isFinite(paddingLeft) ? paddingLeft : 0) +
+    Math.max(0, Number.isFinite(paddingRight) ? paddingRight : 0);
+  const verticalPadding =
+    Math.max(0, Number.isFinite(paddingTop) ? paddingTop : 0) +
+    Math.max(0, Number.isFinite(paddingBottom) ? paddingBottom : 0);
+  const availableWidth = viewportWidth - horizontalPadding;
+  const availableHeight = viewportHeight - verticalPadding;
+
+  if (availableWidth <= 0 || availableHeight <= 0) {
+    return minimumMermaidZoomPercent;
+  }
+
+  let zoomPercent = clamp(
+    Math.floor(
+      Math.min(availableWidth / baseWidth, availableHeight / baseHeight) * 100,
+    ),
+    minimumMermaidZoomPercent,
+    100,
+  );
+
+  while (
+    zoomPercent > minimumMermaidZoomPercent &&
+    (Math.ceil((baseWidth * zoomPercent) / 100) + horizontalPadding >
+      viewportWidth ||
+      Math.ceil((baseHeight * zoomPercent) / 100) + verticalPadding >
+        viewportHeight)
   ) {
     zoomPercent -= 1;
   }
