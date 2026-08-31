@@ -8,6 +8,7 @@ import {
 } from "react";
 import type { FolderEntry } from "./folder-gateway";
 import type { FolderTreeState } from "./folder-tree-state";
+import { showFolderContextMenu } from "./folder-context-menu";
 
 export type VisibleFolderEntry = FolderEntry & { level: number };
 const folderTreePageSize = 300;
@@ -95,6 +96,8 @@ type FolderTreeProps = {
   onRetryDirectory: (directory: string) => void;
   onOpenMarkdown: (entry: FolderEntry) => void;
   onOpenImage: (entry: FolderEntry) => void;
+  onRemoveFile: (entry: FolderEntry) => void;
+  removingFilePath: string | null;
 };
 
 export function FolderTree({
@@ -106,6 +109,8 @@ export function FolderTree({
   onRetryDirectory,
   onOpenMarkdown,
   onOpenImage,
+  onRemoveFile,
+  removingFilePath,
 }: FolderTreeProps) {
   const allVisibleEntries = useMemo(
     () => flattenVisibleFolderEntries(state, maximumVisibleTreeEntries + 1),
@@ -265,10 +270,39 @@ export function FolderTree({
     }
   }
 
+  function openContextMenu(
+    entry: FolderEntry,
+    x: number,
+    y: number,
+  ) {
+    setActivePath(entry.relativePath);
+    onSelect(entry.relativePath);
+    void showFolderContextMenu({
+      entry,
+      x,
+      y,
+      canRemoveFile:
+        !isDocumentBusy && removingFilePath !== entry.relativePath,
+      onReload: () => window.location.reload(),
+      onRemoveFile: () => onRemoveFile(entry),
+    }).catch((error) => {
+      console.error("파일 문맥 메뉴를 열지 못했습니다.", error);
+    });
+  }
+
   function handleKeyDown(
     event: KeyboardEvent<HTMLElement>,
     entry: VisibleFolderEntry,
   ) {
+    if (
+      event.key === "ContextMenu" ||
+      (event.key === "F10" && event.shiftKey)
+    ) {
+      event.preventDefault();
+      const bounds = event.currentTarget.getBoundingClientRect();
+      openContextMenu(entry, bounds.left + 24, bounds.top + bounds.height);
+      return;
+    }
     const index = visibleEntries.findIndex(
       (candidate) => candidate.relativePath === entry.relativePath,
     );
@@ -393,6 +427,7 @@ export function FolderTree({
                 aria-expanded={isDirectory ? isExpanded : undefined}
                 aria-selected={isSelected}
                 aria-current={isCurrent ? "page" : undefined}
+                aria-haspopup="menu"
                 aria-label={`${entry.name}${isCurrent ? ", 현재 문서" : ""}${statusLabel}`}
                 title={
                   directory?.error
@@ -419,6 +454,11 @@ export function FolderTree({
                   }
                   event.preventDefault();
                   activateEntry(entry);
+                }}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  openContextMenu(entry, event.clientX, event.clientY);
                 }}
                 onKeyDown={(event) => handleKeyDown(event, entry)}
               >

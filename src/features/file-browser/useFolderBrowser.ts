@@ -8,9 +8,11 @@ import {
 import {
   chooseFolderPath,
   closeFolderRoot,
+  confirmFolderFileRemoval,
   listFolderChildren,
   openFolderImage,
   openFolderRoot,
+  removeFolderFile,
   type FolderEntry,
   type FolderRoot,
 } from "./folder-gateway";
@@ -59,6 +61,7 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
   );
   const [isPersistenceLimited, setPersistenceLimited] = useState(false);
   const [operationError, setOperationError] = useState<string | null>(null);
+  const [removingFilePath, setRemovingFilePath] = useState<string | null>(null);
   const [state, reducerDispatch] = useReducer(
     folderTreeReducer,
     undefined,
@@ -79,6 +82,7 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
     (priorityDirectory?: string) => Promise<void>
   >(async () => undefined);
   const scheduleNextRefreshRef = useRef<() => void>(() => undefined);
+  const removalFlightPathRef = useRef<string | null>(null);
 
   const clearScheduledRefresh = useCallback(() => {
     if (refreshTimerRef.current === null) return;
@@ -429,6 +433,55 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
     }
   }, []);
 
+  const removeFile = useCallback(
+    async (entry: FolderEntry) => {
+      const root = stateRef.current.root;
+      if (
+        !root ||
+        entry.kind === "directory" ||
+        removalFlightPathRef.current !== null
+      ) {
+        return;
+      }
+
+      const removalPath = entry.relativePath;
+      removalFlightPathRef.current = removalPath;
+      setRemovingFilePath(removalPath);
+      setOperationError(null);
+      try {
+        const approved = await confirmFolderFileRemoval(entry.name);
+        if (
+          !approved ||
+          !mountedRef.current ||
+          stateRef.current.root?.token !== root.token
+        ) {
+          return;
+        }
+
+        await removeFolderFile(root.token, removalPath);
+        const currentRoot = stateRef.current.root;
+        if (!mountedRef.current || currentRoot?.token !== root.token) return;
+        const separator = removalPath.lastIndexOf("/");
+        const parentDirectory =
+          separator < 0 ? "" : removalPath.slice(0, separator);
+        await loadDirectory(currentRoot, parentDirectory);
+      } catch (error) {
+        if (
+          mountedRef.current &&
+          stateRef.current.root?.token === root.token
+        ) {
+          setOperationError(errorMessage(error));
+        }
+      } finally {
+        if (removalFlightPathRef.current === removalPath) {
+          removalFlightPathRef.current = null;
+          if (mountedRef.current) setRemovingFilePath(null);
+        }
+      }
+    },
+    [loadDirectory],
+  );
+
   const setView = useCallback(
     (nextView: FolderBrowserView) => {
       setViewState(nextView);
@@ -452,6 +505,7 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
     sidebarWidth,
     isPersistenceLimited,
     operationError,
+    removingFilePath,
     actions: {
       chooseRoot,
       clearRoot,
@@ -460,6 +514,7 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
       selectEntry,
       retryDirectory,
       openImage,
+      removeFile,
       setView,
       setSidebarWidth,
     },

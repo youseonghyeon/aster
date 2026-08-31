@@ -245,6 +245,33 @@ impl FolderTreeState {
         document_io::read_markdown_file_from_disk(canonical.to_string_lossy().into_owned())
     }
 
+    pub(crate) fn remove_file(&self, root_token: u64, relative_path: String) -> Result<(), String> {
+        let session = self.current_session(root_token)?;
+        let relative = validate_relative_file(&relative_path)?;
+        if relative.components().any(|component| match component {
+            Component::Normal(name) => name.to_string_lossy().starts_with('.'),
+            _ => false,
+        }) {
+            return Err("숨김 파일은 폴더 탐색기에서 제거할 수 없습니다.".into());
+        }
+        let path = session.root.join(relative);
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|error| format!("파일 정보를 읽을 수 없습니다: {error}"))?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err("선택한 항목은 제거할 수 있는 파일이 아닙니다.".into());
+        }
+        if supported_file_kind(&path).is_none() {
+            return Err("지원하는 Markdown이나 이미지 파일만 제거할 수 있습니다.".into());
+        }
+        let canonical = path
+            .canonicalize()
+            .map_err(|error| format!("파일 경로를 확인할 수 없습니다: {error}"))?;
+        if canonical != path || !canonical.starts_with(&session.root) {
+            return Err("선택한 파일이 현재 폴더 안에 있지 않습니다.".into());
+        }
+        fs::remove_file(&canonical).map_err(|error| format!("파일을 제거할 수 없습니다: {error}"))
+    }
+
     fn current_session(&self, token: u64) -> Result<FolderSession, String> {
         let sessions = self
             .inner
@@ -403,6 +430,53 @@ mod tests {
     }
 
     #[test]
+    fn removes_only_supported_files_from_the_current_folder_session() {
+        let directory = TempDir::new().unwrap();
+        fs::create_dir(directory.path().join("guide")).unwrap();
+        let markdown = directory.path().join("guide/start.md");
+        let image = directory.path().join("cover.png");
+        fs::write(&markdown, "# Start").unwrap();
+        fs::write(&image, []).unwrap();
+        let (state, root) = open_test_root(&directory);
+
+        state
+            .remove_file(root.token, "guide/start.md".into())
+            .unwrap();
+        state.remove_file(root.token, "cover.png".into()).unwrap();
+
+        assert!(!markdown.exists());
+        assert!(!image.exists());
+        assert!(directory.path().join("guide").is_dir());
+    }
+
+    #[test]
+    fn refuses_directory_unsupported_outside_and_closed_session_removal() {
+        let directory = TempDir::new().unwrap();
+        fs::create_dir(directory.path().join("guide")).unwrap();
+        fs::write(directory.path().join("notes.txt"), "keep").unwrap();
+        fs::write(directory.path().join(".private.md"), "keep").unwrap();
+        fs::write(directory.path().join("keep.md"), "# Keep").unwrap();
+        let (state, root) = open_test_root(&directory);
+
+        assert!(state.remove_file(root.token, "guide".into()).is_err());
+        assert!(state.remove_file(root.token, "notes.txt".into()).is_err());
+        assert!(state.remove_file(root.token, ".private.md".into()).is_err());
+        assert!(state
+            .remove_file(root.token, "../outside.md".into())
+            .is_err());
+        assert!(state
+            .remove_file(root.token, "/tmp/outside.md".into())
+            .is_err());
+        state.close_folder(Some(root.token)).unwrap();
+        assert!(state.remove_file(root.token, "keep.md".into()).is_err());
+
+        assert!(directory.path().join("guide").is_dir());
+        assert!(directory.path().join("notes.txt").is_file());
+        assert!(directory.path().join(".private.md").is_file());
+        assert!(directory.path().join("keep.md").is_file());
+    }
+
+    #[test]
     fn rejects_escape_absolute_and_closed_session_paths() {
         let first = TempDir::new().unwrap();
         let second = TempDir::new().unwrap();
@@ -469,6 +543,18 @@ mod tests {
                 relative_path: "linked".into(),
             })
             .is_err());
+
+        let linked_file = directory.path().join("linked-file.md");
+        symlink(outside.path().join("outside.md"), &linked_file).unwrap();
+        assert!(state
+            .remove_file(root.token, "linked-file.md".into())
+            .is_err());
+        assert!(linked_file
+            .symlink_metadata()
+            .unwrap()
+            .file_type()
+            .is_symlink());
+        assert!(outside.path().join("outside.md").is_file());
 
         let markdown = directory.path().join("replaced.md");
         fs::write(&markdown, "# Before").unwrap();

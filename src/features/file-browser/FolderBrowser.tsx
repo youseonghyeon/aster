@@ -26,6 +26,8 @@ type FolderBrowserProps = {
   onRetryDirectory: (directory: string) => void;
   onOpenMarkdown: (rootPath: string, entry: FolderEntry) => void;
   onOpenImage: (entry: FolderEntry) => void;
+  onRemoveFile: (entry: FolderEntry) => void;
+  removingFilePath: string | null;
 };
 
 function CloseIcon() {
@@ -61,6 +63,8 @@ export function FolderBrowser({
   onRetryDirectory,
   onOpenMarkdown,
   onOpenImage,
+  onRemoveFile,
+  removingFilePath,
 }: FolderBrowserProps) {
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -276,6 +280,8 @@ export function FolderBrowser({
               state.root && onOpenMarkdown(state.root.path, entry)
             }
             onOpenImage={onOpenImage}
+            onRemoveFile={onRemoveFile}
+            removingFilePath={removingFilePath}
           />
         )}
         {rootListing?.status === "loading" &&

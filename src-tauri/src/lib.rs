@@ -99,6 +99,18 @@ async fn read_folder_markdown(
 }
 
 #[tauri::command]
+async fn remove_folder_file(
+    state: State<'_, FolderTreeState>,
+    root_token: u64,
+    relative_path: String,
+) -> Result<(), String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || state.remove_file(root_token, relative_path))
+        .await
+        .map_err(|error| format!("파일 제거 작업을 완료하지 못했습니다: {error}"))?
+}
+
+#[tauri::command]
 async fn resolve_relative_markdown_path(
     document_path: String,
     relative_path: String,
@@ -280,6 +292,7 @@ pub fn run() {
             close_folder,
             open_folder_image,
             read_folder_markdown,
+            remove_folder_file,
             resolve_relative_markdown_path,
             read_relative_image,
             watch_markdown_file,

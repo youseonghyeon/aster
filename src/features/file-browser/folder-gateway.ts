@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { confirm, open } from "@tauri-apps/plugin-dialog";
 
 export type FolderRoot = {
   token: number;
@@ -72,4 +72,23 @@ export function readFolderMarkdown(
     rootPath,
     relativePath,
   });
+}
+
+export function confirmFolderFileRemoval(fileName: string): Promise<boolean> {
+  return confirm(
+    `“${fileName}”을 디스크에서 제거합니다. 이 작업은 되돌릴 수 없습니다. 계속할까요?`,
+    {
+      title: "파일 제거",
+      kind: "warning",
+      okLabel: "파일 제거",
+      cancelLabel: "취소",
+    },
+  );
+}
+
+export function removeFolderFile(
+  rootToken: number,
+  relativePath: string,
+): Promise<void> {
+  return invoke<void>("remove_folder_file", { rootToken, relativePath });
 }

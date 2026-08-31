@@ -3,8 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   chooseFolderPath,
   closeFolderRoot,
+  confirmFolderFileRemoval,
   listFolderChildren,
   openFolderRoot,
+  removeFolderFile,
   type FolderListing,
 } from "./folder-gateway";
 import { folderBrowserStorageKey } from "./folder-preferences";
@@ -13,9 +15,11 @@ import { useFolderBrowser } from "./useFolderBrowser";
 vi.mock("./folder-gateway", () => ({
   chooseFolderPath: vi.fn(),
   closeFolderRoot: vi.fn(() => Promise.resolve()),
+  confirmFolderFileRemoval: vi.fn(),
   listFolderChildren: vi.fn(),
   openFolderImage: vi.fn(() => Promise.resolve()),
   openFolderRoot: vi.fn(),
+  removeFolderFile: vi.fn(() => Promise.resolve()),
 }));
 
 const root = { token: 7, path: "/docs", name: "docs" };
@@ -32,17 +36,32 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+function saveTestRoot() {
+  localStorage.setItem(
+    folderBrowserStorageKey,
+    JSON.stringify({
+      rootPath: "/docs",
+      expandedPaths: [],
+      view: "files",
+      sidebarWidth: 280,
+    }),
+  );
+}
+
 describe("useFolderBrowser", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.mocked(openFolderRoot).mockReset();
     vi.mocked(chooseFolderPath).mockReset();
     vi.mocked(closeFolderRoot).mockClear();
+    vi.mocked(confirmFolderFileRemoval).mockReset();
     vi.mocked(listFolderChildren).mockReset();
+    vi.mocked(removeFolderFile).mockClear();
     vi.mocked(openFolderRoot).mockResolvedValue(root);
     vi.mocked(listFolderChildren).mockImplementation((_, directory) =>
       Promise.resolve(listing(directory)),
     );
+    vi.mocked(confirmFolderFileRemoval).mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -114,6 +133,130 @@ describe("useFolderBrowser", () => {
     expect(result.current.sidebarWidth).toBe(420);
     expect(JSON.parse(localStorage.getItem(folderBrowserStorageKey) ?? "{}"))
       .toMatchObject({ sidebarWidth: 420 });
+  });
+
+  it("does not remove or refresh a file when the warning is cancelled", async () => {
+    saveTestRoot();
+    const { result } = renderHook(() => useFolderBrowser({ isActive: true }));
+    await waitFor(() => expect(result.current.state.root).toEqual(root));
+    vi.mocked(listFolderChildren).mockClear();
+
+    await act(async () => {
+      await result.current.actions.removeFile({
+        name: "guide.md",
+        relativePath: "guide.md",
+        path: "/docs/guide.md",
+        kind: "markdown",
+      });
+    });
+
+    expect(confirmFolderFileRemoval).toHaveBeenCalledWith("guide.md");
+    expect(removeFolderFile).not.toHaveBeenCalled();
+    expect(listFolderChildren).not.toHaveBeenCalled();
+  });
+
+  it("removes an approved file and refreshes only its parent directory first", async () => {
+    saveTestRoot();
+    vi.mocked(confirmFolderFileRemoval).mockResolvedValue(true);
+    const { result } = renderHook(() => useFolderBrowser({ isActive: true }));
+    await waitFor(() => expect(result.current.state.root).toEqual(root));
+    vi.mocked(listFolderChildren).mockClear();
+
+    await act(async () => {
+      await result.current.actions.removeFile({
+        name: "start.md",
+        relativePath: "guide/start.md",
+        path: "/docs/guide/start.md",
+        kind: "markdown",
+      });
+    });
+
+    expect(removeFolderFile).toHaveBeenCalledWith(7, "guide/start.md");
+    expect(listFolderChildren).toHaveBeenCalledWith(7, "guide");
+    expect(result.current.removingFilePath).toBeNull();
+    expect(result.current.operationError).toBeNull();
+  });
+
+  it("drops a removal approved after the folder root changes", async () => {
+    saveTestRoot();
+    const confirmation = deferred<boolean>();
+    vi.mocked(confirmFolderFileRemoval).mockReturnValue(confirmation.promise);
+    vi.mocked(chooseFolderPath).mockResolvedValue("/next");
+    vi.mocked(openFolderRoot)
+      .mockResolvedValueOnce(root)
+      .mockResolvedValueOnce({ token: 8, path: "/next", name: "next" });
+    const { result } = renderHook(() => useFolderBrowser({ isActive: true }));
+    await waitFor(() => expect(result.current.state.root).toEqual(root));
+
+    let removal!: Promise<void>;
+    act(() => {
+      removal = result.current.actions.removeFile({
+        name: "guide.md",
+        relativePath: "guide.md",
+        path: "/docs/guide.md",
+        kind: "markdown",
+      });
+    });
+    await act(async () => result.current.actions.chooseRoot());
+    confirmation.resolve(true);
+    await act(async () => removal);
+
+    expect(result.current.state.root?.token).toBe(8);
+    expect(removeFolderFile).not.toHaveBeenCalled();
+  });
+
+  it("blocks duplicate removal and drops approval after unmount", async () => {
+    saveTestRoot();
+    const confirmation = deferred<boolean>();
+    vi.mocked(confirmFolderFileRemoval).mockReturnValue(confirmation.promise);
+    const { result, unmount } = renderHook(() =>
+      useFolderBrowser({ isActive: true }),
+    );
+    await waitFor(() => expect(result.current.state.root).toEqual(root));
+
+    let first!: Promise<void>;
+    let duplicate!: Promise<void>;
+    act(() => {
+      first = result.current.actions.removeFile({
+        name: "guide.md",
+        relativePath: "guide.md",
+        path: "/docs/guide.md",
+        kind: "markdown",
+      });
+      duplicate = result.current.actions.removeFile({
+        name: "guide.md",
+        relativePath: "guide.md",
+        path: "/docs/guide.md",
+        kind: "markdown",
+      });
+    });
+    expect(confirmFolderFileRemoval).toHaveBeenCalledOnce();
+
+    unmount();
+    confirmation.resolve(true);
+    await Promise.all([first, duplicate]);
+
+    expect(removeFolderFile).not.toHaveBeenCalled();
+  });
+
+  it("keeps the cached tree and exposes an inline error when removal fails", async () => {
+    saveTestRoot();
+    vi.mocked(confirmFolderFileRemoval).mockResolvedValue(true);
+    vi.mocked(removeFolderFile).mockRejectedValue(new Error("권한이 없습니다"));
+    const { result } = renderHook(() => useFolderBrowser({ isActive: true }));
+    await waitFor(() => expect(result.current.state.root).toEqual(root));
+
+    await act(async () => {
+      await result.current.actions.removeFile({
+        name: "guide.md",
+        relativePath: "guide.md",
+        path: "/docs/guide.md",
+        kind: "markdown",
+      });
+    });
+
+    expect(result.current.operationError).toBe("권한이 없습니다");
+    expect(result.current.state.root).toEqual(root);
   });
 
   it("schedules one refresh after the adaptive delay and pauses when inactive", async () => {

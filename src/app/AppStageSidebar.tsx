@@ -45,6 +45,8 @@ export function AppStageSidebar({
           )
         }
         onOpenImage={(entry) => void folderBrowser.actions.openImage(entry)}
+        onRemoveFile={(entry) => void folderBrowser.actions.removeFile(entry)}
+        removingFilePath={folderBrowser.removingFilePath}
       />
     );
   }

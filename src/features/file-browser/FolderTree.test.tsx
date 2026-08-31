@@ -1,8 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FolderTree, flattenVisibleFolderEntries } from "./FolderTree";
+import { showFolderContextMenu } from "./folder-context-menu";
 import type { FolderTreeState } from "./folder-tree-state";
+
+vi.mock("./folder-context-menu", () => ({
+  showFolderContextMenu: vi.fn(() => Promise.resolve()),
+}));
 
 function treeState(): FolderTreeState {
   return {
@@ -67,12 +72,18 @@ function renderTree(state = treeState()) {
     onRetryDirectory: vi.fn(),
     onOpenMarkdown: vi.fn(),
     onOpenImage: vi.fn(),
+    onRemoveFile: vi.fn(),
+    removingFilePath: null,
   };
   render(<FolderTree {...props} />);
   return props;
 }
 
 describe("FolderTree", () => {
+  beforeEach(() => {
+    vi.mocked(showFolderContextMenu).mockClear();
+  });
+
   it("flattens only expanded directory branches", () => {
     expect(
       flattenVisibleFolderEntries(treeState()).map((entry) => [
@@ -186,6 +197,68 @@ describe("FolderTree", () => {
     expect(props.onOpenMarkdown).not.toHaveBeenCalled();
   });
 
+  it("opens the native context menu with file removal", () => {
+    const props = renderTree();
+    const readme = screen.getByRole("treeitem", {
+      name: "README.md, 현재 문서",
+    });
+
+    const contextMenuEvent = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 180,
+      clientY: 120,
+    });
+    expect(fireEvent(readme, contextMenuEvent)).toBe(false);
+    expect(contextMenuEvent.defaultPrevented).toBe(true);
+
+    expect(showFolderContextMenu).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entry: expect.objectContaining({ relativePath: "README.md" }),
+        x: 180,
+        y: 120,
+        canRemoveFile: true,
+      }),
+    );
+    const menuOptions = vi.mocked(showFolderContextMenu).mock.calls[0]?.[0];
+    menuOptions?.onRemoveFile();
+
+    expect(props.onRemoveFile).toHaveBeenCalledOnce();
+    expect(props.onRemoveFile).toHaveBeenCalledWith(
+      expect.objectContaining({ relativePath: "README.md" }),
+    );
+  });
+
+  it("keeps directory context requests native and non-removable", () => {
+    renderTree();
+
+    fireEvent.contextMenu(screen.getByRole("treeitem", { name: "guide" }));
+
+    expect(showFolderContextMenu).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entry: expect.objectContaining({
+          relativePath: "guide",
+          kind: "directory",
+        }),
+      }),
+    );
+  });
+
+  it("opens the native file menu from the keyboard without replacing tree focus", async () => {
+    const user = userEvent.setup();
+    renderTree();
+    const image = screen.getByRole("treeitem", { name: "cover.png" });
+    image.focus();
+
+    await user.keyboard("{Shift>}{F10}{/Shift}");
+    expect(showFolderContextMenu).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entry: expect.objectContaining({ relativePath: "cover.png" }),
+      }),
+    );
+    expect(image).toHaveFocus();
+  });
+
   it("retries an expanded directory after a child listing error", async () => {
     const state = treeState();
     state.directories.guide = {
@@ -267,6 +340,8 @@ describe("FolderTree", () => {
       onRetryDirectory: vi.fn(),
       onOpenMarkdown: vi.fn(),
       onOpenImage: vi.fn(),
+      onRemoveFile: vi.fn(),
+      removingFilePath: null,
     };
     render(<FolderTree {...props} />);
 
@@ -299,6 +374,8 @@ describe("FolderTree", () => {
       onRetryDirectory: vi.fn(),
       onOpenMarkdown: vi.fn(),
       onOpenImage: vi.fn(),
+      onRemoveFile: vi.fn(),
+      removingFilePath: null,
     };
     const { rerender } = render(<FolderTree {...props} />);
     const lastItem = await screen.findByRole("treeitem", {
@@ -316,7 +393,9 @@ describe("FolderTree", () => {
     };
     rerender(<FolderTree {...props} state={refreshedState} />);
 
-    expect(await screen.findByRole("treeitem", { name: "문서-299.md" })).toHaveFocus();
+    expect(
+      await screen.findByRole("treeitem", { name: "문서-299.md" }),
+    ).toHaveFocus();
     expect(screen.getAllByRole("treeitem")).toHaveLength(300);
     expect(props.onSelect).toHaveBeenLastCalledWith("문서-299.md");
   });

@@ -49,6 +49,8 @@ function browserProps(state: FolderTreeState) {
     onRetryDirectory: vi.fn(),
     onOpenMarkdown: vi.fn(),
     onOpenImage: vi.fn(),
+    onRemoveFile: vi.fn(),
+    removingFilePath: null,
   };
 }
 
