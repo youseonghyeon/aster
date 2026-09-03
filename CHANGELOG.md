@@ -5,11 +5,18 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-03
+
 ### Added
 
 - Markdown 안의 안전한 HTML 요소와 명시적 `id`·`name` 앵커를 미리보기 및 문서 이동 기록에서 지원
 - 읽기 글꼴에 고운바탕과 영문 글꼴 Literata, EB Garamond, Dancing Script를 추가하고 앱 번들에 포함
-- 파일 탐색기의 선택 배경을 항목의 계층 들여쓰기에 맞춰 표시
+
+### Changed
+
+- macOS 창에 통합 타이틀바를 적용하고 창 이동 영역, 신호등 위치와 도구 모음 여백을 조정
+- 문서 목차의 탐색 밀도와 현재 위치 표시, 저장 완료 상태와 작은 화면 사이드바 표현을 간결하게 정리
+- 파일 탐색기의 선택 배경을 계층 들여쓰기에 맞추고 한 번 클릭한 항목을 현재 문서보다 옅게 표시
 
 ### Security
 
@@ -143,4 +150,5 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 [1.3.0]: https://github.com/youseonghyeon/aster/compare/v1.2.0...v1.3.0
 [1.4.0]: https://github.com/youseonghyeon/aster/compare/v1.3.0...v1.4.0
 [1.5.0]: https://github.com/youseonghyeon/aster/compare/v1.4.0...v1.5.0
-[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.5.0...HEAD
+[1.6.0]: https://github.com/youseonghyeon/aster/compare/v1.5.0...v1.6.0
+[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.6.0...HEAD
