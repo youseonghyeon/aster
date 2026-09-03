@@ -10,7 +10,7 @@
   min-height: 0;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   color: var(--text);
-  background: color-mix(in srgb, var(--editor-background) 97%, transparent);
+  background: var(--editor-background);
   border-right: 1px solid var(--border-strong);
   box-shadow: 18px 0 44px rgba(23, 26, 24, 0.15);
 }
