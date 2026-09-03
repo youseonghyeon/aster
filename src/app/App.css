@@ -642,6 +642,15 @@ html[data-platform="macos"] .header-group-divider {
   content: "";
 }
 
+.document-save-status[data-status="saved"] {
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+.document-save-status[data-status="saved"]::before {
+  display: none;
+}
+
 .document-save-status[data-status="modified"]::before,
 .document-save-status[data-status="saving"]::before {
   background: var(--accent-strong);
