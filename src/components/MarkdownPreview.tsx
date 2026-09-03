@@ -9,8 +9,17 @@ import {
   type ReactNode,
 } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import type { PluggableList } from "unified";
 import { rehypeMarkdownHeadingAnchors } from "../lib/markdown-heading-anchors";
+import {
+  markdownHtmlIdAttribute,
+  markdownHtmlNameAttribute,
+  markdownHtmlSanitizeSchema,
+  rehypeMarkdownExplicitAnchors,
+} from "../lib/markdown-html";
 import { getMarkdownHeadingId } from "../lib/markdown-outline";
 import { rehypeMarkdownSourceOffsets } from "../lib/markdown-source-offsets";
 import type { MermaidCurvePreference } from "../lib/mermaid-curve";
@@ -22,7 +31,10 @@ import {
 import { SyntaxHighlightedCode } from "./SyntaxHighlightedCode";
 
 const markdownPlugins = [remarkGfm];
-const markdownRehypePlugins = [
+const markdownRehypePlugins: PluggableList = [
+  rehypeRaw,
+  [rehypeSanitize, markdownHtmlSanitizeSchema],
+  rehypeMarkdownExplicitAnchors,
   rehypeMarkdownSourceOffsets,
   rehypeMarkdownHeadingAnchors,
 ];
@@ -45,14 +57,21 @@ type MarkdownHeadingProps = HTMLAttributes<HTMLHeadingElement> & {
   };
 };
 
+type ExplicitAnchorProps = {
+  [markdownHtmlIdAttribute]?: string;
+  [markdownHtmlNameAttribute]?: string;
+};
+
 function createMarkdownHeading(
   tagName: "h1" | "h2" | "h3" | "h4" | "h5" | "h6",
 ) {
   return function MarkdownHeading({
     node,
+    id: _authoredId,
     ...headingProps
   }: MarkdownHeadingProps) {
     const id = getMarkdownHeadingId(node?.position?.start.offset);
+    void _authoredId;
 
     return createElement(tagName, {
       ...headingProps,
@@ -69,7 +88,7 @@ const MarkdownHeading4 = createMarkdownHeading("h4");
 const MarkdownHeading5 = createMarkdownHeading("h5");
 const MarkdownHeading6 = createMarkdownHeading("h6");
 
-type MarkdownLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+type MarkdownLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & ExplicitAnchorProps & {
   node?: unknown;
 };
 
@@ -82,11 +101,16 @@ const markdownComponents = {
   h6: MarkdownHeading6,
   a: function MarkdownLink({ node, href, onClick, ...linkProps }: MarkdownLinkProps) {
     const activateLink = useContext(MarkdownLinkContext);
+    const isExplicitAnchor = Boolean(
+      linkProps[markdownHtmlIdAttribute] ||
+        linkProps[markdownHtmlNameAttribute],
+    );
     void node;
     return (
       <a
         {...linkProps}
         href={href}
+        tabIndex={isExplicitAnchor && !href ? -1 : linkProps.tabIndex}
         onClick={(event) => {
           onClick?.(event);
           if (event.defaultPrevented || !href || event.button !== 0) return;

@@ -19,11 +19,17 @@ const scrollAnchorTags = new Set([
   "h6",
   "p",
   "blockquote",
+  "dd",
+  "details",
+  "div",
+  "dl",
+  "dt",
   "ul",
   "ol",
   "li",
   "pre",
   "table",
+  "section",
   "hr",
 ]);
 

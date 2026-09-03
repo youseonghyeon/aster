@@ -94,6 +94,50 @@ describe("preview search indexing", () => {
     preview.remove();
   });
 
+  it("indexes a closed details summary but not its hidden body", () => {
+    const preview = createPreview(`
+      <details>
+        <summary>보이는 요약</summary>
+        <p>숨겨진 본문</p>
+      </details>
+      <details open>
+        <summary>열린 요약</summary>
+        <p>보이는 본문</p>
+      </details>
+    `);
+
+    const index = createPreviewTextIndex(preview);
+    expect(index.text).toContain("보이는 요약");
+    expect(index.text).not.toContain("숨겨진 본문");
+    expect(index.text).toContain("열린 요약");
+    expect(index.text).toContain("보이는 본문");
+    preview.remove();
+  });
+
+  it("reindexes details content when the disclosure opens", async () => {
+    const preview = createPreview(`
+      <details>
+        <summary>요약</summary>
+        <p>펼쳐진 본문</p>
+      </details>
+    `);
+    const session = { ...searchSession, query: "펼쳐진 본문" };
+    const { result } = renderHook(() =>
+      usePreviewSearch(preview, "revision-1", session),
+    );
+    await waitFor(() => expect(result.current.matches).toHaveLength(0));
+
+    await act(async () => {
+      preview.querySelector("details")?.setAttribute("open", "");
+      await new Promise<void>((resolve) =>
+        window.requestAnimationFrame(() => resolve()),
+      );
+    });
+
+    await waitFor(() => expect(result.current.matches).toHaveLength(1));
+    preview.remove();
+  });
+
   it("reindexes an async SVG without moving the current search position", async () => {
     const preview = createPreview();
     preview.scrollTop = 143;

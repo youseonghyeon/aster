@@ -24,7 +24,11 @@ type PreviewTextIndex = {
 const blockElementNames = new Set([
   "ADDRESS",
   "BLOCKQUOTE",
+  "DD",
+  "DETAILS",
   "DIV",
+  "DL",
+  "DT",
   "H1",
   "H2",
   "H3",
@@ -34,6 +38,8 @@ const blockElementNames = new Set([
   "LI",
   "P",
   "PRE",
+  "SECTION",
+  "SUMMARY",
   "TABLE",
   "TD",
   "TH",
@@ -68,6 +74,20 @@ export function createPreviewTextIndex(
 
   const visibilityCache = new WeakMap<Element, boolean>();
   const isHiddenFromSearch = (element: Element | null) => {
+    let closedDetails =
+      element?.matches("details:not([open])")
+        ? element.parentElement?.closest("details:not([open])") ?? null
+        : element?.closest("details:not([open])") ?? null;
+    while (closedDetails) {
+      const summary = Array.from(closedDetails.children).find(
+        (child) => child.tagName === "SUMMARY",
+      );
+      if (!summary?.contains(element)) return true;
+      closedDetails = closedDetails.parentElement?.closest(
+        "details:not([open])",
+      ) ?? null;
+    }
+
     let current = element;
 
     while (current && current !== container) {
@@ -447,6 +467,15 @@ export function usePreviewSearch(
     };
     const handlePreviewLayoutChange = scheduleReindex;
     mutationObserver.observe(markdownBody, {
+      attributes: true,
+      attributeFilter: [
+        "aria-hidden",
+        "display",
+        "hidden",
+        "open",
+        "style",
+        "visibility",
+      ],
       childList: true,
       characterData: true,
       subtree: true,

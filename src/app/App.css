@@ -1920,6 +1920,11 @@
   word-break: keep-all;
 }
 
+.markdown-body::selection,
+.markdown-body *::selection {
+  background: var(--selection);
+}
+
 .markdown-body > :first-child {
   margin-top: 0;
 }
@@ -2018,6 +2023,41 @@
   margin-bottom: 0;
 }
 
+.markdown-body dl,
+.markdown-body details {
+  margin: 0 0 1.2em;
+}
+
+.markdown-body dt {
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+.markdown-body dd {
+  margin: 0.25em 0 0.8em 1.25em;
+}
+
+.markdown-body details {
+  padding: 0.7em 0.9em;
+  background: var(--control-background);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.markdown-body summary {
+  color: var(--text-strong);
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.markdown-body details[open] > summary {
+  margin-bottom: 0.7em;
+}
+
+.markdown-body details > :last-child {
+  margin-bottom: 0;
+}
+
 .markdown-body a {
   color: var(--link);
   text-decoration-color: var(--link-underline);
@@ -2038,6 +2078,22 @@
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.86em;
   word-break: break-word;
+}
+
+.markdown-body kbd {
+  padding: 0.12em 0.38em;
+  color: var(--text-strong);
+  background: var(--control-background);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  box-shadow: 0 1px 0 var(--border-strong);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82em;
+}
+
+.markdown-body sub,
+.markdown-body sup {
+  line-height: 0;
 }
 
 .markdown-body pre {

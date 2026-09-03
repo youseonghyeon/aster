@@ -23,6 +23,7 @@ import {
 import type { PaneContent } from "./workspace-types";
 import type { MermaidCurvePreference } from "../../lib/mermaid-curve";
 import type { RelativeImageResolver } from "../../components/RelativeMarkdownImage";
+import { usePreviewSelectionDismissal } from "./usePreviewSelectionDismissal";
 
 export type NoteSaveStatus = "saved" | "saving" | "error";
 
@@ -128,6 +129,7 @@ export function WorkspacePane({
     previewMarkdown,
     searchSession,
   );
+  const previewSelectionDismissal = usePreviewSelectionDismissal();
   const searchResult = isSourcePane ? sourceSearchResult : previewSearchResult;
   const sourceElementRef = useRef<HTMLTextAreaElement | null>(null);
   const previousSourceContextRef = useRef({
@@ -424,7 +426,14 @@ export function WorkspacePane({
           aria-label="미리보기 내용"
           tabIndex={0}
           onFocus={() => onSearchAreaActivate("preview")}
-          onPointerDown={() => onSearchAreaActivate("preview")}
+          onPointerDown={(event) => {
+            previewSelectionDismissal.onPointerDown(event);
+            onSearchAreaActivate("preview");
+          }}
+          onPointerMove={previewSelectionDismissal.onPointerMove}
+          onPointerUp={previewSelectionDismissal.onPointerUp}
+          onPointerCancel={previewSelectionDismissal.onPointerCancel}
+          onClick={previewSelectionDismissal.onClick}
         >
           <MarkdownPreview
             content={previewMarkdown}

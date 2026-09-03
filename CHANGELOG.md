@@ -5,6 +5,18 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 
 ## [Unreleased]
 
+### Added
+
+- Markdown 안의 안전한 HTML 요소와 명시적 `id`·`name` 앵커를 미리보기 및 문서 이동 기록에서 지원
+
+### Security
+
+- raw HTML을 allowlist로 정제해 script, inline style, iframe, event handler, unsafe URL scheme과 DOM clobbering을 차단
+
+### Fixed
+
+- 미리보기 목록을 드래그한 뒤 빈 곳을 눌러도 텍스트 선택 marker가 파란색으로 남던 문제
+
 ## [1.5.0] - 2026-08-31
 
 ### Added

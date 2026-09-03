@@ -84,6 +84,7 @@ const aster = {
 ### Markdown 표현
 
 - GitHub Flavored Markdown
+- 안전하게 정제된 HTML 문서 요소와 `id`·`name` 기반 문서 내 앵커
 - 표와 체크리스트
 - 인라인 코드와 코드 블록
 - 언어별 구문 강조

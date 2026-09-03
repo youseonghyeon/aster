@@ -7,7 +7,7 @@ import {
   classifyMarkdownLink,
   decodeRelativeAssetPath,
 } from "../lib/markdown-links";
-import { createMarkdownHeadingAnchor } from "../lib/markdown-heading-anchors";
+import { findMarkdownFragmentTarget } from "../lib/markdown-fragment-target";
 import { showMarkdownMessage } from "../features/documents/markdown-files";
 import {
   openExternalLink,
@@ -115,6 +115,14 @@ export function useLinkNavigationController({
     [captureCurrentScroll, commitHistory],
   );
 
+  const reportError = useCallback(async (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    await showMarkdownMessage(message, {
+      title: "링크를 열 수 없습니다",
+      kind: "error",
+    }).catch(() => console.error("링크를 열 수 없습니다:", message));
+  }, []);
+
   const restoreEntry = useCallback(
     (entry: NavigationEntry, preferSavedScroll: boolean) => {
       const restoreToken = ++restoreTokenRef.current;
@@ -139,33 +147,41 @@ export function useLinkNavigationController({
           return;
         }
 
-        const heading = Array.from(
-          element.querySelectorAll<HTMLElement>("[data-markdown-anchor]"),
-        ).find((candidate) => candidate.dataset.markdownAnchor === entry.anchor);
-        if (!heading) {
-          if (attempts++ < 24) window.requestAnimationFrame(restore);
+        const target = findMarkdownFragmentTarget(element, entry.anchor);
+        if (!target) {
+          if (attempts++ < 24) {
+            window.requestAnimationFrame(restore);
+            return;
+          }
+
+          const history = historyRef.current;
+          const currentEntry = history.entries[history.index];
+          if (currentEntry === entry) {
+            const entries = history.entries.slice();
+            entries[history.index] = {
+              ...currentEntry,
+              anchor: null,
+              scrollTop: 0,
+            };
+            historyRef.current = { entries, index: history.index };
+          }
+          setPreviewScrollTop(element, 0);
+          element.focus({ preventScroll: true });
+          void reportError(`문서에서 “${entry.anchor}” 앵커를 찾을 수 없습니다.`);
           return;
         }
         const top =
           element.scrollTop +
-          heading.getBoundingClientRect().top -
+          target.getBoundingClientRect().top -
           element.getBoundingClientRect().top -
           32;
         setPreviewScrollTop(element, Math.max(0, top));
-        heading.focus({ preventScroll: true });
+        target.focus({ preventScroll: true });
       };
       window.requestAnimationFrame(restore);
     },
-    [setPreviewScrollTop],
+    [reportError, setPreviewScrollTop],
   );
-
-  const reportError = useCallback(async (error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    await showMarkdownMessage(message, {
-      title: "링크를 열 수 없습니다",
-      kind: "error",
-    }).catch(() => console.error("링크를 열 수 없습니다:", message));
-  }, []);
 
   useEffect(() => {
     if (documentPath === observedPathRef.current) return;
@@ -251,20 +267,34 @@ export function useLinkNavigationController({
         return;
       }
       if (target.kind === "anchor") {
-        const anchor = target.anchor
-          ? createMarkdownHeadingAnchor(target.anchor) || null
-          : null;
+        const anchor = target.anchor;
         const path = documentPathRef.current;
         if (!path) {
           const element = previewElementRef.current;
           if (!anchor && element) setPreviewScrollTop(element, 0);
           else {
-            const heading = Array.from(
-              element?.querySelectorAll<HTMLElement>("[data-markdown-anchor]") ?? [],
-            ).find((candidate) => candidate.dataset.markdownAnchor === anchor);
-            heading?.scrollIntoView({ block: "start" });
-            heading?.focus({ preventScroll: true });
+            const fragmentTarget =
+              element && anchor
+                ? findMarkdownFragmentTarget(element, anchor)
+                : null;
+            if (anchor && !fragmentTarget) {
+              await reportError(
+                `문서에서 “${anchor}” 앵커를 찾을 수 없습니다.`,
+              );
+              return;
+            }
+            fragmentTarget?.scrollIntoView({ block: "start" });
+            fragmentTarget?.focus({ preventScroll: true });
           }
+          return;
+        }
+        const element = previewElementRef.current;
+        if (
+          anchor &&
+          element?.dataset.documentPath === path &&
+          !findMarkdownFragmentTarget(element, anchor)
+        ) {
+          await reportError(`문서에서 “${anchor}” 앵커를 찾을 수 없습니다.`);
           return;
         }
         const entry = { path, anchor, scrollTop: null };
@@ -282,10 +312,19 @@ export function useLinkNavigationController({
       isNavigatingRef.current = true;
       try {
         const resolvedPath = await resolveRelativeMarkdownPath(currentPath, target.path);
-        const anchor = target.anchor
-          ? createMarkdownHeadingAnchor(target.anchor) || null
-          : null;
+        const anchor = target.anchor;
         if (resolvedPath === currentPath) {
+          const element = previewElementRef.current;
+          if (
+            anchor &&
+            element?.dataset.documentPath === currentPath &&
+            !findMarkdownFragmentTarget(element, anchor)
+          ) {
+            await reportError(
+              `문서에서 “${anchor}” 앵커를 찾을 수 없습니다.`,
+            );
+            return;
+          }
           const entry = { path: currentPath, anchor, scrollTop: null };
           pushEntry(entry);
           restoreEntry(entry, false);
