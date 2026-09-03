@@ -33,7 +33,7 @@ describe("reading preference controller", () => {
 
     act(() => {
       result.current.selectTheme("paper");
-      result.current.selectReadingFont("system");
+      result.current.selectReadingFont("gowun-batang");
       result.current.selectLineSpacing("compact");
       result.current.selectMermaidCurve("orthogonal");
       result.current.toggleScrollSync();
@@ -43,7 +43,7 @@ describe("reading preference controller", () => {
       "paper",
     );
     expect(localStorage.getItem(readingPreferenceStorageKeys.font)).toBe(
-      "system",
+      "gowun-batang",
     );
     expect(
       localStorage.getItem(readingPreferenceStorageKeys.lineSpacing),

@@ -397,6 +397,14 @@ export function FolderTree({
             const siblingPosition = siblingPositionByPath.get(
               entry.relativePath,
             );
+            const visualIndent =
+              8 +
+              Math.min(
+                entry.level - 1,
+                maximumVisualIndentLevel - 1,
+              ) *
+                16;
+            const rowIndent = visualIndent + (isDirectory ? 0 : 20);
             const statusLabel =
               directory?.status === "loading"
                 ? ", 불러오는 중"
@@ -418,7 +426,8 @@ export function FolderTree({
                 role="treeitem"
                 className={`folder-tree-item is-${entry.kind}`}
                 style={{
-                  paddingInlineStart: `${8 + Math.min(entry.level - 1, maximumVisualIndentLevel - 1) * 16}px`,
+                  marginInlineStart: `${rowIndent}px`,
+                  minWidth: `calc(100% - ${rowIndent}px)`,
                 }}
                 tabIndex={activePath === entry.relativePath ? 0 : -1}
                 aria-level={entry.level}

@@ -98,6 +98,23 @@ describe("FolderTree", () => {
     ]);
   });
 
+  it("starts each row at its visual tree indentation", () => {
+    renderTree();
+
+    const rootItem = screen.getByRole("treeitem", { name: "guide" });
+    const nestedItem = screen.getByRole("treeitem", { name: "start.md" });
+    const rootFile = screen.getByRole("treeitem", {
+      name: "README.md, 현재 문서",
+    });
+
+    expect(rootItem.style.marginInlineStart).toBe("8px");
+    expect(rootItem.style.minWidth).toBe("calc(100% - 8px)");
+    expect(nestedItem.style.marginInlineStart).toBe("44px");
+    expect(nestedItem.style.minWidth).toBe("calc(100% - 44px)");
+    expect(rootFile.style.marginInlineStart).toBe("28px");
+    expect(rootFile.style.minWidth).toBe("calc(100% - 28px)");
+  });
+
   it("selects on one click and opens Markdown only on double click", async () => {
     const user = userEvent.setup();
     const props = renderTree();

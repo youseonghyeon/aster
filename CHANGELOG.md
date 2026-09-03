@@ -8,6 +8,8 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 ### Added
 
 - Markdown 안의 안전한 HTML 요소와 명시적 `id`·`name` 앵커를 미리보기 및 문서 이동 기록에서 지원
+- 읽기 글꼴에 고운바탕과 영문 글꼴 Literata, EB Garamond, Dancing Script를 추가하고 앱 번들에 포함
+- 파일 탐색기의 선택 배경을 항목의 계층 들여쓰기에 맞춰 표시
 
 ### Security
 

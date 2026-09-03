@@ -111,10 +111,33 @@
     "Noto Serif KR Variable", "Noto Serif KR", "AppleMyungjo", "Batang", serif;
 }
 
+.app-shell[data-font="gowun-batang"] {
+  --reading-font:
+    "Gowun Batang", "Noto Serif KR Variable", "AppleMyungjo", "Batang", serif;
+}
+
 .app-shell[data-font="system"] {
   --reading-font:
     -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI",
     "Noto Sans KR", "Malgun Gothic", sans-serif;
+}
+
+.app-shell[data-font="literata"] {
+  --reading-font:
+    "Literata Variable", "Noto Serif KR Variable", "AppleMyungjo", "Batang",
+    serif;
+}
+
+.app-shell[data-font="eb-garamond"] {
+  --reading-font:
+    "EB Garamond Variable", "Noto Serif KR Variable", "AppleMyungjo", "Batang",
+    serif;
+}
+
+.app-shell[data-font="dancing-script"] {
+  --reading-font:
+    "Dancing Script Variable", "Gowun Batang", "Noto Serif KR Variable",
+    "AppleMyungjo", "Batang", serif;
 }
 
 .app-shell[data-line-spacing="tight"] {
@@ -1140,9 +1163,25 @@ html[data-platform="macos"] .header-group-divider {
   font-family: "Noto Serif KR Variable", "Noto Serif KR", serif;
 }
 
+.font-select-option[data-font-option="gowun-batang"] {
+  font-family: "Gowun Batang", "Noto Serif KR Variable", serif;
+}
+
 .font-select-option[data-font-option="system"] {
   font-family:
     -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+}
+
+.font-select-option[data-font-option="literata"] {
+  font-family: "Literata Variable", "Noto Serif KR Variable", serif;
+}
+
+.font-select-option[data-font-option="eb-garamond"] {
+  font-family: "EB Garamond Variable", "Noto Serif KR Variable", serif;
+}
+
+.font-select-option[data-font-option="dancing-script"] {
+  font-family: "Dancing Script Variable", "Gowun Batang", serif;
 }
 
 .line-spacing-option[data-spacing="tight"] {

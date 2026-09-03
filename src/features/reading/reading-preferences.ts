@@ -17,8 +17,12 @@ export const themes = [
 export const readingFonts = [
   { value: "pretendard", label: "Pretendard" },
   { value: "noto-sans", label: "Noto Sans KR" },
+  { value: "gowun-batang", label: "고운바탕" },
   { value: "noto-serif", label: "Noto Serif KR" },
   { value: "system", label: "시스템 고딕" },
+  { value: "literata", label: "Literata" },
+  { value: "eb-garamond", label: "EB Garamond" },
+  { value: "dancing-script", label: "Dancing Script" },
 ] as const;
 
 export const lineSpacings = [

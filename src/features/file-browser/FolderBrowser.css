@@ -105,6 +105,15 @@
   user-select: none;
 }
 
+.folder-tree-item:not(.is-directory) {
+  grid-template-columns: 18px max-content auto;
+  padding-inline-start: 7px;
+}
+
+.folder-tree-item:not(.is-directory) .folder-tree-disclosure-placeholder {
+  display: none;
+}
+
 .folder-tree-item:hover {
   color: var(--text-strong);
   background: var(--table-row-hover);
@@ -112,7 +121,7 @@
 
 .folder-tree-item[aria-selected="true"] {
   color: var(--text-strong);
-  background: color-mix(in srgb, var(--selection) 72%, transparent);
+  background: color-mix(in srgb, var(--selection) 42%, transparent);
 }
 
 .folder-tree-item[aria-current="page"] {

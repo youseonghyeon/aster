@@ -26,12 +26,24 @@ describe("reading settings", () => {
 
     await user.click(screen.getByRole("button", { name: "야간" }));
     await user.click(screen.getByRole("button", { name: "글꼴" }));
-    await user.click(screen.getByRole("option", { name: "Noto Serif KR" }));
+    expect(
+      screen.getAllByRole("option").map((option) => option.textContent),
+    ).toEqual([
+      "Pretendard",
+      "Noto Sans KR",
+      "고운바탕",
+      "Noto Serif KR",
+      "시스템 고딕",
+      "Literata",
+      "EB Garamond",
+      "Dancing Script",
+    ]);
+    await user.click(screen.getByRole("option", { name: "Dancing Script" }));
     await user.click(screen.getByRole("button", { name: "여유 1.9" }));
     await user.click(screen.getByRole("button", { name: "직각" }));
 
     expect(onThemeChange).toHaveBeenCalledWith("night");
-    expect(onReadingFontChange).toHaveBeenCalledWith("noto-serif");
+    expect(onReadingFontChange).toHaveBeenCalledWith("dancing-script");
     expect(onLineSpacingChange).toHaveBeenCalledWith("relaxed");
     expect(onMermaidCurveChange).toHaveBeenCalledWith("orthogonal");
     rerender(

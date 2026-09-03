@@ -8,10 +8,22 @@ importers:
 
   .:
     dependencies:
+      '@fontsource-variable/dancing-script':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource-variable/eb-garamond':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource-variable/literata':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@fontsource-variable/noto-sans-kr':
         specifier: ^5.3.0
         version: 5.3.0
       '@fontsource-variable/noto-serif-kr':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/gowun-batang':
         specifier: ^5.3.0
         version: 5.3.0
       '@fontsource/pretendard':
@@ -414,11 +426,23 @@ packages:
       '@noble/hashes':
         optional: true
 
+  '@fontsource-variable/dancing-script@5.3.0':
+    resolution: {integrity: sha512-5Z/flvW1UPkznr0hzejY+Wq72GV3hmtJiDGw2hWMu7n6TmCTB6O2jsfySl7+xuMp6R6bWyuNrKjdpT0yt91sfw==}
+
+  '@fontsource-variable/eb-garamond@5.3.0':
+    resolution: {integrity: sha512-656OJsA9Vv24yhqRZFEzXnzS2AYgKdEILLgHJYLzzXndgcWFKfSXFqzbRI5/6Yk1Yt7UfWrUeppE5nRQPQMwlQ==}
+
+  '@fontsource-variable/literata@5.3.0':
+    resolution: {integrity: sha512-1Jw7xvOcoGyB83lxB2nG4bfNbqtX2/TTbdh9sHAOmU064SvmSdulDtA5RBu5JYWf64fdaKX7xU+z3GO1T2bCHA==}
+
   '@fontsource-variable/noto-sans-kr@5.3.0':
     resolution: {integrity: sha512-h863ZOIVMKjX0PSr0hLMUp/SjrwOul2yp0f5P61avqXdhqDABSkakzG2Ee07d3W8gVYgS9dMmxULdCkoN09f1A==}
 
   '@fontsource-variable/noto-serif-kr@5.3.0':
     resolution: {integrity: sha512-sy7jHCFyLRfo86KbolWCUDuWYroUvbUZqxQikjOv1F6+rOjS5PtGPS9MLB5MBCCB1gcKfBaZKzKCu3I0OqOqnw==}
+
+  '@fontsource/gowun-batang@5.3.0':
+    resolution: {integrity: sha512-wWDwzFKhKbk7l94OFQjZTH6x9PjqErCXBsXQ+h/SopIOosN2LjAN5W22Zua4unCmOIK2hc1fI6jNrB4OqYh6Qg==}
 
   '@fontsource/pretendard@5.3.0':
     resolution: {integrity: sha512-IDvI+QlHSFW9AkBX8cKXFi9nRJXdj7IQSGSqgemwFqII6EptpWQmWKcs3OfTZBT2yftzqt6VF6abQpUeAmHxMA==}
@@ -2211,9 +2235,17 @@ snapshots:
 
   '@exodus/bytes@1.15.1': {}
 
+  '@fontsource-variable/dancing-script@5.3.0': {}
+
+  '@fontsource-variable/eb-garamond@5.3.0': {}
+
+  '@fontsource-variable/literata@5.3.0': {}
+
   '@fontsource-variable/noto-sans-kr@5.3.0': {}
 
   '@fontsource-variable/noto-serif-kr@5.3.0': {}
+
+  '@fontsource/gowun-batang@5.3.0': {}
 
   '@fontsource/pretendard@5.3.0': {}
 
