@@ -1,6 +1,7 @@
 import {
   useCallback,
   useDeferredValue,
+  useEffect,
   useMemo,
   useReducer,
   useRef,
@@ -16,6 +17,11 @@ import {
   createWorkspaceInteractionState,
   workspaceInteractionReducer,
 } from "./workspace-interactions";
+import {
+  loadWorkspacePreferences,
+  saveWorkspacePreferences,
+  type WorkspacePreferences,
+} from "./workspace-preferences";
 import { useWorkspaceSearch } from "./useWorkspaceSearch";
 import { useWorkspaceEventBridge } from "./useWorkspaceEventBridge";
 import { useWorkspaceResponsive } from "./useWorkspaceResponsive";
@@ -45,12 +51,36 @@ export function useWorkspaceController({
   isScrollSyncEnabled,
   isBlockingModalOpen = isNoBlockingModalOpen,
 }: UseWorkspaceControllerOptions) {
+  const workspacePreferencesRef = useRef<WorkspacePreferences | null>(null);
+  if (workspacePreferencesRef.current === null) {
+    workspacePreferencesRef.current = loadWorkspacePreferences();
+  }
+  const restoredWorkspacePreferences = workspacePreferencesRef.current;
+  const persistWorkspacePreferences = useCallback(
+    (updates: Partial<WorkspacePreferences>) => {
+      const nextPreferences = {
+        ...workspacePreferencesRef.current,
+        ...updates,
+      } as WorkspacePreferences;
+      workspacePreferencesRef.current = nextPreferences;
+      saveWorkspacePreferences(nextPreferences);
+    },
+    [],
+  );
+  const persistSplitPercent = useCallback(
+    (splitPercent: number) => persistWorkspacePreferences({ splitPercent }),
+    [persistWorkspacePreferences],
+  );
   const [interaction, dispatch] = useReducer(
     workspaceInteractionReducer,
-    undefined,
-    () =>
+    {
+      isSidebarInset: window.matchMedia("(min-width: 1280px)").matches,
+      stageSidebar: restoredWorkspacePreferences.stageSidebar,
+    },
+    (initialState) =>
       createWorkspaceInteractionState(
-        window.matchMedia("(min-width: 1280px)").matches,
+        initialState.isSidebarInset,
+        initialState.stageSidebar,
       ),
   );
   const {
@@ -61,7 +91,9 @@ export function useWorkspaceController({
     isSettingsOpen,
     isPanelLayoutMenuOpen,
   } = interaction;
-  const [leftPane, setLeftPane] = useState<PaneKind>("editor");
+  const [leftPane, setLeftPane] = useState<PaneKind>(
+    restoredWorkspacePreferences.leftPane,
+  );
   const [previewScrollElement, setPreviewScrollElement] =
     useState<HTMLDivElement | null>(null);
   const [editorScrollElement, setEditorScrollElement] =
@@ -111,7 +143,18 @@ export function useWorkspaceController({
     dividerRef,
     splitGuideRef,
     isPreviewFocusMode,
+    initialSplitPercent: restoredWorkspacePreferences.splitPercent,
+    onSplitChange: persistSplitPercent,
   });
+
+  const didRestoreStageSidebarRef = useRef(false);
+  useEffect(() => {
+    if (!didRestoreStageSidebarRef.current) {
+      didRestoreStageSidebarRef.current = true;
+      return;
+    }
+    persistWorkspacePreferences({ stageSidebar });
+  }, [persistWorkspacePreferences, stageSidebar]);
   const {
     searchSessions,
     searchSessionsRef,
@@ -351,9 +394,11 @@ export function useWorkspaceController({
 
   const swapPanes = useCallback(() => {
     captureCurrentSourceScroll();
-    setLeftPane((currentPane) => oppositePane[currentPane]);
+    const nextLeftPane = oppositePane[leftPane];
+    setLeftPane(nextLeftPane);
+    persistWorkspacePreferences({ leftPane: nextLeftPane });
     swapSplit();
-  }, [swapSplit]);
+  }, [leftPane, persistWorkspacePreferences, swapSplit]);
 
   const handleOutlineClose = useCallback(() => {
     stageSidebarRef.current = null;

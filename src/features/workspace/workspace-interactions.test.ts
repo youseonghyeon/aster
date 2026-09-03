@@ -6,6 +6,15 @@ import {
 } from "./workspace-interactions";
 
 describe("workspace interaction transitions", () => {
+  it("restores the saved stage sidebar into the initial state", () => {
+    expect(createWorkspaceInteractionState(true, "files").stageSidebar).toBe(
+      "files",
+    );
+    expect(
+      createWorkspaceInteractionState(false, "outline").stageSidebar,
+    ).toBe("outline");
+  });
+
   it("keeps an inset sidebar when settings toggle", () => {
     let state = createWorkspaceInteractionState(true);
     state = workspaceInteractionReducer(state, {

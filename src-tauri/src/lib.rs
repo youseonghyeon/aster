@@ -4,6 +4,7 @@ mod file_watch;
 mod folder_tree;
 mod linked_resources;
 mod recovery;
+mod window_geometry;
 
 use close_guard::{CloseGuardState, ResolveCloseRequest};
 use document_io::{MarkdownDocument, MarkdownFileStatus, SaveMarkdownRequest, SaveMarkdownResult};
@@ -226,6 +227,12 @@ pub fn run() {
         .manage(CloseGuardState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window_geometry::restore(&window);
+            }
+            Ok(())
+        })
         .menu(|app| {
             let menu = Menu::default(app)?;
             let open_item = MenuItemBuilder::with_id("open_markdown", "Open…")
@@ -282,7 +289,10 @@ pub fn run() {
             }
             _ => {}
         })
-        .on_window_event(close_guard::handle_window_event)
+        .on_window_event(|window, event| {
+            window_geometry::handle_window_event(window, event);
+            close_guard::handle_window_event(window, event);
+        })
         .invoke_handler(tauri::generate_handler![
             read_markdown_file,
             get_markdown_file_status,

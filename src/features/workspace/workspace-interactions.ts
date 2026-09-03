@@ -24,9 +24,10 @@ export type WorkspaceInteractionAction =
 
 export function createWorkspaceInteractionState(
   isSidebarInset: boolean,
+  stageSidebar: StageSidebar = null,
 ): WorkspaceInteractionState {
   return {
-    stageSidebar: null,
+    stageSidebar,
     isPreviewFocusMode: false,
     isSidebarInset,
     isNotesOpen: false,
