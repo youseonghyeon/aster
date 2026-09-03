@@ -32,6 +32,18 @@ function renderHeader(options: Partial<AppHeaderProps>) {
 }
 
 describe("AppHeader document status", () => {
+  it("marks non-interactive title bar surfaces as native drag regions", () => {
+    renderHeader({});
+
+    expect(screen.getByRole("banner")).toHaveAttribute("data-tauri-drag-region");
+    expect(screen.getByText("guide.md")).toHaveAttribute("data-tauri-drag-region");
+    expect(screen.getByRole("status")).toHaveAttribute("data-tauri-drag-region");
+
+    for (const button of screen.getAllByRole("button")) {
+      expect(button).not.toHaveAttribute("data-tauri-drag-region");
+    }
+  });
+
   it.each([
     [{ saveStatus: "saved" as const }, "저장됨"],
     [{ documentPath: null, saveStatus: "saved" as const }, "새 문서"],

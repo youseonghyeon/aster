@@ -125,8 +125,8 @@ export function AppHeader({
               : "새 문서";
 
   return (
-    <header className="app-header">
-      <div className="header-leading">
+    <header className="app-header" data-tauri-drag-region="">
+      <div className="header-leading" data-tauri-drag-region="">
         <div className="brand" aria-label="Aster 마크다운 뷰어">
           <span className="brand-mark" aria-hidden="true">
             <AsterBrandIcon />
@@ -199,11 +199,18 @@ export function AppHeader({
           </button>
         </nav>
       </div>
-      <div className="document-identity" title={documentPath ?? documentName}>
-        <span className="document-name">{documentName}</span>
+      <div
+        className="document-identity"
+        title={documentPath ?? documentName}
+        data-tauri-drag-region=""
+      >
+        <span className="document-name" data-tauri-drag-region="">
+          {documentName}
+        </span>
         <span
           className="document-save-status"
           data-status={saveStatus}
+          data-tauri-drag-region=""
           role="status"
           aria-live="polite"
         >

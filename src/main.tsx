@@ -6,6 +6,10 @@ import "@fontsource-variable/noto-sans-kr";
 import "@fontsource-variable/noto-serif-kr";
 import App from "./app/App";
 
+if (/Macintosh|Mac OS X/u.test(navigator.userAgent)) {
+  document.documentElement.dataset.platform = "macos";
+}
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <App />
