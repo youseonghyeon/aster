@@ -50,7 +50,7 @@ export function AppWorkspace({
       data-theme={reading.theme}
       data-font={reading.readingFont}
       data-line-spacing={reading.lineSpacing}
-      style={reading.readingZoomStyle}
+      style={reading.readingStyle}
     >
       <AppHeader
         documentName={documents.document.name}
@@ -79,10 +79,12 @@ export function AppWorkspace({
           <ReadingSettings
             theme={reading.theme}
             readingFont={reading.readingFont}
+            readingFontSize={reading.readingFontSize}
             lineSpacing={reading.lineSpacing}
             mermaidCurve={reading.mermaidCurve}
             onThemeChange={reading.selectTheme}
             onReadingFontChange={reading.selectReadingFont}
+            onReadingFontSizeChange={reading.selectReadingFontSize}
             onLineSpacingChange={reading.selectLineSpacing}
             onMermaidCurveChange={reading.selectMermaidCurve}
           />
@@ -129,7 +131,7 @@ export function AppWorkspace({
             noteSaveStatus={documents.note.saveStatus}
             previewMarkdown={state.previewMarkdown}
             previewDocumentPath={state.previewDocumentPath}
-            previewAppearanceKey={`${reading.theme}:${reading.readingFont}:${reading.readingZoom}`}
+            previewAppearanceKey={`${reading.theme}:${reading.readingFont}:${reading.readingFontSize}:${reading.readingZoom}`}
             mermaidCurve={reading.mermaidCurve}
             isPreviewUpdating={state.isPreviewUpdating}
             isPreviewFocusMode={state.isPreviewFocusMode}
@@ -178,7 +180,7 @@ export function AppWorkspace({
             noteSaveStatus={documents.note.saveStatus}
             previewMarkdown={state.previewMarkdown}
             previewDocumentPath={state.previewDocumentPath}
-            previewAppearanceKey={`${reading.theme}:${reading.readingFont}:${reading.readingZoom}`}
+            previewAppearanceKey={`${reading.theme}:${reading.readingFont}:${reading.readingFontSize}:${reading.readingZoom}`}
             mermaidCurve={reading.mermaidCurve}
             isPreviewUpdating={state.isPreviewUpdating}
             isPreviewFocusMode={state.isPreviewFocusMode}

@@ -11,6 +11,7 @@ import {
   lineSpacings,
   loadReadingPreference,
   readingFonts,
+  readingFontSizes,
   mermaidCurveOptions,
   readingPreferenceStorageKeys,
   readingZoomLevels,
@@ -20,6 +21,7 @@ import {
   type LineSpacing,
   type MermaidCurvePreference,
   type ReadingFont,
+  type ReadingFontSize,
   type ReadingZoom,
   type ReadingZoomCommand,
   type ScrollSyncPreference,
@@ -41,6 +43,13 @@ export function useReadingPreferences({
       readingPreferenceStorageKeys.font,
       readingFonts,
       "pretendard",
+    ),
+  );
+  const [readingFontSize, setReadingFontSize] = useState<ReadingFontSize>(() =>
+    loadReadingPreference(
+      readingPreferenceStorageKeys.fontSize,
+      readingFontSizes,
+      "17",
     ),
   );
   const [lineSpacing, setLineSpacing] = useState<LineSpacing>(() =>
@@ -80,6 +89,10 @@ export function useReadingPreferences({
   const selectReadingFont = useCallback((nextFont: ReadingFont) => {
     setReadingFont(nextFont);
     saveReadingPreference(readingPreferenceStorageKeys.font, nextFont);
+  }, []);
+  const selectReadingFontSize = useCallback((nextSize: ReadingFontSize) => {
+    setReadingFontSize(nextSize);
+    saveReadingPreference(readingPreferenceStorageKeys.fontSize, nextSize);
   }, []);
   const selectLineSpacing = useCallback((nextSpacing: LineSpacing) => {
     setLineSpacing(nextSpacing);
@@ -143,24 +156,28 @@ export function useReadingPreferences({
     };
   }, [isBlockingModalOpen]);
 
-  const readingZoomStyle = useMemo(
-    () =>
-      ({
-        "--reading-font-size": `${(17 * Number(readingZoom)) / 100}px`,
-      }) as CSSProperties,
-    [readingZoom],
-  );
+  const readingStyle = useMemo(() => {
+    const zoomPercent = Number(readingZoom);
+    return {
+      "--reading-font-size": `${(Number(readingFontSize) * zoomPercent) / 100}px`,
+      "--reading-content-width": `${(800 * zoomPercent) / 100}px`,
+      "--reading-padding-top": `${(42 * zoomPercent) / 100}px`,
+      "--reading-padding-bottom": `${(100 * zoomPercent) / 100}px`,
+    } as CSSProperties;
+  }, [readingFontSize, readingZoom]);
 
   return {
     theme,
     readingFont,
+    readingFontSize,
     lineSpacing,
     mermaidCurve,
     readingZoom,
-    readingZoomStyle,
+    readingStyle,
     isScrollSyncEnabled: scrollSyncPreference === "on",
     selectTheme,
     selectReadingFont,
+    selectReadingFontSize,
     selectLineSpacing,
     selectMermaidCurve,
     toggleScrollSync,

@@ -20,6 +20,18 @@ function cssRule(selector: string) {
 }
 
 describe("reading settings visual hierarchy", () => {
+  it("keeps reading measure and outer padding independent from font size", () => {
+    const markdownBody = cssRule(".markdown-body");
+
+    expect(markdownBody).toMatch(
+      /width:\s*min\(calc\(100% - 64px\), var\(--reading-content-width\)\)/,
+    );
+    expect(markdownBody).toMatch(
+      /padding:\s*var\(--reading-padding-top\) 0 var\(--reading-padding-bottom\)/,
+    );
+    expect(markdownBody).not.toMatch(/width:[^;]*em|padding:[^;]*em/);
+  });
+
   it("places a stable tooltip immediately beside the diagram help icon", () => {
     const popover = cssRule(".settings-popover");
     const help = cssRule(".mermaid-curve-help");

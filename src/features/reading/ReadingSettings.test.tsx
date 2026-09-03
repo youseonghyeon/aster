@@ -4,10 +4,11 @@ import { describe, expect, it, vi } from "vitest";
 import { ReadingSettings } from "./ReadingSettings";
 
 describe("reading settings", () => {
-  it("reports theme, font, and line spacing selections", async () => {
+  it("reports theme, font, font size, and line spacing selections", async () => {
     const user = userEvent.setup();
     const onThemeChange = vi.fn();
     const onReadingFontChange = vi.fn();
+    const onReadingFontSizeChange = vi.fn();
     const onLineSpacingChange = vi.fn();
     const onMermaidCurveChange = vi.fn();
 
@@ -15,10 +16,12 @@ describe("reading settings", () => {
       <ReadingSettings
         theme="paper"
         readingFont="pretendard"
+        readingFontSize="17"
         lineSpacing="balanced"
         mermaidCurve="curved"
         onThemeChange={onThemeChange}
         onReadingFontChange={onReadingFontChange}
+        onReadingFontSizeChange={onReadingFontSizeChange}
         onLineSpacingChange={onLineSpacingChange}
         onMermaidCurveChange={onMermaidCurveChange}
       />,
@@ -39,21 +42,25 @@ describe("reading settings", () => {
       "Dancing Script",
     ]);
     await user.click(screen.getByRole("option", { name: "Dancing Script" }));
+    await user.click(screen.getByRole("button", { name: "아주 크게 21px" }));
     await user.click(screen.getByRole("button", { name: "여유 1.9" }));
     await user.click(screen.getByRole("button", { name: "직각" }));
 
     expect(onThemeChange).toHaveBeenCalledWith("night");
     expect(onReadingFontChange).toHaveBeenCalledWith("dancing-script");
+    expect(onReadingFontSizeChange).toHaveBeenCalledWith("21");
     expect(onLineSpacingChange).toHaveBeenCalledWith("relaxed");
     expect(onMermaidCurveChange).toHaveBeenCalledWith("orthogonal");
     rerender(
       <ReadingSettings
         theme="paper"
         readingFont="pretendard"
+        readingFontSize="21"
         lineSpacing="balanced"
         mermaidCurve="orthogonal"
         onThemeChange={onThemeChange}
         onReadingFontChange={onReadingFontChange}
+        onReadingFontSizeChange={onReadingFontSizeChange}
         onLineSpacingChange={onLineSpacingChange}
         onMermaidCurveChange={onMermaidCurveChange}
       />,
@@ -71,6 +78,9 @@ describe("reading settings", () => {
       "aria-pressed",
       "false",
     );
+    expect(
+      screen.getByRole("button", { name: "아주 크게 21px" }),
+    ).toHaveAttribute("aria-pressed", "true");
 
     const straightButton = screen.getByRole("button", { name: "직선" });
     straightButton.focus();
@@ -90,10 +100,12 @@ describe("reading settings", () => {
       <ReadingSettings
         theme="paper"
         readingFont="pretendard"
+        readingFontSize="17"
         lineSpacing="balanced"
         mermaidCurve="curved"
         onThemeChange={vi.fn()}
         onReadingFontChange={vi.fn()}
+        onReadingFontSizeChange={vi.fn()}
         onLineSpacingChange={vi.fn()}
         onMermaidCurveChange={vi.fn()}
       />,

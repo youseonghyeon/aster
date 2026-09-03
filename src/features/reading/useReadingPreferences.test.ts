@@ -18,6 +18,7 @@ describe("reading preference controller", () => {
   it("loads and saves the existing v1 primitive values", () => {
     localStorage.setItem(readingPreferenceStorageKeys.theme, "night");
     localStorage.setItem(readingPreferenceStorageKeys.font, "noto-serif");
+    localStorage.setItem(readingPreferenceStorageKeys.fontSize, "19");
     localStorage.setItem(readingPreferenceStorageKeys.lineSpacing, "relaxed");
     localStorage.setItem(readingPreferenceStorageKeys.mermaidCurve, "straight");
     localStorage.setItem(readingPreferenceStorageKeys.scrollSync, "on");
@@ -26,6 +27,7 @@ describe("reading preference controller", () => {
     expect(result.current).toMatchObject({
       theme: "night",
       readingFont: "noto-serif",
+      readingFontSize: "19",
       lineSpacing: "relaxed",
       mermaidCurve: "straight",
       isScrollSyncEnabled: true,
@@ -34,6 +36,7 @@ describe("reading preference controller", () => {
     act(() => {
       result.current.selectTheme("paper");
       result.current.selectReadingFont("gowun-batang");
+      result.current.selectReadingFontSize("21");
       result.current.selectLineSpacing("compact");
       result.current.selectMermaidCurve("orthogonal");
       result.current.toggleScrollSync();
@@ -44,6 +47,9 @@ describe("reading preference controller", () => {
     );
     expect(localStorage.getItem(readingPreferenceStorageKeys.font)).toBe(
       "gowun-batang",
+    );
+    expect(localStorage.getItem(readingPreferenceStorageKeys.fontSize)).toBe(
+      "21",
     );
     expect(
       localStorage.getItem(readingPreferenceStorageKeys.lineSpacing),
@@ -80,6 +86,37 @@ describe("reading preference controller", () => {
 
     unmount();
     await waitFor(() => expect(unlisten).toHaveBeenCalledOnce());
+  });
+
+  it("changes only the font size until a native zoom command is used", async () => {
+    const { result } = renderHook(() => useReadingPreferences());
+    await waitFor(() => expect(listen).toHaveBeenCalled());
+    const handler = vi.mocked(listen).mock.calls[0][1] as (event: {
+      payload: "in" | "out" | "reset";
+    }) => void;
+
+    expect(result.current.readingStyle).toEqual({
+      "--reading-font-size": "17px",
+      "--reading-content-width": "800px",
+      "--reading-padding-top": "42px",
+      "--reading-padding-bottom": "100px",
+    });
+
+    act(() => result.current.selectReadingFontSize("21"));
+    expect(result.current.readingStyle).toEqual({
+      "--reading-font-size": "21px",
+      "--reading-content-width": "800px",
+      "--reading-padding-top": "42px",
+      "--reading-padding-bottom": "100px",
+    });
+
+    act(() => handler({ payload: "in" }));
+    expect(result.current.readingStyle).toEqual({
+      "--reading-font-size": "23.1px",
+      "--reading-content-width": "880px",
+      "--reading-padding-top": "46.2px",
+      "--reading-padding-bottom": "110px",
+    });
   });
 
   it("ignores native reading zoom while a blocking modal is open", async () => {

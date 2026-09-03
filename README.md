@@ -23,6 +23,7 @@ macOS에서는 DMG를 열고 Aster를 Applications 폴더로 드래그하면 됩
 | --- | --- |
 | 테마 | 밝게, 종이, Solarized, 세피아, Nord, Dracula, Gruvbox, 야간 |
 | 글꼴 | Pretendard, Noto Sans KR, 고운바탕, Noto Serif KR, 시스템 고딕, Literata, EB Garamond, Dancing Script |
+| 본문 크기 | 15px, 17px, 19px, 21px |
 | 행간 | 1.4, 1.5, 1.72, 1.9 |
 | 다이어그램 선 | 곡선, 직선, 직각 |
 | 확대 | 80%부터 150%까지 단계 조절 |

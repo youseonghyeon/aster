@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   getSteppedReadingZoom,
   loadReadingPreference,
+  readingFontSizes,
   readingPreferenceStorageKeys,
   mermaidCurveOptions,
   themes,
@@ -43,6 +44,26 @@ describe("reading preference policies", () => {
       ),
     ).toBe("paper");
     storageRead.mockRestore();
+  });
+
+  it("accepts only supported font sizes", () => {
+    localStorage.setItem(readingPreferenceStorageKeys.fontSize, "19");
+    expect(
+      loadReadingPreference(
+        readingPreferenceStorageKeys.fontSize,
+        readingFontSizes,
+        "17",
+      ),
+    ).toBe("19");
+
+    localStorage.setItem(readingPreferenceStorageKeys.fontSize, "18");
+    expect(
+      loadReadingPreference(
+        readingPreferenceStorageKeys.fontSize,
+        readingFontSizes,
+        "17",
+      ),
+    ).toBe("17");
   });
 
   it("clamps zoom steps at both boundaries", () => {

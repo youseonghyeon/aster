@@ -40,7 +40,7 @@ function App() {
         data-theme={reading.theme}
         data-font={reading.readingFont}
         data-line-spacing={reading.lineSpacing}
-        style={reading.readingZoomStyle}
+        style={reading.readingStyle}
       >
         <main
           className="startup-document-state"

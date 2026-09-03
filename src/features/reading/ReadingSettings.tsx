@@ -8,20 +8,24 @@ import {
   lineSpacings,
   mermaidCurveOptions,
   readingFonts,
+  readingFontSizes,
   themes,
   type LineSpacing,
   type MermaidCurvePreference,
   type ReadingFont,
+  type ReadingFontSize,
   type Theme,
 } from "./reading-preferences";
 
 type ReadingSettingsProps = {
   theme: Theme;
   readingFont: ReadingFont;
+  readingFontSize: ReadingFontSize;
   lineSpacing: LineSpacing;
   mermaidCurve: MermaidCurvePreference;
   onThemeChange: (theme: Theme) => void;
   onReadingFontChange: (font: ReadingFont) => void;
+  onReadingFontSizeChange: (size: ReadingFontSize) => void;
   onLineSpacingChange: (spacing: LineSpacing) => void;
   onMermaidCurveChange: (curve: MermaidCurvePreference) => void;
 };
@@ -32,6 +36,14 @@ function LineSpacingGlyph() {
       <span />
       <span />
       <span />
+    </span>
+  );
+}
+
+function FontSizeGlyph({ size }: { size: ReadingFontSize }) {
+  return (
+    <span className="font-size-glyph" data-size={size} aria-hidden="true">
+      가
     </span>
   );
 }
@@ -295,10 +307,12 @@ function ReadingFontSelect({
 export function ReadingSettings({
   theme,
   readingFont,
+  readingFontSize,
   lineSpacing,
   mermaidCurve,
   onThemeChange,
   onReadingFontChange,
+  onReadingFontSizeChange,
   onLineSpacingChange,
   onMermaidCurveChange,
 }: ReadingSettingsProps) {
@@ -339,6 +353,31 @@ export function ReadingSettings({
       <div className="settings-group">
         <span className="settings-label">글꼴</span>
         <ReadingFontSelect value={readingFont} onChange={onReadingFontChange} />
+      </div>
+
+      <div className="settings-group">
+        <span id="font-size-setting-label" className="settings-label">
+          본문 크기
+        </span>
+        <div
+          className="font-size-options"
+          role="group"
+          aria-labelledby="font-size-setting-label"
+        >
+          {readingFontSizes.map((sizeOption) => (
+            <button
+              key={sizeOption.value}
+              type="button"
+              className="font-size-option"
+              aria-label={sizeOption.label}
+              aria-pressed={readingFontSize === sizeOption.value}
+              title={sizeOption.label}
+              onClick={() => onReadingFontSizeChange(sizeOption.value)}
+            >
+              <FontSizeGlyph size={sizeOption.value} />
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="settings-group">

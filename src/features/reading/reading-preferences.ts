@@ -32,6 +32,13 @@ export const lineSpacings = [
   { value: "relaxed", label: "여유 1.9" },
 ] as const;
 
+export const readingFontSizes = [
+  { value: "15", label: "작게 15px" },
+  { value: "17", label: "기본 17px" },
+  { value: "19", label: "크게 19px" },
+  { value: "21", label: "아주 크게 21px" },
+] as const;
+
 export const mermaidCurveOptions = [
   { value: mermaidCurvePreferences[0], label: "곡선" },
   { value: mermaidCurvePreferences[1], label: "직선" },
@@ -57,6 +64,7 @@ export const scrollSyncOptions = [{ value: "off" }, { value: "on" }] as const;
 export const readingPreferenceStorageKeys = {
   theme: "aster:theme:v1",
   font: "aster:reading-font:v1",
+  fontSize: "aster:reading-font-size:v1",
   lineSpacing: "aster:line-spacing:v1",
   mermaidCurve: "aster:mermaid-curve:v1",
   zoom: "aster:reading-zoom:v1",
@@ -65,6 +73,7 @@ export const readingPreferenceStorageKeys = {
 
 export type Theme = (typeof themes)[number]["value"];
 export type ReadingFont = (typeof readingFonts)[number]["value"];
+export type ReadingFontSize = (typeof readingFontSizes)[number]["value"];
 export type LineSpacing = (typeof lineSpacings)[number]["value"];
 export type { MermaidCurvePreference } from "../../lib/mermaid-curve";
 export type ReadingZoom = (typeof readingZoomLevels)[number]["value"];
