@@ -572,6 +572,10 @@ html[data-platform="macos"] .header-leading {
   padding-left: 60px;
 }
 
+html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
+  padding-left: 0;
+}
+
 html[data-platform="macos"] .brand,
 html[data-platform="macos"] .header-group-divider {
   display: none;
