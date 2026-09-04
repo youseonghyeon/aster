@@ -55,6 +55,8 @@
     "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
     "Segoe UI", "Noto Sans KR", "Malgun Gothic", sans-serif;
   --reading-font-size: 17px;
+  --reading-font-weight: 400;
+  --reading-text-stroke-width: 0px;
   --reading-content-width: 800px;
   --reading-padding-top: 42px;
   --reading-padding-bottom: 100px;
@@ -2006,10 +2008,33 @@ html[data-platform="macos"] .header-group-divider {
   color: var(--text-body);
   font-family: var(--reading-font);
   font-size: var(--reading-font-size);
+  font-optical-sizing: auto;
+  font-weight: var(--reading-font-weight);
   line-height: var(--reading-line-height);
+  -webkit-text-stroke: var(--reading-text-stroke-width) currentColor;
   overflow-wrap: anywhere;
   text-wrap: pretty;
   word-break: keep-all;
+}
+
+/* Optical body-text compensation must not amplify semantic bold or monospace. */
+.markdown-body :is(
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    strong,
+    b,
+    dt,
+    summary,
+    code,
+    kbd,
+    button,
+    input
+  ) {
+  -webkit-text-stroke-width: 0;
 }
 
 .markdown-body::selection,
@@ -2169,6 +2194,7 @@ html[data-platform="macos"] .header-group-divider {
   border-radius: 4px;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.86em;
+  font-weight: 400;
   word-break: break-word;
 }
 
@@ -2181,6 +2207,7 @@ html[data-platform="macos"] .header-group-divider {
   box-shadow: 0 1px 0 var(--border-strong);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.82em;
+  font-weight: 400;
 }
 
 .markdown-body sub,

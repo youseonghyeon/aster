@@ -8,6 +8,7 @@ import "@fontsource-variable/literata/wght-italic.css";
 import "@fontsource/gowun-batang/400.css";
 import "@fontsource/gowun-batang/700.css";
 import "@fontsource/pretendard/400.css";
+import "@fontsource/pretendard/500.css";
 import "@fontsource/pretendard/700.css";
 import "@fontsource-variable/noto-sans-kr";
 import "@fontsource-variable/noto-serif-kr";

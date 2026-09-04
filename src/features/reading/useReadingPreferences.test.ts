@@ -121,6 +121,8 @@ describe("reading preference controller", () => {
 
     expect(result.current.readingStyle).toEqual({
       "--reading-font-size": "17px",
+      "--reading-font-weight": 400,
+      "--reading-text-stroke-width": "0px",
       "--reading-content-width": "800px",
       "--reading-padding-top": "42px",
       "--reading-padding-bottom": "100px",
@@ -129,6 +131,8 @@ describe("reading preference controller", () => {
     act(() => result.current.selectReadingFontSize("21"));
     expect(result.current.readingStyle).toEqual({
       "--reading-font-size": "21px",
+      "--reading-font-weight": 400,
+      "--reading-text-stroke-width": "0px",
       "--reading-content-width": "800px",
       "--reading-padding-top": "42px",
       "--reading-padding-bottom": "100px",
@@ -137,9 +141,34 @@ describe("reading preference controller", () => {
     act(() => handler({ payload: "in" }));
     expect(result.current.readingStyle).toEqual({
       "--reading-font-size": "23.1px",
+      "--reading-font-weight": 400,
+      "--reading-text-stroke-width": "0px",
       "--reading-content-width": "880px",
       "--reading-padding-top": "46.2px",
       "--reading-padding-bottom": "110px",
+    });
+  });
+
+  it("derives optical weight from the selected font and effective size", () => {
+    const { result } = renderHook(() => useReadingPreferences());
+
+    act(() => result.current.selectReadingFontSize("15"));
+    expect(result.current.readingStyle).toMatchObject({
+      "--reading-font-size": "15px",
+      "--reading-font-weight": 500,
+      "--reading-text-stroke-width": "0px",
+    });
+
+    act(() => result.current.selectReadingFont("noto-serif"));
+    expect(result.current.readingStyle).toMatchObject({
+      "--reading-font-weight": 450,
+      "--reading-text-stroke-width": "0px",
+    });
+
+    act(() => result.current.selectReadingFont("gowun-batang"));
+    expect(result.current.readingStyle).toMatchObject({
+      "--reading-font-weight": 400,
+      "--reading-text-stroke-width": "0.056px",
     });
   });
 

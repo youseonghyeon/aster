@@ -28,6 +28,7 @@ import {
   type ScrollSyncPreference,
   type Theme,
 } from "./reading-preferences";
+import { getReadingTypographyCompensation } from "./reading-typography";
 
 const isNoBlockingModalOpen = () => false;
 
@@ -167,13 +168,21 @@ export function useReadingPreferences({
 
   const readingStyle = useMemo(() => {
     const zoomPercent = Number(readingZoom);
+    const effectiveFontSize =
+      (Number(readingFontSize) * zoomPercent) / 100;
+    const typographyCompensation = getReadingTypographyCompensation(
+      readingFont,
+      effectiveFontSize,
+    );
     return {
-      "--reading-font-size": `${(Number(readingFontSize) * zoomPercent) / 100}px`,
+      "--reading-font-size": `${effectiveFontSize}px`,
+      "--reading-font-weight": typographyCompensation.fontWeight,
+      "--reading-text-stroke-width": `${typographyCompensation.textStrokeWidth}px`,
       "--reading-content-width": `${(800 * zoomPercent) / 100}px`,
       "--reading-padding-top": `${(42 * zoomPercent) / 100}px`,
       "--reading-padding-bottom": `${(100 * zoomPercent) / 100}px`,
     } as CSSProperties;
-  }, [readingFontSize, readingZoom]);
+  }, [readingFont, readingFontSize, readingZoom]);
 
   return {
     theme,
