@@ -5,11 +5,23 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-09-04
+
 ### Added
 
 - 읽기 설정에서 본문 폭과 여백을 유지하는 네 단계 글자 크기 선택 추가
 - 좌우 패널 순서·너비와 목차·파일 목록의 열림 상태를 다음 실행에 복원
 - 창 크기와 화면 위치를 다음 실행에 복원
+
+### Changed
+
+- 문서 목차로 이동한 제목을 미리보기 높이에 맞춘 상단 읽기 기준선에 배치
+- macOS 전체 화면에서 사라진 신호등 공간을 회수해 뒤로·앞으로와 탐색 버튼을 왼쪽으로 정렬
+- 작은 화면의 목차·파일 목록 배경을 불투명하게 표시해 본문과 명확히 분리
+
+### Fixed
+
+- 글꼴, 글자 크기, 줄 간격, 확대, 테마와 Mermaid 선 모양을 바꿀 때 현재 읽던 본문 위치가 움직이던 문제
 
 ## [1.6.0] - 2026-09-03
 
@@ -157,4 +169,5 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 [1.4.0]: https://github.com/youseonghyeon/aster/compare/v1.3.0...v1.4.0
 [1.5.0]: https://github.com/youseonghyeon/aster/compare/v1.4.0...v1.5.0
 [1.6.0]: https://github.com/youseonghyeon/aster/compare/v1.5.0...v1.6.0
-[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.6.0...HEAD
+[1.7.0]: https://github.com/youseonghyeon/aster/compare/v1.6.0...v1.7.0
+[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.7.0...HEAD
