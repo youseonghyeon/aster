@@ -124,11 +124,18 @@ export function useActiveHeading(
         "(prefers-reduced-motion: reduce)",
       ).matches;
 
-      setActiveHeadingId(headingId);
+      // REGRESSION GUARD: activeHeadingId remains owned by the viewport during
+      // smooth navigation. Never preselect the clicked destination here: the
+      // observer would immediately replace C with the still-visible A and then
+      // report B and C, recreating the C -> A -> B -> C flash from v1.7.0.
+      // Cover the start, intermediate, and arrival scroll events in tests.
       if (
         Math.abs(headingTop - containerTop - readingFocusOffset) <=
         headingPositionTolerance
       ) {
+        // No scroll event will fire when the heading is already at the focus
+        // line, so this is the only branch that synchronizes state directly.
+        setActiveHeadingId(headingId);
         return heading;
       }
       container.scrollTo({
