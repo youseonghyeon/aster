@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import type { AppEventChannel } from "../../shared/app-events";
 import {
   useCallback,
   useEffect,
@@ -31,8 +32,10 @@ import {
 const isNoBlockingModalOpen = () => false;
 
 export function useReadingPreferences({
+  events,
   isBlockingModalOpen = isNoBlockingModalOpen,
 }: {
+  events?: AppEventChannel;
   isBlockingModalOpen?: () => boolean;
 } = {}) {
   const [theme, setTheme] = useState<Theme>(() =>
@@ -83,33 +86,38 @@ export function useReadingPreferences({
     );
 
   const selectTheme = useCallback((nextTheme: Theme) => {
+    events?.emit("reading-layout-will-change", undefined);
     setTheme(nextTheme);
     saveReadingPreference(readingPreferenceStorageKeys.theme, nextTheme);
-  }, []);
+  }, [events]);
   const selectReadingFont = useCallback((nextFont: ReadingFont) => {
+    events?.emit("reading-layout-will-change", undefined);
     setReadingFont(nextFont);
     saveReadingPreference(readingPreferenceStorageKeys.font, nextFont);
-  }, []);
+  }, [events]);
   const selectReadingFontSize = useCallback((nextSize: ReadingFontSize) => {
+    events?.emit("reading-layout-will-change", undefined);
     setReadingFontSize(nextSize);
     saveReadingPreference(readingPreferenceStorageKeys.fontSize, nextSize);
-  }, []);
+  }, [events]);
   const selectLineSpacing = useCallback((nextSpacing: LineSpacing) => {
+    events?.emit("reading-layout-will-change", undefined);
     setLineSpacing(nextSpacing);
     saveReadingPreference(
       readingPreferenceStorageKeys.lineSpacing,
       nextSpacing,
     );
-  }, []);
+  }, [events]);
   const selectMermaidCurve = useCallback(
     (nextCurve: MermaidCurvePreference) => {
+      events?.emit("reading-layout-will-change", undefined);
       setMermaidCurve(nextCurve);
       saveReadingPreference(
         readingPreferenceStorageKeys.mermaidCurve,
         nextCurve,
       );
     },
-    [],
+    [events],
   );
   const toggleScrollSync = useCallback(() => {
     setScrollSyncPreference((currentPreference) => {
@@ -127,6 +135,7 @@ export function useReadingPreferences({
     let stopListening: (() => void) | undefined;
     void listen<ReadingZoomCommand>("reading-zoom-requested", (event) => {
       if (isBlockingModalOpen()) return;
+      events?.emit("reading-layout-will-change", undefined);
       setReadingZoom((currentZoom) => {
         const updatedZoom =
           event.payload === "in"
@@ -154,7 +163,7 @@ export function useReadingPreferences({
       disposed = true;
       stopListening?.();
     };
-  }, [isBlockingModalOpen]);
+  }, [events, isBlockingModalOpen]);
 
   const readingStyle = useMemo(() => {
     const zoomPercent = Number(readingZoom);

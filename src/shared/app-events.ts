@@ -28,6 +28,7 @@ export type AppEventMap = {
   "external-content-will-apply": { commitToken: number };
   "external-content-applied": { commitToken: number };
   "recent-sidebar-opened": undefined;
+  "reading-layout-will-change": undefined;
 };
 
 type AppEventListener<K extends keyof AppEventMap> = (

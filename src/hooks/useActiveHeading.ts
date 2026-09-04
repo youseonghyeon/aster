@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
+import { getReadingFocusOffset } from "../lib/reading-viewport";
 
-const headingActivationOffset = 32;
 const headingActivationTolerance = 1;
+const headingPositionTolerance = 24;
 const scrollBottomTolerance = 2;
 
 function getHeadingElements(container: HTMLElement, headingIds: string[]) {
@@ -39,10 +40,16 @@ export function useActiveHeading(
       const hasScrollableContent =
         scrollContainer.scrollHeight >
         scrollContainer.clientHeight + scrollBottomTolerance;
+      const isAtTop = scrollContainer.scrollTop <= scrollBottomTolerance;
       const isAtBottom =
         hasScrollableContent &&
         scrollContainer.scrollTop + scrollContainer.clientHeight >=
           scrollContainer.scrollHeight - scrollBottomTolerance;
+
+      if (isAtTop) {
+        setActiveHeadingId(headings[0]?.id ?? null);
+        return;
+      }
 
       if (isAtBottom) {
         setActiveHeadingId(headings[headings.length - 1]?.id ?? null);
@@ -50,7 +57,9 @@ export function useActiveHeading(
       }
 
       const activationLine =
-        scrollContainer.getBoundingClientRect().top + headingActivationOffset;
+        scrollContainer.getBoundingClientRect().top +
+        getReadingFocusOffset(scrollContainer.clientHeight) +
+        headingPositionTolerance;
       let currentHeading = headings[0];
 
       for (const heading of headings) {
@@ -105,15 +114,23 @@ export function useActiveHeading(
 
       const containerTop = container.getBoundingClientRect().top;
       const headingTop = heading.getBoundingClientRect().top;
+      const readingFocusOffset = getReadingFocusOffset(container.clientHeight);
       const nextScrollTop =
         container.scrollTop +
         headingTop -
         containerTop -
-        headingActivationOffset;
+        readingFocusOffset;
       const prefersReducedMotion = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
       ).matches;
 
+      setActiveHeadingId(headingId);
+      if (
+        Math.abs(headingTop - containerTop - readingFocusOffset) <=
+        headingPositionTolerance
+      ) {
+        return heading;
+      }
       container.scrollTo({
         top: Math.max(0, nextScrollTop),
         behavior: prefersReducedMotion ? "auto" : "smooth",

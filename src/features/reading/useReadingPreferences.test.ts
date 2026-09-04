@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readingPreferenceStorageKeys } from "./reading-preferences";
 import { useReadingPreferences } from "./useReadingPreferences";
+import { createAppEventChannel } from "../../shared/app-events";
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(),
@@ -62,10 +63,32 @@ describe("reading preference controller", () => {
     ).toBe("off");
   });
 
+  it("announces layout-affecting preferences before applying them", () => {
+    const events = createAppEventChannel();
+    const onLayoutWillChange = vi.fn();
+    events.subscribe("reading-layout-will-change", onLayoutWillChange);
+    const { result } = renderHook(() => useReadingPreferences({ events }));
+
+    act(() => {
+      result.current.selectTheme("night");
+      result.current.selectReadingFont("noto-serif");
+      result.current.selectReadingFontSize("19");
+      result.current.selectLineSpacing("relaxed");
+      result.current.selectMermaidCurve("straight");
+    });
+
+    expect(onLayoutWillChange).toHaveBeenCalledTimes(5);
+  });
+
   it("normalizes native zoom commands and cleans up the listener", async () => {
     const unlisten = vi.fn();
+    const events = createAppEventChannel();
+    const onLayoutWillChange = vi.fn();
+    events.subscribe("reading-layout-will-change", onLayoutWillChange);
     vi.mocked(listen).mockResolvedValue(unlisten);
-    const { result, unmount } = renderHook(() => useReadingPreferences());
+    const { result, unmount } = renderHook(() =>
+      useReadingPreferences({ events }),
+    );
     await waitFor(() =>
       expect(listen).toHaveBeenCalledWith(
         "reading-zoom-requested",
@@ -83,6 +106,7 @@ describe("reading preference controller", () => {
     );
     act(() => handler({ payload: "reset" }));
     expect(result.current.readingZoom).toBe("100");
+    expect(onLayoutWillChange).toHaveBeenCalledTimes(2);
 
     unmount();
     await waitFor(() => expect(unlisten).toHaveBeenCalledOnce());

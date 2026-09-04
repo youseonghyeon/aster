@@ -30,6 +30,7 @@ function App() {
     isBlockingModalOpen: blockingModal.isOpen,
   });
   const reading = useReadingPreferences({
+    events,
     isBlockingModalOpen: blockingModal.isOpen,
   });
 

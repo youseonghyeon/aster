@@ -26,6 +26,7 @@ import { useWorkspaceSearch } from "./useWorkspaceSearch";
 import { useWorkspaceEventBridge } from "./useWorkspaceEventBridge";
 import { useWorkspaceResponsive } from "./useWorkspaceResponsive";
 import { usePreviewFocusMode } from "./usePreviewFocusMode";
+import { useReadingLayoutPreservation } from "./useReadingLayoutPreservation";
 import { useWorkspaceKeyboardLayers } from "./useWorkspaceKeyboardLayers";
 import type { PaneContent, PaneKind } from "./workspace-types";
 
@@ -214,6 +215,11 @@ export function useWorkspaceController({
     markdown: previewMarkdown,
     editorElement: editorScrollElement,
     previewElement: previewScrollElement,
+  });
+  useReadingLayoutPreservation({
+    events,
+    previewElement: previewScrollElement,
+    suppressScrollSyncRestore,
   });
 
   const registerWorkspace = useCallback((element: HTMLElement | null) => {
