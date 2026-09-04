@@ -4,6 +4,7 @@ mod file_watch;
 mod folder_tree;
 mod linked_resources;
 mod recovery;
+mod update_check;
 mod window_geometry;
 
 use close_guard::{CloseGuardState, ResolveCloseRequest};
@@ -13,6 +14,8 @@ use folder_tree::{FolderListing, FolderRoot, FolderTreeState, ListFolderChildren
 use recovery::{
     DeleteRecoveryDraftRequest, RecoveryDraft, RecoveryState, SaveRecoveryDraftRequest,
 };
+#[cfg(target_os = "macos")]
+use tauri::menu::AboutMetadata;
 use tauri::{
     menu::{Menu, MenuItemBuilder, MenuItemKind, PredefinedMenuItem},
     AppHandle, Emitter, Manager, State, Window,
@@ -218,6 +221,11 @@ fn resolve_close_request(
     close_guard::resolve_close_request(window, &close_state, &recovery_state, request)
 }
 
+#[tauri::command]
+async fn check_for_update(app: AppHandle) -> Result<update_check::UpdateCheckResult, String> {
+    update_check::check_for_update(&app.package_info().version.to_string()).await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -252,10 +260,33 @@ pub fn run() {
                 .accelerator("CmdOrCtrl+0")
                 .build(app)?;
             let view_separator = PredefinedMenuItem::separator(app)?;
+            #[cfg(target_os = "macos")]
+            let check_for_updates_item =
+                MenuItemBuilder::with_id("check_for_updates", "업데이트 확인…").build(app)?;
+            #[cfg(target_os = "macos")]
+            let application_menu_name = app.package_info().name.clone();
+            #[cfg(target_os = "macos")]
+            let about_item = PredefinedMenuItem::about(
+                app,
+                Some("Aster 정보"),
+                Some(AboutMetadata {
+                    name: Some(app.package_info().name.clone()),
+                    version: Some(app.package_info().version.to_string()),
+                    copyright: app.config().bundle.copyright.clone(),
+                    credits: Some("개발자: seonghyeon you\n라이선스: MIT License".to_string()),
+                    ..Default::default()
+                }),
+            )?;
 
             for item in menu.items()? {
                 if let MenuItemKind::Submenu(submenu) = item {
                     match submenu.text()?.as_str() {
+                        #[cfg(target_os = "macos")]
+                        name if name == application_menu_name => {
+                            let _ = submenu.remove_at(0)?;
+                            submenu.insert(&about_item, 0)?;
+                            submenu.insert(&check_for_updates_item, 1)?
+                        }
                         "File" => {
                             submenu.prepend_items(&[&open_item, &save_item, &file_separator])?
                         }
@@ -287,6 +318,9 @@ pub fn run() {
             "actual_size" => {
                 let _ = app.emit("reading-zoom-requested", "reset");
             }
+            "check_for_updates" => {
+                let _ = app.emit("update-check-requested", ());
+            }
             _ => {}
         })
         .on_window_event(|window, event| {
@@ -312,6 +346,7 @@ pub fn run() {
             delete_recovery_draft,
             enable_close_guard,
             resolve_close_request,
+            check_for_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { confirm, message, open, save } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
@@ -16,9 +18,11 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
   isTauri: () => mockedRuntime.desktop,
 }));
+vi.mock("@tauri-apps/api/app", () => ({ getVersion: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async () => () => undefined),
 }));
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   confirm: vi.fn(),
   message: vi.fn(),
@@ -65,13 +69,70 @@ describe("workspace regression contracts", () => {
     mockedRuntime.desktop = false;
     setViewportWidth(1440);
     vi.mocked(invoke).mockReset();
+    vi.mocked(getVersion).mockReset();
+    vi.mocked(getVersion).mockResolvedValue("1.7.0");
     vi.mocked(confirm).mockReset();
     vi.mocked(message).mockReset();
     vi.mocked(open).mockReset();
     vi.mocked(save).mockReset();
+    vi.mocked(openUrl).mockReset();
+    vi.mocked(openUrl).mockResolvedValue(undefined);
     vi.mocked(listen).mockReset();
     vi.mocked(listen).mockImplementation(async () => () => undefined);
     vi.mocked(message).mockResolvedValue("Ok");
+  });
+
+  it("shows a newer release and lets the native menu check again", async () => {
+    mockedRuntime.desktop = true;
+    const user = userEvent.setup();
+    vi.mocked(invoke).mockImplementation((command) => {
+      if (command === "check_for_update") {
+        return Promise.resolve({
+          currentVersion: "1.7.0",
+          latestVersion: "1.8.0",
+          releaseUrl:
+            "https://github.com/youseonghyeon/aster/releases/tag/v1.8.0",
+          updateAvailable: true,
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("complementary", { name: "Aster 업데이트" }),
+    ).toHaveTextContent("새 버전 1.8.0");
+    expect(screen.getByText("현재 1.7.0")).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith("check_for_update");
+
+    await user.click(screen.getByRole("button", { name: "업데이트 보기" }));
+    expect(openUrl).toHaveBeenCalledWith(
+      "https://github.com/youseonghyeon/aster/releases/tag/v1.8.0",
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "업데이트 알림 닫기" }),
+    );
+    expect(
+      screen.queryByRole("complementary", { name: "Aster 업데이트" }),
+    ).not.toBeInTheDocument();
+
+    const updateRequestListener = vi
+      .mocked(listen)
+      .mock.calls.find(([event]) => event === "update-check-requested")?.[1];
+    expect(updateRequestListener).toBeDefined();
+    act(() => {
+      updateRequestListener?.({ payload: undefined } as never);
+    });
+    expect(
+      await screen.findByRole("complementary", { name: "Aster 업데이트" }),
+    ).toHaveTextContent("새 버전 1.8.0");
+    expect(
+      vi
+        .mocked(invoke)
+        .mock.calls.filter(([command]) => command === "check_for_update"),
+    ).toHaveLength(2);
   });
 
   it("hides the default document while restoring the startup document", async () => {

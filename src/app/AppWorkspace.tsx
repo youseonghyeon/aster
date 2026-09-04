@@ -3,6 +3,8 @@ import { ExternalFileNotice } from "../features/documents/ExternalFileNotice";
 import { useFolderBrowser } from "../features/file-browser/useFolderBrowser";
 import { ReadingSettings } from "../features/reading/ReadingSettings";
 import type { useReadingPreferences } from "../features/reading/useReadingPreferences";
+import { UpdateNotice } from "../features/updates/UpdateNotice";
+import { useUpdateCheck } from "../features/updates/useUpdateCheck";
 import { PaneDivider } from "../features/workspace/PaneDivider";
 import { StageSidebarLayout } from "../features/workspace/StageSidebarLayout";
 import { WorkspacePane } from "../features/workspace/WorkspacePane";
@@ -43,6 +45,7 @@ export function AppWorkspace({
     previewElement: workspace.navigation.previewElement,
     openDocument: documents.openDocument,
   });
+  const updateCheck = useUpdateCheck();
 
   return (
     <div
@@ -209,6 +212,13 @@ export function AppWorkspace({
               noticeRef={elements.externalFileNotice}
               onReload={() => void documents.reloadDocument()}
               onDismiss={documents.dismissExternalFileNotice}
+            />
+          ) : null}
+          {updateCheck.visibleUpdateCheck ? (
+            <UpdateNotice
+              update={updateCheck.visibleUpdateCheck}
+              isStacked={documents.visibleExternalFileState !== null}
+              onDismiss={updateCheck.dismiss}
             />
           ) : null}
         </main>
