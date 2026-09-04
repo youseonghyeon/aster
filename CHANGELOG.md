@@ -5,6 +5,22 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-09-04
+
+### Added
+
+- GitHub 최신 릴리스를 하루에 한 번 확인하고 새 버전이 있으면 앱 안에서 안내하는 업데이트 확인 기능
+- macOS 애플리케이션 메뉴에 수동 업데이트 확인 항목과 개발자·버전·라이선스를 표시하는 정보 창 추가
+
+### Changed
+
+- Markdown 문서와 읽기 흐름을 간결하게 표현한 새 애플리케이션 아이콘 적용
+- 실제 표시 크기와 글꼴 특성에 따라 작은 본문만 자동으로 굵기를 보정하고 기본 크기 이상은 기존 인상을 유지
+
+### Fixed
+
+- 목차에서 아래 제목을 선택하면 대상이 먼저 강조된 뒤 기존 위치부터 중간 제목을 거쳐 다시 강조되던 문제
+
 ## [1.7.0] - 2026-09-04
 
 ### Added
@@ -170,4 +186,5 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 [1.5.0]: https://github.com/youseonghyeon/aster/compare/v1.4.0...v1.5.0
 [1.6.0]: https://github.com/youseonghyeon/aster/compare/v1.5.0...v1.6.0
 [1.7.0]: https://github.com/youseonghyeon/aster/compare/v1.6.0...v1.7.0
-[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.7.0...HEAD
+[1.7.1]: https://github.com/youseonghyeon/aster/compare/v1.7.0...v1.7.1
+[Unreleased]: https://github.com/youseonghyeon/aster/compare/v1.7.1...HEAD
