@@ -225,3 +225,27 @@ A --&gt; B</code></pre>`}
     expect(screen.getByText("본문")).toHaveAttribute("data-source-offset");
   });
 });
+
+describe("nested Markdown lists", () => {
+  it.each([
+    {label: "tight", content: "- xxxx\n   - yyy\n   - zzz\n- next", paragraph: false},
+    {label: "loose", content: "- xxxx\n\n   - yyy\n   - zzz\n\n- next", paragraph: true},
+  ])("keeps $label nesting and the next parent as separate semantic items", ({content, paragraph}) => {
+    const {container} = render(<MarkdownPreview content={content} appearanceKey="paper" mermaidCurve="curved" />);
+    const root = container.querySelector(".markdown-body > ul")!;
+    expect(root.children.length).toBe(2);
+    const parent = root.firstElementChild!;
+    expect(parent.querySelectorAll(":scope > ul > li")).toHaveLength(2);
+    expect(Boolean(parent.querySelector(":scope > p"))).toBe(paragraph);
+    expect(root.lastElementChild?.textContent?.trim()).toBe("next");
+  });
+
+  it("preserves paragraphs and mixed three-level lists with checkboxes", () => {
+    const content = "1. 부모 항목\n   - [ ] 긴 한글 문장이 줄바꿈되어도 같은 항목이어야 합니다\n     1. 셋째 깊이\n     2. 셋째 다음 항목\n\n   이어지는 부모 문단입니다.\n\n2. 다음 부모";
+    const {container} = render(<MarkdownPreview content={content} appearanceKey="night" mermaidCurve="curved" />);
+    expect(container.querySelectorAll(".markdown-body > ol > li")).toHaveLength(2);
+    expect(container.querySelectorAll("ol > li > ul > li > ol > li")).toHaveLength(2);
+    expect(container.querySelector('input[type="checkbox"]')).toBeDisabled();
+    expect(screen.getByText("이어지는 부모 문단입니다.")).toHaveProperty("tagName", "P");
+  });
+});
