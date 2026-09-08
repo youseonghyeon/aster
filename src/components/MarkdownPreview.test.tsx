@@ -240,6 +240,22 @@ describe("nested Markdown lists", () => {
     expect(root.lastElementChild?.textContent?.trim()).toBe("next");
   });
 
+  it("keeps completed task state read-only and driven by Markdown updates", () => {
+    const props = { appearanceKey: "paper", mermaidCurve: "curved" as const };
+    const { container, rerender } = render(<MarkdownPreview {...props} content={"- [ ] 아직 할 일\n- [x] 완료한 일"} />);
+    const boxes = container.querySelectorAll('input[type="checkbox"]');
+    expect(boxes).toHaveLength(2);
+    expect(boxes[0]).not.toBeChecked();
+    expect(boxes[1]).toBeChecked();
+    expect(boxes[0]).toBeDisabled();
+    expect(boxes[1]).toBeDisabled();
+    rerender(<MarkdownPreview {...props} content={"- [ ] 아직 할 일\n- [ ] 완료 취소"} />);
+    expect(container.querySelectorAll('input[type="checkbox"]')[1]).not.toBeChecked();
+    rerender(<MarkdownPreview {...props} content={"- [ ] 아직 할 일\n- [x] 다시 완료"} />);
+    expect(container.querySelectorAll('input[type="checkbox"]')[1]).toBeChecked();
+    expect(container.querySelectorAll('input[type="checkbox"]')[1]).toBeDisabled();
+  });
+
   it("preserves paragraphs and mixed three-level lists with checkboxes", () => {
     const content = "1. 부모 항목\n   - [ ] 긴 한글 문장이 줄바꿈되어도 같은 항목이어야 합니다\n     1. 셋째 깊이\n     2. 셋째 다음 항목\n\n   이어지는 부모 문단입니다.\n\n2. 다음 부모";
     const {container} = render(<MarkdownPreview content={content} appearanceKey="night" mermaidCurve="curved" />);
