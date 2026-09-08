@@ -130,6 +130,10 @@ export function useWorkspaceController({
     dispatch({ type: "start-document-action" });
   }, []);
 
+  const preserveReadingPosition = useCallback(() => {
+    events.emit("reading-layout-will-change", undefined);
+  }, [events]);
+
   const {
     updateSplit,
     swapSplit,
@@ -146,6 +150,7 @@ export function useWorkspaceController({
     isPreviewFocusMode,
     initialSplitPercent: restoredWorkspacePreferences.splitPercent,
     onSplitChange: persistSplitPercent,
+    onBeforeSplitChange: preserveReadingPosition,
   });
 
   const didRestoreStageSidebarRef = useRef(false);
@@ -220,6 +225,10 @@ export function useWorkspaceController({
     events,
     previewElement: previewScrollElement,
     suppressScrollSyncRestore,
+    markdown: previewMarkdown,
+    documentPath: previewDocumentPath,
+    isPreviewUpdating,
+    layoutKey: `${stageSidebar}:${isSidebarInset}:${isPreviewFocusMode}:${leftPane}`,
   });
 
   const registerWorkspace = useCallback((element: HTMLElement | null) => {
@@ -369,6 +378,7 @@ export function useWorkspaceController({
     restoreSourceSearchSnapshot: restorePendingSourceSearchSnapshot,
     setPreviewFocusMode,
     suppressScrollSyncRestore,
+    preserveReadingPosition,
   });
 
   function requestSourceFocus(mode: "editor" | "notes") {
@@ -424,6 +434,7 @@ export function useWorkspaceController({
     headingId: string,
     shouldMoveFocus: boolean,
   ) => {
+    events.emit("reading-navigation-will-change", undefined);
     const heading = navigateToHeading(headingId);
     if (!heading || isSidebarInset) return;
     stageSidebarRef.current = null;
@@ -431,7 +442,7 @@ export function useWorkspaceController({
     if (shouldMoveFocus) {
       window.requestAnimationFrame(() => heading.focus({ preventScroll: true }));
     }
-  }, [isSidebarInset, navigateToHeading]);
+  }, [events, isSidebarInset, navigateToHeading]);
 
   const toggleDocumentBrowser = useCallback(
     (preferred: "files" | "recent") => {
@@ -457,6 +468,11 @@ export function useWorkspaceController({
     },
     [events],
   );
+
+  const updateWorkspaceSearch = useCallback((area: SearchArea, patch: Parameters<typeof updateSearchSession>[1]) => {
+    events.emit("reading-navigation-will-change", undefined);
+    updateSearchSession(area, patch);
+  }, [events, updateSearchSession]);
 
   const toggleOutline = useCallback(
     () => dispatch({ type: "toggle-stage-sidebar", sidebar: "outline" }),
@@ -524,7 +540,7 @@ export function useWorkspaceController({
     outline: { items: outlineItems, activeHeadingId },
     search: {
       sessions: searchSessions,
-      update: updateSearchSession,
+      update: updateWorkspaceSearch,
       activateArea: activateSearchArea,
       open: openSearch,
       close: closeSearch,

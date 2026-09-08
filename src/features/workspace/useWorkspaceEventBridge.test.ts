@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { createAppEventChannel } from "../../shared/app-events";
+import { useReadingLayoutPreservation } from "./useReadingLayoutPreservation";
 import { useWorkspaceEventBridge } from "./useWorkspaceEventBridge";
 import type { StageSidebar } from "./workspace-interactions";
 import type { WorkspaceContentElements } from "./workspace-types";
@@ -205,4 +206,50 @@ describe("useWorkspaceEventBridge", () => {
     expect(editor.scrollTop).toBe(38);
     editor.remove();
   });
+});
+
+
+it("lets the reading controller own preview pixels after an external commit", () => {
+  const options = createOptions();
+  const preview = document.createElement("div");
+  preview.className = "preview-scroll";
+  preview.innerHTML = '<article class="markdown-body"><p data-source-offset="6">읽던 문장입니다</p></article>';
+  document.body.append(preview);
+  options.contentElementsRef.current.preview = preview;
+  const paragraph = preview.querySelector("p")!;
+  Object.defineProperties(preview, {clientHeight:{value:600},scrollHeight:{value:3000}});
+  preview.getBoundingClientRect = () => ({top:0} as DOMRect);
+  let top = 1120;
+  paragraph.getBoundingClientRect = () => ({top:top-preview.scrollTop,bottom:top-preview.scrollTop+100,height:100} as DOMRect);
+  preview.scrollTop = 1000;
+  const suppress = vi.fn();
+  const original = "head\n\n읽던 문장입니다";
+  const {rerender, unmount} = renderHook(({markdown}) => {
+    useReadingLayoutPreservation({events:options.events, previewElement:preview,
+      markdown, suppressScrollSyncRestore:suppress});
+    useWorkspaceEventBridge(options);
+  }, {initialProps:{markdown:original}});
+  act(() => options.events.emit("external-content-will-apply", {commitToken:1}));
+  top = 1420; paragraph.dataset.sourceOffset = "9";
+  rerender({markdown:"추가\n"+original});
+  act(() => options.events.emit("external-content-applied", {commitToken:1}));
+  expect(preview.scrollTop).toBe(1300);
+  expect(paragraph.getBoundingClientRect().top).toBe(120);
+  unmount(); preview.remove();
+});
+
+it("does not steal focus back if the user acts while external content is deferred", () => {
+  const options = createOptions();
+  const editor = document.createElement("textarea");
+  const next = document.createElement("button");
+  document.body.append(editor,next); editor.focus();
+  options.contentElementsRef.current.editor = editor;
+  const {rerender,unmount} = renderHook(({isPreviewUpdating}) =>
+    useWorkspaceEventBridge({...options,isPreviewUpdating}), {initialProps:{isPreviewUpdating:true}});
+  act(() => options.events.emit("external-content-will-apply", {commitToken:1}));
+  next.dispatchEvent(new Event("pointerdown", {bubbles:true})); next.focus();
+  act(() => options.events.emit("external-content-applied", {commitToken:1}));
+  rerender({isPreviewUpdating:false});
+  expect(document.activeElement).toBe(next);
+  unmount(); editor.remove(); next.remove();
 });

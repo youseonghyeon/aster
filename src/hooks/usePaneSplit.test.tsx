@@ -44,3 +44,28 @@ describe("pane split controller", () => {
     expect(onSplitChange).toHaveBeenCalledWith(58);
   });
 });
+
+it("captures reading geometry before keyboard and pointer resize commits", () => {
+  const workspace = document.createElement("main");
+  const divider = document.createElement("div");
+  workspace.getBoundingClientRect = () => ({left:0,width:1000} as DOMRect);
+  divider.setPointerCapture = vi.fn();
+  divider.releasePointerCapture = vi.fn();
+  divider.hasPointerCapture = () => true;
+  const before: string[] = [];
+  const {result} = renderHook(() => usePaneSplit({
+    workspaceRef:elementRef(workspace),dividerRef:elementRef(divider),splitGuideRef:elementRef(null),
+    isPreviewFocusMode:false,
+    onBeforeSplitChange:() => before.push(workspace.style.getPropertyValue("--left-pane-width")),
+  }));
+  act(() => result.current.handleDividerKeyDown({key:"ArrowRight",shiftKey:false,preventDefault:vi.fn()} as never));
+  expect(before).toEqual(["50%"]);
+  const afterKeyboard = workspace.style.getPropertyValue("--left-pane-width");
+  act(() => {
+    result.current.handleDividerPointerDown({isPrimary:true,button:0,pointerId:1,clientX:500,
+      currentTarget:divider,preventDefault:vi.fn()} as never);
+    result.current.handleDividerPointerUp({pointerId:1,clientX:600} as never);
+  });
+  expect(before).toEqual(["50%",afterKeyboard]);
+  expect(workspace.style.getPropertyValue("--left-pane-width")).toBe("60%");
+});

@@ -33,6 +33,7 @@ type UsePaneSplitOptions = {
   splitGuideRef: RefObject<HTMLDivElement | null>;
   isPreviewFocusMode: boolean;
   initialSplitPercent?: number;
+  onBeforeSplitChange?: () => void;
   onSplitChange?: (splitPercent: number) => void;
 };
 
@@ -45,6 +46,7 @@ export function usePaneSplit({
   isPreviewFocusMode,
   initialSplitPercent = 50,
   onSplitChange = ignoreSplitChange,
+  onBeforeSplitChange = ignoreSplitChange,
 }: UsePaneSplitOptions) {
   const requestedSplitPercentRef = useRef(initialSplitPercent);
   const appliedSplitPercentRef = useRef(initialSplitPercent);
@@ -73,10 +75,11 @@ export function usePaneSplit({
   }, [dividerRef, workspaceRef]);
 
   const updateSplit = useCallback((nextPercent: number) => {
+    onBeforeSplitChange();
     requestedSplitPercentRef.current = nextPercent;
     applySplit(nextPercent);
     onSplitChange(nextPercent);
-  }, [applySplit, onSplitChange]);
+  }, [applySplit, onBeforeSplitChange, onSplitChange]);
 
   function getDragRequestedPercent(state: SplitDragState, clientX: number) {
     return getPointerSplitPercent(

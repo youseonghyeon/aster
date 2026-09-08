@@ -4,6 +4,7 @@ import {
   capturePreviewReadingAnchor,
   restorePreviewReadingAnchor,
   restorePreviewScrollAnchor,
+  remapPreviewReadingAnchor,
 } from "./preview-scroll-anchor";
 
 describe("preview scroll anchors", () => {
@@ -124,4 +125,41 @@ describe("preview scroll anchors", () => {
     expect(preview.scrollTop).toBe(800);
     preview.remove();
   });
+});
+
+it("does not scroll when the closest block is outside the reading focus line", () => {
+  const preview = document.createElement("div");
+  const paragraph = document.createElement("p"); paragraph.dataset.sourceOffset = "0";
+  preview.append(paragraph); document.body.append(preview);
+  Object.defineProperties(preview, {clientHeight: {value:600},scrollHeight:{value:3000}});
+  preview.scrollTop = 50;
+  preview.getBoundingClientRect = () => ({top:0} as DOMRect);
+  paragraph.getBoundingClientRect = () => ({top:1120-preview.scrollTop,bottom:1220-preview.scrollTop,height:100} as DOMRect);
+  const snapshot = capturePreviewReadingAnchor(preview);
+  restorePreviewReadingAnchor(snapshot);
+  expect(preview.scrollTop).toBe(50);
+  preview.remove();
+});
+
+
+it("uses the nearest surviving source neighbour when the reading block is deleted", () => {
+  const snapshot = {
+    container:document.createElement("div"),sourceOffset:"100",blockProgress:0.5,
+    viewportOffset:120,scrollProgress:0.4,scrollTop:400,neighbours:["120","20"],
+  };
+  const mapped = remapPreviewReadingAnchor(snapshot, offset => offset === 100 ? null : offset - 10);
+  expect(mapped.sourceOffset).toBe("110");
+  expect(mapped.blockProgress).toBe(0);
+  expect(mapped.textAnchor).toBeNull();
+});
+
+it("ignores source anchors inside collapsed content", () => {
+  const preview = document.createElement("div");
+  const hidden = document.createElement("p"); hidden.dataset.sourceOffset = "1";
+  const visible = document.createElement("p"); visible.dataset.sourceOffset = "20";
+  preview.append(hidden,visible);
+  Object.defineProperty(preview,"clientHeight",{value:600});
+  hidden.getBoundingClientRect = () => ({top:0,bottom:0,height:0} as DOMRect);
+  visible.getBoundingClientRect = () => ({top:300,bottom:400,height:100} as DOMRect);
+  expect(capturePreviewReadingAnchor(preview).sourceOffset).toBe("20");
 });

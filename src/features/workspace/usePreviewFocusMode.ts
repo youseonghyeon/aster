@@ -1,15 +1,9 @@
 import { useCallback, useRef, type RefObject } from "react";
 import type { SearchArea } from "../../lib/text-search";
-import {
-  getScrollProgress,
-  restoreScrollProgress,
-  type PreviewScrollProgress,
-} from "./workspace-scroll";
 import type {
   SourceArea,
   WorkspaceContentElements,
 } from "./workspace-types";
-import { getPreviewScrollRegions } from "../../lib/preview-scroll-regions";
 
 type UsePreviewFocusModeOptions = {
   contentElementsRef: RefObject<WorkspaceContentElements>;
@@ -24,6 +18,7 @@ type UsePreviewFocusModeOptions = {
   ) => number | null;
   setPreviewFocusMode: (isOpen: boolean) => void;
   suppressScrollSyncRestore: () => void;
+  preserveReadingPosition: () => void;
 };
 
 export function usePreviewFocusMode({
@@ -36,34 +31,12 @@ export function usePreviewFocusMode({
   restoreSourceSearchSnapshot,
   setPreviewFocusMode,
   suppressScrollSyncRestore,
+  preserveReadingPosition,
 }: UsePreviewFocusModeOptions) {
   const returnAreaRef = useRef<SearchArea>("preview");
 
-  const capturePreviewScrollProgress = useCallback(() => {
-    const previewElement = contentElementsRef.current.preview;
-    if (!(previewElement instanceof HTMLDivElement)) return null;
-    return {
-      outer: getScrollProgress(previewElement),
-      nested: getPreviewScrollRegions(previewElement).map(getScrollProgress),
-    } satisfies PreviewScrollProgress;
-  }, [contentElementsRef]);
-
-  const restorePreviewScrollProgress = useCallback(
-    (progress: PreviewScrollProgress | null) => {
-      const previewElement = contentElementsRef.current.preview;
-      if (!(previewElement instanceof HTMLDivElement) || !progress) return;
-      restoreScrollProgress(previewElement, progress.outer);
-      const nestedElements = getPreviewScrollRegions(previewElement);
-      progress.nested.forEach((nestedProgress, index) => {
-        const element = nestedElements[index];
-        if (element) restoreScrollProgress(element, nestedProgress);
-      });
-    },
-    [contentElementsRef],
-  );
-
   const enter = useCallback(() => {
-    const previewScrollProgress = capturePreviewScrollProgress();
+    preserveReadingPosition();
     suppressScrollSyncRestore();
     returnAreaRef.current = lastSearchAreaRef.current;
     closeSourceSearches();
@@ -71,28 +44,25 @@ export function usePreviewFocusMode({
     setPreviewFocusMode(true);
     lastSearchAreaRef.current = "preview";
     window.requestAnimationFrame(() => {
-      restorePreviewScrollProgress(previewScrollProgress);
       contentElementsRef.current.preview?.focus({ preventScroll: true });
     });
   }, [
-    capturePreviewScrollProgress,
+    preserveReadingPosition,
     closeSourceSearches,
     contentElementsRef,
     dismissTransientLayers,
     lastSearchAreaRef,
-    restorePreviewScrollProgress,
     setPreviewFocusMode,
     suppressScrollSyncRestore,
   ]);
 
   const exit = useCallback(() => {
-    const previewScrollProgress = capturePreviewScrollProgress();
+    preserveReadingPosition();
     suppressScrollSyncRestore();
     const returnArea = returnAreaRef.current;
     setPreviewFocusMode(false);
     lastSearchAreaRef.current = returnArea;
     window.requestAnimationFrame(() => {
-      restorePreviewScrollProgress(previewScrollProgress);
       const returnElement = contentElementsRef.current[returnArea];
       const restoredPositions = (["editor", "notes"] as const)
         .map((area) => {
@@ -120,10 +90,9 @@ export function usePreviewFocusMode({
       }
     });
   }, [
-    capturePreviewScrollProgress,
+    preserveReadingPosition,
     contentElementsRef,
     lastSearchAreaRef,
-    restorePreviewScrollProgress,
     restoreSourceSearchSnapshot,
     setPreviewFocusMode,
     sourceScrollPositionsRef,

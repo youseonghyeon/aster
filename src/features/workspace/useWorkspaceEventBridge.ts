@@ -3,7 +3,6 @@ import type { AppEventChannel } from "../../shared/app-events";
 import type { SearchArea } from "../../lib/text-search";
 import type { StageSidebar } from "./workspace-interactions";
 import type { WorkspaceContentElements } from "./workspace-types";
-import { getPreviewScrollRegions } from "../../lib/preview-scroll-regions";
 import {
   captureSearchSnapshot,
   restoreTextareaSnapshot,
@@ -59,16 +58,6 @@ export function useWorkspaceEventBridge({
       if (!element || !snapshot) continue;
       if (element instanceof HTMLTextAreaElement) {
         restoreTextareaSnapshot(element, snapshot);
-      } else {
-        element.scrollTop = snapshot.scrollTop;
-        element.scrollLeft = snapshot.scrollLeft;
-        const nested = getPreviewScrollRegions(element);
-        snapshot.nestedScrollPositions?.forEach((position, index) => {
-          if (nested[index]) {
-            nested[index].scrollTop = position.scrollTop;
-            nested[index].scrollLeft = position.scrollLeft;
-          }
-        });
       }
       if (snapshot.activeElementKind === "content") {
         element.focus({ preventScroll: true });
@@ -92,6 +81,8 @@ export function useWorkspaceEventBridge({
     const unsubscribeDocumentCommitted = events.subscribe(
       "document-committed",
       () => {
+        externalSnapshotsRef.current = null;
+        externalCommitTokenRef.current = null;
         resetSearchSessions();
       },
     );
@@ -159,7 +150,17 @@ export function useWorkspaceEventBridge({
       ({ commitToken }) => setAppliedExternalCommitToken(commitToken),
     );
 
+    const cancelPendingExternalFocus = () => {
+      externalSnapshotsRef.current = null;
+      externalCommitTokenRef.current = null;
+    };
+    const unsubscribeNavigation = events.subscribe("reading-navigation-will-change", cancelPendingExternalFocus);
+    const intentEvents = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+    intentEvents.forEach(eventName => document.addEventListener(eventName, cancelPendingExternalFocus, true));
+
     return () => {
+      intentEvents.forEach(eventName => document.removeEventListener(eventName, cancelPendingExternalFocus, true));
+      unsubscribeNavigation();
       unsubscribeDocumentCommitted();
       unsubscribeOpenSettled();
       unsubscribeExternalWillShow();

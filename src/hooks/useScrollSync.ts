@@ -34,6 +34,7 @@ type UseScrollSyncOptions = {
 type ScrollSyncControls = {
   enable: () => void;
   disable: () => void;
+  cancelPending: () => void;
 };
 
 const quietMeasurementDelay = 140;
@@ -227,6 +228,7 @@ export function useScrollSync({
 
   const suppressScrollSyncRestore = useCallback(() => {
     suppressionUntilRef.current = performance.now() + quietMeasurementDelay;
+    controlsRef.current?.cancelPending();
   }, []);
 
   useLayoutEffect(() => {
@@ -414,11 +416,19 @@ export function useScrollSync({
       scheduleScroll(source);
     }
 
+    function cancelPendingScroll() {
+      pendingSource = null;
+      expectedScroll = null;
+      if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
+      animationFrame = null;
+    }
+
     function takeOwnership(source: ScrollSide) {
       if (!enabledRef.current) {
         return;
       }
 
+      cancelPendingScroll();
       suppressionUntilRef.current = 0;
       ownerUntil = performance.now() + userOwnershipDuration;
       expectedScroll = null;
@@ -530,6 +540,7 @@ export function useScrollSync({
     document.fonts.addEventListener("loadingdone", handleFontLayoutChange);
 
     controlsRef.current = {
+      cancelPending: cancelPendingScroll,
       enable: () => scheduleMeasurement(0),
       disable: () => {
         clearScheduledMeasurement();
