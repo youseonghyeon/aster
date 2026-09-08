@@ -16,6 +16,35 @@ describe("reading preference controller", () => {
     localStorage.clear();
   });
 
+  it.each([null, "unknown", "circle", "square"])("defaults unknown bullet style %s without changing older preferences", (stored) => {
+    if (stored !== null) localStorage.setItem(readingPreferenceStorageKeys.bulletStyle, stored);
+    localStorage.setItem(readingPreferenceStorageKeys.lineSpacing, "tight");
+    const { result } = renderHook(() => useReadingPreferences());
+    expect(result.current.bulletStyle).toBe("default");
+    expect(result.current.lineSpacing).toBe("tight");
+  });
+
+  it("announces marker changes before applying, saves them and restores on remount", () => {
+    const events = createAppEventChannel();
+    const { result, unmount } = renderHook(() => useReadingPreferences({ events }));
+    let valueBeforeChange = "";
+    events.subscribe("reading-layout-will-change", () => { valueBeforeChange = result.current.bulletStyle; });
+    act(() => result.current.selectBulletStyle("triangle"));
+    expect(valueBeforeChange).toBe("default");
+    expect(result.current.bulletStyle).toBe("triangle");
+    expect(localStorage.getItem(readingPreferenceStorageKeys.bulletStyle)).toBe("triangle");
+    unmount();
+    const restored = renderHook(() => useReadingPreferences());
+    expect(restored.result.current.bulletStyle).toBe("triangle");
+  });
+
+  it("applies markers for this session when preference storage fails", () => {
+    const { result } = renderHook(() => useReadingPreferences());
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Storage unavailable"); });
+    act(() => result.current.selectBulletStyle("triangle"));
+    expect(result.current.bulletStyle).toBe("triangle");
+  });
+
   it("loads and saves the existing v1 primitive values", () => {
     localStorage.setItem(readingPreferenceStorageKeys.theme, "night");
     localStorage.setItem(readingPreferenceStorageKeys.font, "noto-serif");

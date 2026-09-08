@@ -53,6 +53,7 @@ export function AppWorkspace({
       data-theme={reading.theme}
       data-font={reading.readingFont}
       data-line-spacing={reading.lineSpacing}
+      data-bullet-style={reading.bulletStyle}
       style={reading.readingStyle}
     >
       <AppHeader
@@ -84,11 +85,13 @@ export function AppWorkspace({
             readingFont={reading.readingFont}
             readingFontSize={reading.readingFontSize}
             lineSpacing={reading.lineSpacing}
+            bulletStyle={reading.bulletStyle}
             mermaidCurve={reading.mermaidCurve}
             onThemeChange={reading.selectTheme}
             onReadingFontChange={reading.selectReadingFont}
             onReadingFontSizeChange={reading.selectReadingFontSize}
             onLineSpacingChange={reading.selectLineSpacing}
+            onBulletStyleChange={reading.selectBulletStyle}
             onMermaidCurveChange={reading.selectMermaidCurve}
           />
         }

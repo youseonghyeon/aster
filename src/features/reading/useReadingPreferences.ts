@@ -8,6 +8,8 @@ import {
   type CSSProperties,
 } from "react";
 import {
+  bulletStyles,
+  type BulletStyle,
   getSteppedReadingZoom,
   lineSpacings,
   loadReadingPreference,
@@ -63,6 +65,9 @@ export function useReadingPreferences({
       "balanced",
     ),
   );
+  const [bulletStyle, setBulletStyle] = useState<BulletStyle>(() =>
+    loadReadingPreference(readingPreferenceStorageKeys.bulletStyle, bulletStyles, "default"),
+  );
   const [mermaidCurve, setMermaidCurve] = useState<MermaidCurvePreference>(() =>
     loadReadingPreference(
       readingPreferenceStorageKeys.mermaidCurve,
@@ -108,6 +113,11 @@ export function useReadingPreferences({
       readingPreferenceStorageKeys.lineSpacing,
       nextSpacing,
     );
+  }, [events]);
+  const selectBulletStyle = useCallback((nextStyle: BulletStyle) => {
+    events?.emit("reading-layout-will-change", undefined);
+    setBulletStyle(nextStyle);
+    saveReadingPreference(readingPreferenceStorageKeys.bulletStyle, nextStyle);
   }, [events]);
   const selectMermaidCurve = useCallback(
     (nextCurve: MermaidCurvePreference) => {
@@ -189,6 +199,7 @@ export function useReadingPreferences({
     readingFont,
     readingFontSize,
     lineSpacing,
+    bulletStyle,
     mermaidCurve,
     readingZoom,
     readingStyle,
@@ -197,6 +208,7 @@ export function useReadingPreferences({
     selectReadingFont,
     selectReadingFontSize,
     selectLineSpacing,
+    selectBulletStyle,
     selectMermaidCurve,
     toggleScrollSync,
   };

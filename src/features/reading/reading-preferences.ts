@@ -25,6 +25,11 @@ export const readingFonts = [
   { value: "dancing-script", label: "Dancing Script" },
 ] as const;
 
+export const bulletStyles = [
+  { value: "default", label: "기본" },
+  { value: "triangle", label: "세모" },
+] as const;
+
 export const lineSpacings = [
   { value: "tight", label: "매우 촘촘 1.4" },
   { value: "compact", label: "촘촘 1.5" },
@@ -66,6 +71,7 @@ export const readingPreferenceStorageKeys = {
   font: "aster:reading-font:v1",
   fontSize: "aster:reading-font-size:v1",
   lineSpacing: "aster:line-spacing:v1",
+  bulletStyle: "aster:bullet-style:v1",
   mermaidCurve: "aster:mermaid-curve:v1",
   zoom: "aster:reading-zoom:v1",
   scrollSync: "aster:scroll-sync:v1",
@@ -74,6 +80,7 @@ export const readingPreferenceStorageKeys = {
 export type Theme = (typeof themes)[number]["value"];
 export type ReadingFont = (typeof readingFonts)[number]["value"];
 export type ReadingFontSize = (typeof readingFontSizes)[number]["value"];
+export type BulletStyle = (typeof bulletStyles)[number]["value"];
 export type LineSpacing = (typeof lineSpacings)[number]["value"];
 export type { MermaidCurvePreference } from "../../lib/mermaid-curve";
 export type ReadingZoom = (typeof readingZoomLevels)[number]["value"];
