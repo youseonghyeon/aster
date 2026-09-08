@@ -144,6 +144,12 @@ pnpm install
 pnpm tauri dev
 ```
 
+`pnpm tauri dev`는 **Aster Dev** (`com.yuseonghyeon.aster.dev`)로 실행합니다.
+테스트 번들은 **Aster Preview** (`com.yuseonghyeon.aster.preview`), 정식 배포는
+**Aster** (`com.yuseonghyeon.aster`)로 고정합니다. 역할별 데이터는 분리되며,
+충돌 시 이름이나 식별자를 바꾸지 않고 점유 프로세스·포트 등의 원인을 해결합니다.
+개발 시 `pnpm exec tauri`로 실행 설정을 우회하지 않습니다.
+
 브라우저에서 프런트엔드만 확인하려면 다음 명령을 사용합니다.
 
 ```bash
@@ -156,7 +162,10 @@ pnpm dev
 # 프런트엔드 검사와 빌드
 pnpm build
 
-# 데스크톱 앱 번들 생성
+# 테스트용 Aster Preview (.app만, DMG 없음)
+pnpm build:preview
+
+# 정식 Aster 배포 번들 생성
 pnpm tauri build
 ```
 
