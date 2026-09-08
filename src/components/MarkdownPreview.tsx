@@ -93,6 +93,11 @@ type MarkdownLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & ExplicitAncho
 };
 
 const markdownComponents = {
+  input: ({ node, checked, ...inputProps }) => {
+    void node;
+    // Missing checked means false, not an uncontrolled input left in its old state.
+    return <input {...inputProps} checked={Boolean(checked)} disabled readOnly />;
+  },
   h1: MarkdownHeading1,
   h2: MarkdownHeading2,
   h3: MarkdownHeading3,
