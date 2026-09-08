@@ -70,6 +70,7 @@ function renderTree(state = treeState()) {
     onSelect: vi.fn(),
     onToggleDirectory: vi.fn(),
     onRetryDirectory: vi.fn(),
+    onRefresh: vi.fn(),
     onOpenMarkdown: vi.fn(),
     onOpenImage: vi.fn(),
     onRemoveFile: vi.fn(),
@@ -296,6 +297,23 @@ describe("FolderTree", () => {
     expect(props.onToggleDirectory).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["guide", "guide"],
+    ["start.md", "guide"],
+    ["README.md, 현재 문서", ""],
+    ["cover.png", ""],
+  ])("reloads the containing listing for %s without opening a document", (name, directory) => {
+    const props = renderTree();
+    const item = screen.getByRole("treeitem", { name });
+    fireEvent.contextMenu(item);
+    vi.mocked(showFolderContextMenu).mock.calls[0][0].onReload();
+    expect(props.onRefresh).toHaveBeenCalledExactlyOnceWith(directory);
+    expect(props.onOpenMarkdown).not.toHaveBeenCalled();
+    expect(props.onOpenImage).not.toHaveBeenCalled();
+    expect(props.onToggleDirectory).not.toHaveBeenCalled();
+    expect(screen.getByRole("treeitem", { name })).toBe(item);
+  });
+
   it("renders large directories in bounded pages", async () => {
     const state = treeState();
     state.expandedPaths = new Set();
@@ -355,6 +373,7 @@ describe("FolderTree", () => {
       onSelect: vi.fn(),
       onToggleDirectory: vi.fn(),
       onRetryDirectory: vi.fn(),
+      onRefresh: vi.fn(),
       onOpenMarkdown: vi.fn(),
       onOpenImage: vi.fn(),
       onRemoveFile: vi.fn(),
@@ -389,6 +408,7 @@ describe("FolderTree", () => {
       onSelect: vi.fn(),
       onToggleDirectory: vi.fn(),
       onRetryDirectory: vi.fn(),
+      onRefresh: vi.fn(),
       onOpenMarkdown: vi.fn(),
       onOpenImage: vi.fn(),
       onRemoveFile: vi.fn(),

@@ -39,7 +39,7 @@ type FolderRefreshFlight = {
   rootToken: number;
   epoch: number;
   trailing: boolean;
-  priorityDirectory: string | null;
+  priorityDirectories: Set<string>;
   promise: Promise<void>;
 };
 
@@ -194,7 +194,7 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
       ) {
         existing.trailing = true;
         if (priorityDirectory) {
-          existing.priorityDirectory = priorityDirectory;
+          existing.priorityDirectories.add(priorityDirectory);
         }
         return existing.promise;
       }
@@ -205,7 +205,7 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
         rootToken,
         epoch,
         trailing: true,
-        priorityDirectory: priorityDirectory ?? null,
+        priorityDirectories: new Set(priorityDirectory ? [priorityDirectory] : []),
         promise: Promise.resolve(),
       };
       const promise = (async () => {
@@ -218,10 +218,10 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
           ) {
             break;
           }
-          const priority = flight.priorityDirectory;
-          flight.priorityDirectory = null;
+          const priority = [...flight.priorityDirectories];
+          flight.priorityDirectories.clear();
           const directories = new Set([
-            ...(priority ? [priority] : []),
+            ...priority,
             "",
             ...stateRef.current.expandedPaths,
           ]);
@@ -355,9 +355,11 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
     };
   }, [activate, invalidateScheduler, isActive]);
 
-  const refresh = useCallback(async () => {
-    await requestRefresh();
-  }, [requestRefresh]);
+  const refresh = useCallback(async (priorityDirectory?: string) => {
+    // A native menu can outlive the root for which it was opened.
+    if (stateRef.current.root?.token !== state.root?.token) return;
+    await requestRefresh(priorityDirectory);
+  }, [requestRefresh, state.root?.token]);
 
   useEffect(() => {
     function handleVisibilityChange() {

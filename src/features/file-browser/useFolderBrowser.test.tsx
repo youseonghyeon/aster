@@ -408,6 +408,60 @@ describe("useFolderBrowser", () => {
     }
   });
 
+  it("refreshes the requested directory first without resetting tree preferences", async () => {
+    saveTestRoot();
+    const { result } = renderHook(() => useFolderBrowser({ isActive: true }));
+    await waitFor(() => expect(listFolderChildren).toHaveBeenCalledTimes(1));
+    act(() => result.current.actions.selectEntry("guide"));
+    const before = result.current.state;
+    vi.mocked(listFolderChildren).mockClear();
+
+    await act(async () => result.current.actions.refresh("guide"));
+
+    expect(vi.mocked(listFolderChildren).mock.calls).toEqual([[7, "guide"], [7, ""]]);
+    expect(result.current.state.root).toBe(before.root);
+    expect(result.current.state.expandedPaths).toEqual(before.expandedPaths);
+    expect(result.current.state.selectedPath).toBe(before.selectedPath);
+  });
+
+  it("retains all distinct directory requests while coalescing a pending refresh", async () => {
+    saveTestRoot();
+    const { result } = renderHook(() => useFolderBrowser({ isActive: true }));
+    await waitFor(() => expect(listFolderChildren).toHaveBeenCalledTimes(1));
+    const pending = deferred<FolderListing>();
+    vi.mocked(listFolderChildren).mockClear().mockReturnValueOnce(pending.promise);
+    let refresh!: Promise<void>;
+    act(() => {
+      refresh = result.current.actions.refresh();
+      void result.current.actions.refresh("guide");
+      void result.current.actions.refresh("notes");
+      void result.current.actions.refresh("guide");
+    });
+    pending.resolve(listing(""));
+    await act(async () => refresh);
+    expect(vi.mocked(listFolderChildren).mock.calls).toEqual([
+      [7, ""], [7, "guide"], [7, "notes"], [7, ""],
+    ]);
+  });
+
+  it("ignores a menu refresh captured before the root changed", async () => {
+    saveTestRoot();
+    const { result } = renderHook(() => useFolderBrowser({ isActive: true }));
+    await waitFor(() => expect(listFolderChildren).toHaveBeenCalledTimes(1));
+    const oldMenuRefresh = result.current.actions.refresh;
+    vi.mocked(chooseFolderPath).mockResolvedValue("/next");
+    vi.mocked(openFolderRoot).mockResolvedValue({ token: 8, path: "/next", name: "next" });
+    vi.mocked(listFolderChildren).mockImplementation((rootToken, directory) =>
+      Promise.resolve({ ...listing(directory), rootToken }),
+    );
+    await act(async () => result.current.actions.chooseRoot());
+    vi.mocked(listFolderChildren).mockClear();
+    await act(async () => oldMenuRefresh("guide"));
+    expect(listFolderChildren).not.toHaveBeenCalled();
+    await act(async () => result.current.actions.refresh("guide"));
+    expect(listFolderChildren).toHaveBeenCalledWith(8, "guide");
+  });
+
   it("coalesces repeated refresh requests into one trailing pass", async () => {
     localStorage.setItem(
       folderBrowserStorageKey,
