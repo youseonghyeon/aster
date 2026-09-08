@@ -2236,6 +2236,13 @@ html[data-platform="macos"] .header-group-divider {
   opacity: 1;
 }
 
+/* Use the vacant bullet column instead of adding a second marker column.
+   Keep continuation lines and nested lists at the list's text indentation. */
+.markdown-body ul > li.task-list-item > input[type="checkbox"],
+.markdown-body ul > li.task-list-item > p:first-child > input[type="checkbox"] {
+  margin-left: -1.4em;
+}
+
 .markdown-body input[type="checkbox"]::before {
   content: "";
   width: 0.64em;
