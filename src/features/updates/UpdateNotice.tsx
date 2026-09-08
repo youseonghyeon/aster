@@ -1,3 +1,4 @@
+import type { useUpdateInstaller } from "./useUpdateInstaller";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect } from "react";
 import type { UpdateCheckResult } from "./update-check";
@@ -9,6 +10,7 @@ type UpdateNoticeProps = {
   update: UpdateCheckResult;
   isStacked: boolean;
   onDismiss: () => void;
+  installer?: ReturnType<typeof useUpdateInstaller>;
 };
 
 function UpdateIcon() {
@@ -24,7 +26,9 @@ export function UpdateNotice({
   update,
   isStacked,
   onDismiss,
+  installer,
 }: UpdateNoticeProps) {
+  const busy = installer?.phase === "downloading" || installer?.phase === "installing";
   useEffect(() => {
     if (update.updateAvailable) return;
 
@@ -45,7 +49,7 @@ export function UpdateNotice({
       className={`update-notice${isStacked ? " is-stacked" : ""}`}
       aria-label="Aster 업데이트"
       onKeyDown={(event) => {
-        if (event.key === "Escape") {
+        if (event.key === "Escape" && !busy) {
           event.preventDefault();
           event.stopPropagation();
           onDismiss();
@@ -58,18 +62,28 @@ export function UpdateNotice({
       <span className="update-notice-message" role="status" aria-live="polite">
         <strong>
           {update.updateAvailable
-            ? `새 버전 ${update.latestVersion}`
+            ? `새 버전 ${installer?.downloadedVersion ?? update.latestVersion}`
             : "최신 버전입니다"}
         </strong>
-        <span>현재 {update.currentVersion}</span>
+        <span>{installer?.error || (installer?.phase === "downloading"
+          ? `다운로드 중${installer.progress === null ? "…" : ` ${installer.progress}%`}`
+          : installer?.phase === "ready" ? "다운로드 완료 · 준비되면 설치해 주세요"
+          : installer?.phase === "installing" ? "저장 후 업데이트를 설치하고 재시작합니다…"
+          : `현재 ${update.currentVersion}`)}</span>
       </span>
       {update.updateAvailable ? (
         <button
           type="button"
           className="update-notice-open"
-          onClick={() => void openUrl(update.releaseUrl).catch(() => undefined)}
+          disabled={busy}
+          onClick={() => {
+            if (installer?.supported) {
+              if (installer.phase === "ready") void installer.install();
+              else void installer.download(update.latestVersion);
+            } else void openUrl(update.releaseUrl).catch(() => undefined);
+          }}
         >
-          업데이트 보기
+          {installer?.supported ? (installer.phase === "ready" ? "설치하고 재시작" : busy ? "업데이트 중…" : "업데이트 다운로드") : "업데이트 보기"}
         </button>
       ) : null}
       <button
@@ -78,6 +92,7 @@ export function UpdateNotice({
         aria-label="업데이트 알림 닫기"
         title="닫기"
         onClick={onDismiss}
+        disabled={busy}
       >
         <span aria-hidden="true">×</span>
       </button>

@@ -132,3 +132,16 @@
     grid-row: 1 / span 2;
   }
 }
+
+.update-notice button:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.update-install-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}

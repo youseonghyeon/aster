@@ -45,6 +45,18 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc5OEM1OUExNDY4NTEyOUEKUldTYUVvVkdvVm1NZWZCS0d2anZXcHJhcFRLUUtnc2VPc05yK29obkZocnJTdC9NYk8xdDJ0eGcK",
+      "endpoints": [
+        "https://github.com/youseonghyeon/aster/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

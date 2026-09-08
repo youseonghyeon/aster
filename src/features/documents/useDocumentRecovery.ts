@@ -37,7 +37,7 @@ export function useDocumentRecovery(
   }, []);
 
   const flushDraft = useCallback(async (override?: RecoveryDocumentSnapshot) => {
-    if (!isDesktopRuntime()) return;
+    if (!isDesktopRuntime()) return true;
     if (timerRef.current !== null) {
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -48,13 +48,13 @@ export function useDocumentRecovery(
       suppressed?.identity === current.identity &&
       suppressed.markdown === current.markdown
     ) {
-      return;
+      return true;
     }
     if (suppressed) suppressedSnapshotRef.current = null;
-    if (current.markdown === current.loadedMarkdown) return;
+    if (current.markdown === current.loadedMarkdown) return true;
     const sequence = nextSequence();
     try {
-      await saveRecoveryDraft({
+      return await saveRecoveryDraft({
         identity: current.identity,
         path: current.path,
         content: current.markdown,
@@ -63,6 +63,7 @@ export function useDocumentRecovery(
       });
     } catch (error) {
       onErrorRef.current(error instanceof Error ? error.message : String(error));
+      return false;
     }
   }, [nextSequence]);
 

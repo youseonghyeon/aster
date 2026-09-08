@@ -34,6 +34,17 @@ describe("document recovery controller", () => {
 
   afterEach(() => vi.useRealTimers());
 
+  it("reports a failed forced save so an update can stop before restarting", async () => {
+    const report = vi.fn();
+    const { result } = renderHook(() => useDocumentRecovery(dirtySnapshot, report));
+    vi.mocked(saveRecoveryDraft).mockRejectedValueOnce(new Error("disk full"));
+    await act(async () => { expect(await result.current.flushDraft()).toBe(false); });
+    expect(report).toHaveBeenCalledWith("disk full");
+    vi.mocked(saveRecoveryDraft).mockResolvedValueOnce(false);
+    await act(async () => { expect(await result.current.flushDraft()).toBe(false); });
+    await act(async () => { expect(await result.current.flushDraft()).toBe(true); });
+  });
+
   it("writes a file-scoped recovery draft after the debounce", async () => {
     renderHook(() => useDocumentRecovery(dirtySnapshot, vi.fn()));
 
