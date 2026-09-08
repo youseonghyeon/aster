@@ -84,7 +84,7 @@ pub(crate) fn handle_window_event(window: &Window, event: &WindowEvent) {
     }
 }
 
-fn save(window: &Window) -> Result<(), String> {
+pub(crate) fn save(window: &Window) -> Result<(), String> {
     if window
         .is_minimized()
         .map_err(|error| format!("창 최소화 상태를 확인할 수 없습니다: {error}"))?

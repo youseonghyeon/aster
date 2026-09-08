@@ -277,7 +277,22 @@ export function useDocumentSession({
     state.operation,
   ]);
 
+  const prepareUpdateRestart = useCallback(async () => {
+    if (activeOperationRef.current !== null) return false;
+    const before = stateRef.current;
+    if (!(await flushCurrentNote())) return false;
+    const doc = before.document;
+    if (!(await flushDraft({ identity: doc.draftIdentity, path: doc.path,
+      markdown: doc.markdown, loadedMarkdown: doc.loadedMarkdown,
+      revision: doc.revision, generation: doc.generation }))) return false;
+    const after = stateRef.current;
+    return mountedRef.current && activeOperationRef.current === null &&
+      before.document.generation === after.document.generation &&
+      before.document.markdown === after.document.markdown && before.note.value === after.note.value;
+  }, [flushCurrentNote, flushDraft]);
+
   const decideClose = useCallback(async () => {
+    if (isBlockingModalOpen()) return { allow: false };
     if (activeOperationRef.current !== null) return { allow: false };
     if (!(await flushCurrentNote())) return { allow: false };
     const current = stateRef.current.document;
@@ -289,7 +304,7 @@ export function useDocumentSession({
       allow: true,
       discardDraft: reserveDiscardFence(current.draftIdentity),
     };
-  }, [flushCurrentNote, reserveDiscardFence]);
+  }, [flushCurrentNote, reserveDiscardFence, isBlockingModalOpen]);
   useDocumentCloseGuard(decideClose);
   const { hasStoredDocument, isRestoring } = useLastOpenedDocument({
     documentPath: state.document.path,
@@ -428,5 +443,6 @@ export function useDocumentSession({
     reloadDocument,
     dismissExternalFileNotice,
     ensureCanLeave,
+    prepareUpdateRestart,
   };
 }

@@ -1,3 +1,5 @@
+import { useUpdateInstaller } from "../features/updates/useUpdateInstaller";
+import { saveUpdateReadingResume } from "../lib/update-reading-resume";
 import type { useDocumentSession } from "../features/documents/useDocumentSession";
 import { ExternalFileNotice } from "../features/documents/ExternalFileNotice";
 import { useFolderBrowser } from "../features/file-browser/useFolderBrowser";
@@ -46,10 +48,17 @@ export function AppWorkspace({
     openDocument: documents.openDocument,
   });
   const updateCheck = useUpdateCheck();
+  const installer = useUpdateInstaller(async () => {
+    if (!(await documents.prepareUpdateRestart())) return false;
+    saveUpdateReadingResume(workspace.navigation.previewElement, documents.document.path, documents.document.markdown);
+    return true;
+  });
 
   return (
+    <>
     <div
       className="app-shell"
+      inert={installer.phase === "installing"}
       data-theme={reading.theme}
       data-font={reading.readingFont}
       data-line-spacing={reading.lineSpacing}
@@ -220,6 +229,7 @@ export function AppWorkspace({
           {updateCheck.visibleUpdateCheck ? (
             <UpdateNotice
               update={updateCheck.visibleUpdateCheck}
+              installer={installer}
               isStacked={documents.visibleExternalFileState !== null}
               onDismiss={updateCheck.dismiss}
             />
@@ -227,5 +237,7 @@ export function AppWorkspace({
         </main>
       </StageSidebarLayout>
     </div>
+    <span className="update-install-announcement" role="status">{installer.phase === "installing" ? "업데이트를 설치하고 재시작합니다." : ""}</span>
+    </>
   );
 }

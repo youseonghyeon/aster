@@ -16,6 +16,7 @@ const mockedRuntime = vi.hoisted(() => ({ desktop: false }));
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
+  Channel: class { onmessage = () => {}; },
   isTauri: () => mockedRuntime.desktop,
 }));
 vi.mock("@tauri-apps/api/app", () => ({ getVersion: vi.fn() }));
@@ -80,6 +81,33 @@ describe("workspace regression contracts", () => {
     vi.mocked(listen).mockReset();
     vi.mocked(listen).mockImplementation(async () => () => undefined);
     vi.mocked(message).mockResolvedValue("Ok");
+  });
+
+  it.each([true, false])("saves recovery before update installation (saved=%s)", async (saved) => {
+    mockedRuntime.desktop = true;
+    const user = userEvent.setup();
+    vi.mocked(invoke).mockImplementation(async command => {
+      if (command === "check_for_update") return {
+        currentVersion: "1.7.0", latestVersion: "1.9.0", updateAvailable: true,
+        releaseUrl: "https://github.com/youseonghyeon/aster/releases/tag/v1.9.0",
+      };
+      if (command === "can_install_update") return true;
+      if (command === "save_recovery_draft") return saved;
+      if (command === "load_recovery_draft") return null;
+      return undefined;
+    });
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "업데이트 다운로드" }));
+    const install = await screen.findByRole("button", { name: "설치하고 재시작" });
+    await user.click(install);
+    if (saved) {
+      await waitFor(() => expect(invoke).toHaveBeenCalledWith("install_app_update", { version: "1.9.0" }));
+      const calls = vi.mocked(invoke).mock.calls.map(([command]) => command);
+      expect(calls.lastIndexOf("save_recovery_draft")).toBeLessThan(calls.indexOf("install_app_update"));
+    } else {
+      await screen.findByText("작업을 저장하지 못했습니다. 저장 상태를 확인한 뒤 다시 시도해 주세요.");
+      expect(invoke).not.toHaveBeenCalledWith("install_app_update", expect.anything());
+    }
   });
 
   it("shows a newer release and lets the native menu check again", async () => {

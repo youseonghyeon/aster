@@ -1,5 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Aster Dev",
-  "identifier": "com.yuseonghyeon.aster.dev"
+  "identifier": "com.yuseonghyeon.aster.dev",
+  "bundle": {
+    "createUpdaterArtifacts": false
+  }
 }

@@ -1,3 +1,4 @@
+import { takeUpdateReadingResume } from "../../lib/update-reading-resume";
 import { useLayoutEffect, useRef } from "react";
 import {
   capturePreviewReadingAnchor,
@@ -210,6 +211,13 @@ export function useReadingLayoutPreservation({
     preview.addEventListener("keydown", cancelForNavigation);
     document.fonts.addEventListener("loadingdone", afterLayoutChange);
 
+    if (!snapshotRef.current && isCurrentPreview()) {
+      const current = inputsRef.current;
+      const resumed = takeUpdateReadingResume(preview, current.documentPath, current.markdown);
+      if (resumed) snapshotRef.current = {
+        anchor: resumed, regions: [], markdown: current.markdown, path: current.documentPath,
+      };
+    }
     // A cached anchor predates native resize callbacks and React layout commits.
     if (snapshotRef.current) commit();
     else capture();

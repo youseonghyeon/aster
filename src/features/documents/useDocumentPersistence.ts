@@ -41,7 +41,7 @@ type UseDocumentPersistenceOptions = {
   finishOperation: (operation: DocumentOperation) => void;
   resetExternalFileStatus: () => void;
   discardDraft: (identity?: string) => Promise<unknown>;
-  flushDraft: (snapshot?: RecoveryDocumentSnapshot) => Promise<void>;
+  flushDraft: (snapshot?: RecoveryDocumentSnapshot) => Promise<boolean | void>;
   showError: (error: unknown, title?: string) => Promise<void>;
 };
 

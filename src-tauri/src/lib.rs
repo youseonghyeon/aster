@@ -1,3 +1,4 @@
+mod app_update;
 mod close_guard;
 mod document_io;
 mod file_watch;
@@ -233,6 +234,8 @@ pub fn run() {
         .manage(FolderTreeState::default())
         .manage(RecoveryState::default())
         .manage(CloseGuardState::default())
+        .manage(app_update::UpdateState::default())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
@@ -347,6 +350,9 @@ pub fn run() {
             enable_close_guard,
             resolve_close_request,
             check_for_update,
+            app_update::can_install_update,
+            app_update::download_app_update,
+            app_update::install_app_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

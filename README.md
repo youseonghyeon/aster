@@ -221,3 +221,32 @@ Aster는 기능의 수보다 읽는 경험의 완성도를 우선합니다.
 ## 라이선스
 
 Aster는 [MIT License](LICENSE)로 배포됩니다.
+
+### 앱 내 업데이트 배포
+
+정식 Aster는 새 버전 안내에서 다운로드한 뒤 사용자가 `설치하고 재시작`을 선택할 수 있습니다.
+메모와 복구 초안 저장이 실패하면 설치하지 않습니다. Dev와 Preview는 정식 업데이트를 설치하지 않습니다.
+기능 도입 전 버전에서는 이 기능이 포함된 첫 버전까지 한 번 수동 설치가 필요합니다.
+
+배포 빌드에는 업데이트 서명 키를 `TAURI_SIGNING_PRIVATE_KEY`로 전달합니다. 필요한 경우
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`도 지정합니다. 개인 키는 Git에 저장하지 않습니다.
+Windows 수동 빌드 workflow에는 동일한 이름의 GitHub Actions secrets를 등록해야 합니다.
+일반 macOS Developer ID 서명·Apple 공증과 업데이트 서명은 각각 수행해야 합니다.
+
+- macOS는 Universal 빌드의 `Aster.app.tar.gz`와 `.sig`, Windows는 설치 `.exe`와 `.sig`를 준비합니다.
+- macOS 앱을 공증·staple한 뒤 아래 전용 명령으로 업데이트 파일을 다시 만들고 최종 압축 파일에 업데이트 서명합니다. 기본 macOS tar의 `._` 메타데이터가 들어가면 설치기의 압축 해제가 실패하므로 일반 압축 명령으로 대체하지 않습니다.
+
+```bash
+node scripts/package-macos-updater.mjs PATH/Aster.app ARTIFACT_DIRECTORY/Aster.app.tar.gz
+pnpm tauri signer sign --private-key-path KEY_PATH ARTIFACT_DIRECTORY/Aster.app.tar.gz
+```
+- 최종 파일을 한 디렉토리에 모으고 아래 명령으로 플랫폼별 다운로드 정보를 생성합니다.
+
+```bash
+node scripts/updater-manifest.mjs VERSION ARTIFACT_DIRECTORY Aster.app.tar.gz Aster_VERSION_x64-setup.exe
+node --test scripts/updater-manifest.check.mjs
+```
+
+`latest.json`, 두 업데이트 파일과 각 `.sig`를 **같은 버전의 draft 릴리스**에 먼저 올리고 검증한 뒤 공개합니다.
+macOS Universal 파일을 두 아키텍처에 연결하므로 단일 아키텍처 빌드로 대체하지 않습니다.
+최초 업데이트 배포 전에 실제 이전 버전에서 설치·재시작·메모 및 읽기 위치 복원을 확인합니다.
