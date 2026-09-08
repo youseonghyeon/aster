@@ -10,7 +10,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "node scripts/tauri-profile.mjs",
+    "build:preview": "node scripts/tauri-profile.mjs preview",
+    "test:profiles": "node --test scripts/tauri-profile.check.mjs"
   },
   "dependencies": {
     "@fontsource-variable/dancing-script": "^5.3.0",
