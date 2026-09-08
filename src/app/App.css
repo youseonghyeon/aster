@@ -2124,6 +2124,16 @@ html[data-platform="macos"] .header-group-divider {
   margin-bottom: 0.35em;
 }
 
+.markdown-body li > :is(ul, ol):not(:last-child) {
+  margin-bottom: 0.5em;
+}
+
+/* Nested lists follow the same vertical rhythm as sibling items. */
+.markdown-body li > :is(ul, ol) {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+}
+
 .markdown-body input[type="checkbox"] {
   margin: 0 0.5em 0.1em 0;
   accent-color: var(--accent);
