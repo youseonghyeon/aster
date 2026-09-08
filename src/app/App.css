@@ -147,6 +147,9 @@
 
 .app-shell[data-line-spacing="tight"] {
   --reading-line-height: 1.4;
+  --reading-h2-margin: 1.5em 0 0.5em;
+  --reading-list-gap: 0.3em;
+  --reading-list-paragraph-gap: 0.25em;
 }
 
 .app-shell[data-line-spacing="compact"] {
@@ -2073,7 +2076,7 @@ html[data-platform="macos"] .header-group-divider {
 }
 
 .markdown-body h2 {
-  margin: 2.1em 0 0.75em;
+  margin: var(--reading-h2-margin, 2.1em 0 0.75em);
   font-size: 1.55em;
 }
 
@@ -2117,20 +2120,20 @@ html[data-platform="macos"] .header-group-divider {
 }
 
 .markdown-body li + li {
-  margin-top: 0.5em;
+  margin-top: var(--reading-list-gap, 0.5em);
 }
 
 .markdown-body li > p {
-  margin-bottom: 0.35em;
+  margin-bottom: var(--reading-list-paragraph-gap, 0.35em);
 }
 
 .markdown-body li > :is(ul, ol):not(:last-child) {
-  margin-bottom: 0.5em;
+  margin-bottom: var(--reading-list-gap, 0.5em);
 }
 
 /* Nested lists follow the same vertical rhythm as sibling items. */
 .markdown-body li > :is(ul, ol) {
-  margin-top: 0.5em;
+  margin-top: var(--reading-list-gap, 0.5em);
   margin-bottom: 0;
 }
 
@@ -2206,6 +2209,15 @@ html[data-platform="macos"] .header-group-divider {
   font-size: 0.86em;
   font-weight: 400;
   word-break: break-word;
+}
+
+/* Keep inline backgrounds within tight text lines and off adjacent prose. */
+.markdown-body code:not(pre code) {
+  position: relative;
+  top: -0.06em;
+  padding-block: 0.09em;
+  margin-inline: 0.12em;
+  font-size: 0.83em;
 }
 
 .markdown-body kbd {
