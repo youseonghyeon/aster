@@ -35,7 +35,7 @@ export function AppStageSidebar({
         }}
         onChooseRoot={() => void folderBrowser.actions.chooseRoot()}
         onClearRoot={() => void folderBrowser.actions.clearRoot()}
-        onRefresh={() => void folderBrowser.actions.refresh()}
+        onRefresh={folderBrowser.actions.refresh}
         onSelectEntry={folderBrowser.actions.selectEntry}
         onToggleDirectory={folderBrowser.actions.toggleDirectory}
         onRetryDirectory={folderBrowser.actions.retryDirectory}

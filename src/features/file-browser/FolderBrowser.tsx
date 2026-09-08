@@ -20,7 +20,7 @@ type FolderBrowserProps = {
   onRecentView: () => void;
   onChooseRoot: () => void;
   onClearRoot: () => void;
-  onRefresh: () => void;
+  onRefresh: (directory?: string) => void;
   onSelectEntry: (path: string) => void;
   onToggleDirectory: (entry: FolderEntry) => void;
   onRetryDirectory: (directory: string) => void;
@@ -257,7 +257,7 @@ export function FolderBrowser({
             <button
               type="button"
               data-primary-action="true"
-              onClick={onRefresh}
+              onClick={() => onRefresh()}
             >
               다시 시도
             </button>
@@ -276,6 +276,7 @@ export function FolderBrowser({
             onSelect={onSelectEntry}
             onToggleDirectory={onToggleDirectory}
             onRetryDirectory={onRetryDirectory}
+            onRefresh={onRefresh}
             onOpenMarkdown={(entry) =>
               state.root && onOpenMarkdown(state.root.path, entry)
             }

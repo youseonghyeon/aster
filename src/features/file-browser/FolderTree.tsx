@@ -94,6 +94,7 @@ type FolderTreeProps = {
   onSelect: (path: string) => void;
   onToggleDirectory: (entry: FolderEntry) => void;
   onRetryDirectory: (directory: string) => void;
+  onRefresh: (directory?: string) => void;
   onOpenMarkdown: (entry: FolderEntry) => void;
   onOpenImage: (entry: FolderEntry) => void;
   onRemoveFile: (entry: FolderEntry) => void;
@@ -107,6 +108,7 @@ export function FolderTree({
   onSelect,
   onToggleDirectory,
   onRetryDirectory,
+  onRefresh,
   onOpenMarkdown,
   onOpenImage,
   onRemoveFile,
@@ -283,7 +285,11 @@ export function FolderTree({
       y,
       canRemoveFile:
         !isDocumentBusy && removingFilePath !== entry.relativePath,
-      onReload: () => window.location.reload(),
+      onReload: () => onRefresh(
+        entry.kind === "directory"
+          ? entry.relativePath
+          : parentPath(entry.relativePath) ?? "",
+      ),
       onRemoveFile: () => onRemoveFile(entry),
     }).catch((error) => {
       console.error("파일 문맥 메뉴를 열지 못했습니다.", error);

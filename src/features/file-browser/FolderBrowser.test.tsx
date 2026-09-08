@@ -1,8 +1,13 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { FolderTreeState } from "./folder-tree-state";
 import { FolderBrowser } from "./FolderBrowser";
+import { showFolderContextMenu } from "./folder-context-menu";
+
+vi.mock("./folder-context-menu", () => ({
+  showFolderContextMenu: vi.fn(() => Promise.resolve()),
+}));
 
 function browserState(): FolderTreeState {
   return {
@@ -55,6 +60,19 @@ function browserProps(state: FolderTreeState) {
 }
 
 describe("FolderBrowser", () => {
+  it("routes native Reload through the listing callback while keeping the tree mounted", () => {
+    const props = browserProps(browserState());
+    props.isDocumentBusy = true;
+    render(<FolderBrowser {...props} />);
+    const item = screen.getByRole("treeitem", { name: "README.md, 현재 문서" });
+    fireEvent.contextMenu(item);
+    vi.mocked(showFolderContextMenu).mock.lastCall?.[0].onReload();
+    expect(props.onRefresh).toHaveBeenCalledExactlyOnceWith("");
+    expect(props.onOpenMarkdown).not.toHaveBeenCalled();
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("treeitem", { name: "README.md, 현재 문서" })).toBe(item);
+  });
+
   it("moves focus to folder change when a refresh removes the entire tree", async () => {
     const state = browserState();
     const props = browserProps(state);
