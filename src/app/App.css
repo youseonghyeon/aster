@@ -934,6 +934,7 @@ html[data-platform="macos"] .header-group-divider {
 .theme-option,
 .font-size-option,
 .line-spacing-option,
+.bullet-style-option,
 .mermaid-curve-option {
   position: relative;
   display: grid;
@@ -951,6 +952,7 @@ html[data-platform="macos"] .header-group-divider {
 .theme-option:hover,
 .font-size-option:hover,
 .line-spacing-option:hover,
+.bullet-style-option:hover,
 .mermaid-curve-option:hover {
   color: var(--accent-hover);
   background: var(--table-row-hover);
@@ -960,6 +962,7 @@ html[data-platform="macos"] .header-group-divider {
 .theme-option:focus-visible,
 .font-size-option:focus-visible,
 .line-spacing-option:focus-visible,
+.bullet-style-option:focus-visible,
 .mermaid-curve-option:focus-visible,
 .font-select-trigger:focus-visible,
 .font-select-option:focus-visible {
@@ -970,11 +973,27 @@ html[data-platform="macos"] .header-group-divider {
 .theme-option[aria-pressed="true"],
 .font-size-option[aria-pressed="true"],
 .line-spacing-option[aria-pressed="true"],
+.bullet-style-option[aria-pressed="true"],
 .mermaid-curve-option[aria-pressed="true"] {
   color: var(--accent-strong);
-  background: var(--table-row-hover);
+  background: color-mix(in srgb, var(--accent) 8%, var(--control-background));
   border-color: var(--accent);
-  box-shadow: inset 0 0 0 0.75px var(--accent);
+}
+
+.bullet-style-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.bullet-style-option {
+  font: inherit;
+}
+
+.bullet-style-glyph {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
 }
 
 .font-size-glyph {
@@ -2117,6 +2136,64 @@ html[data-platform="macos"] .header-group-divider {
 .markdown-body ul,
 .markdown-body ol {
   padding-left: 1.55em;
+}
+
+/* Keep native list semantics and marker metrics identical across shape choices.
+   Decorative shapes sit outside text flow, centered on the first text line. */
+.markdown-body ul > li {
+  position: relative;
+}
+
+.markdown-body ul > li::marker {
+  color: transparent;
+}
+
+.markdown-body ul > li::before {
+  content: "";
+  position: absolute;
+  inset-inline-end: calc(100% + 0.45em);
+  top: 0.5lh;
+  transform: translateY(-50%);
+  width: 0.4em;
+  height: 0.4em;
+  border-radius: 50%;
+  background: currentColor;
+  pointer-events: none;
+}
+
+.markdown-body ul ul > li::before {
+  border: 0.07em solid currentColor;
+  background: transparent;
+}
+
+.markdown-body ul ul ul > li::before {
+  border: 0;
+  border-radius: 0;
+  background: currentColor;
+}
+
+.app-shell[data-bullet-style="triangle"] .markdown-body ul > li::before {
+  width: 0.6em;
+  height: 0.6em;
+  border: 0;
+  border-radius: 0;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M3 1L19 10L3 19Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.app-shell[data-bullet-style="triangle"] .markdown-body ul ul > li::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill-rule='evenodd' d='M3 1L19 10L3 19ZM4.8 4.1L15.4 10L4.8 15.9Z'/%3E%3C/svg%3E");
+}
+
+.app-shell[data-bullet-style="triangle"] .markdown-body ul ul ul > li::before {
+  width: 0.4em;
+  height: 0.4em;
+  mask: none;
+}
+
+/* Task inputs replace the visible marker while retaining list indentation. */
+.markdown-body ul > li.task-list-item::before {
+  content: none;
 }
 
 .markdown-body li + li {

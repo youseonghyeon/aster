@@ -41,6 +41,7 @@ function App() {
         data-theme={reading.theme}
         data-font={reading.readingFont}
         data-line-spacing={reading.lineSpacing}
+        data-bullet-style={reading.bulletStyle}
         style={reading.readingStyle}
       >
         <main

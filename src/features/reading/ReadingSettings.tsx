@@ -5,6 +5,8 @@ import {
   type KeyboardEvent,
 } from "react";
 import {
+  bulletStyles,
+  type BulletStyle,
   lineSpacings,
   mermaidCurveOptions,
   readingFonts,
@@ -22,11 +24,13 @@ type ReadingSettingsProps = {
   readingFont: ReadingFont;
   readingFontSize: ReadingFontSize;
   lineSpacing: LineSpacing;
+  bulletStyle: BulletStyle;
   mermaidCurve: MermaidCurvePreference;
   onThemeChange: (theme: Theme) => void;
   onReadingFontChange: (font: ReadingFont) => void;
   onReadingFontSizeChange: (size: ReadingFontSize) => void;
   onLineSpacingChange: (spacing: LineSpacing) => void;
+  onBulletStyleChange: (style: BulletStyle) => void;
   onMermaidCurveChange: (curve: MermaidCurvePreference) => void;
 };
 
@@ -309,11 +313,13 @@ export function ReadingSettings({
   readingFont,
   readingFontSize,
   lineSpacing,
+  bulletStyle,
   mermaidCurve,
   onThemeChange,
   onReadingFontChange,
   onReadingFontSizeChange,
   onLineSpacingChange,
+  onBulletStyleChange,
   onMermaidCurveChange,
 }: ReadingSettingsProps) {
   return (
@@ -401,6 +407,29 @@ export function ReadingSettings({
               onClick={() => onLineSpacingChange(spacingOption.value)}
             >
               <LineSpacingGlyph />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="settings-group">
+        <span id="bullet-style-setting-label" className="settings-label">글머리표 모양</span>
+        <div className="bullet-style-options" role="group" aria-labelledby="bullet-style-setting-label">
+          {bulletStyles.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className="bullet-style-option"
+              aria-label={option.label}
+              title={option.label}
+              aria-pressed={bulletStyle === option.value}
+              onClick={() => onBulletStyleChange(option.value)}
+            >
+              <svg className="bullet-style-glyph" viewBox="0 0 24 24" aria-hidden="true">
+                {option.value === "default"
+                  ? <circle cx="12" cy="12" r="6" />
+                  : <path d="M6 4 20 12 6 20Z" />}
+              </svg>
             </button>
           ))}
         </div>

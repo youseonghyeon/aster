@@ -18,6 +18,8 @@ describe("reading settings", () => {
         readingFont="pretendard"
         readingFontSize="17"
         lineSpacing="balanced"
+        bulletStyle="default"
+        onBulletStyleChange={vi.fn()}
         mermaidCurve="curved"
         onThemeChange={onThemeChange}
         onReadingFontChange={onReadingFontChange}
@@ -57,6 +59,8 @@ describe("reading settings", () => {
         readingFont="pretendard"
         readingFontSize="21"
         lineSpacing="balanced"
+        bulletStyle="default"
+        onBulletStyleChange={vi.fn()}
         mermaidCurve="orthogonal"
         onThemeChange={onThemeChange}
         onReadingFontChange={onReadingFontChange}
@@ -94,6 +98,33 @@ describe("reading settings", () => {
     expect(onMermaidCurveChange).toHaveBeenLastCalledWith("straight");
   });
 
+  it("selects bullet styles with pointer and keyboard and exposes the selected state", async () => {
+    const user = userEvent.setup();
+    const onBulletStyleChange = vi.fn();
+    const props = {
+      theme: "paper" as const, readingFont: "pretendard" as const,
+      readingFontSize: "17" as const, lineSpacing: "tight" as const,
+      mermaidCurve: "curved" as const, bulletStyle: "default" as const,
+      onThemeChange: vi.fn(), onReadingFontChange: vi.fn(), onReadingFontSizeChange: vi.fn(),
+      onLineSpacingChange: vi.fn(), onMermaidCurveChange: vi.fn(), onBulletStyleChange,
+    };
+    const { rerender } = render(<ReadingSettings {...props} />);
+    expect(screen.getByRole("group", { name: "글머리표 모양" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "원형" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "사각형" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "세모" }));
+    expect(onBulletStyleChange).toHaveBeenLastCalledWith("triangle");
+    rerender(<ReadingSettings {...props} bulletStyle="triangle" />);
+    expect(screen.getByRole("button", { name: "세모" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "기본" })).toHaveAttribute("aria-pressed", "false");
+    screen.getByRole("button", { name: "기본" }).focus();
+    await user.keyboard("{Enter}");
+    expect(onBulletStyleChange).toHaveBeenLastCalledWith("default");
+    const count = onBulletStyleChange.mock.calls.length;
+    await user.keyboard(" ");
+    expect(onBulletStyleChange).toHaveBeenCalledTimes(count + 1);
+  });
+
   it("exposes diagram help as a hover and focus tooltip", async () => {
     const user = userEvent.setup();
     render(
@@ -102,6 +133,8 @@ describe("reading settings", () => {
         readingFont="pretendard"
         readingFontSize="17"
         lineSpacing="balanced"
+        bulletStyle="default"
+        onBulletStyleChange={vi.fn()}
         mermaidCurve="curved"
         onThemeChange={vi.fn()}
         onReadingFontChange={vi.fn()}

@@ -200,6 +200,28 @@ describe("workspace regression contracts", () => {
     expect(screen.queryByText("마지막 문서를 여는 중…")).not.toBeInTheDocument();
   });
 
+  it("changes all unordered markers without changing Markdown, numbered lists or task inputs", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    const markdown = "- 일반 항목\n  - 하위 항목\n- [ ] 확인 항목\n\n1. 번호 항목";
+    const editor = screen.getByRole("textbox", { name: "마크다운 입력" });
+    fireEvent.change(editor, { target: { value: markdown } });
+    await waitFor(() => expect(container.querySelectorAll(".markdown-body li.task-list-item")).toHaveLength(1));
+    const preview = container.querySelector(".markdown-body");
+    const task = preview?.querySelector('input[type="checkbox"]');
+    const numbered = preview?.querySelector("ol > li");
+    await user.click(screen.getByRole("button", { name: "읽기 설정" }));
+    await user.click(screen.getByRole("button", { name: "세모" }));
+    expect(container.querySelector(".app-shell")).toHaveAttribute("data-bullet-style", "triangle");
+    expect(editor).toHaveValue(markdown);
+    expect(preview?.querySelector('input[type="checkbox"]')).toBe(task);
+    expect(task).not.toBeChecked();
+    expect(preview?.querySelector("ol > li")).toBe(numbered);
+    expect(preview?.querySelectorAll("ul > li")).toHaveLength(3);
+    await user.click(screen.getByRole("button", { name: "기본" }));
+    expect(container.querySelector(".app-shell")).toHaveAttribute("data-bullet-style", "default");
+  });
+
   it("keeps an inset outline open while reading settings toggle", async () => {
     const user = userEvent.setup();
     render(<App />);
