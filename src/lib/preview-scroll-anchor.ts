@@ -1,3 +1,4 @@
+import { captureReadingTextAnchor, getReadingTextAnchorTop, type ReadingTextAnchor } from "./reading-text-anchor";
 import { getReadingFocusOffset } from "./reading-viewport";
 
 export type PreviewScrollAnchorSnapshot = {
@@ -11,6 +12,8 @@ export type PreviewReadingAnchorSnapshot = {
   container: HTMLElement;
   sourceOffset: string | null;
   blockProgress: number;
+  textAnchor?: ReadingTextAnchor | null;
+  neighbours?: string[];
   viewportOffset: number;
   scrollProgress: number;
   scrollTop: number;
@@ -99,7 +102,7 @@ export function capturePreviewReadingAnchor(
   const viewportOffset = getReadingFocusOffset(container.clientHeight);
   const anchors = Array.from(
     container.querySelectorAll<HTMLElement>("[data-source-offset]"),
-  );
+  ).filter(anchor => anchor.getBoundingClientRect().height > 0);
   const anchor = anchors.reduce<HTMLElement | null>((best, candidate) => {
     if (!best) return candidate;
 
@@ -137,7 +140,14 @@ export function capturePreviewReadingAnchor(
     container,
     sourceOffset: anchor?.getAttribute("data-source-offset") ?? null,
     blockProgress,
-    viewportOffset,
+    textAnchor: anchor ? captureReadingTextAnchor(anchor, containerRect.top, viewportOffset) : null,
+    neighbours: Array.from(new Set(anchors
+      .slice(Math.max(0, anchors.indexOf(anchor!) - 4), anchors.indexOf(anchor!) + 5)
+      .map(element => element.getAttribute("data-source-offset")!)
+      .filter(offset => offset !== anchor?.getAttribute("data-source-offset"))))
+      .sort((left, right) => Math.abs(Number(left) - Number(anchor?.dataset.sourceOffset)) -
+        Math.abs(Number(right) - Number(anchor?.dataset.sourceOffset))),
+    viewportOffset: anchorRect ? anchorTop + anchorRect.height * blockProgress : viewportOffset,
     scrollProgress:
       maximumScrollTop > 0 ? container.scrollTop / maximumScrollTop : 0,
     scrollTop: container.scrollTop,
@@ -162,7 +172,8 @@ export function restorePreviewReadingAnchor(
     ? Array.from(
         container.querySelectorAll<HTMLElement>("[data-source-offset]"),
       ).filter(
-        (anchor) => anchor.getAttribute("data-source-offset") === sourceOffset,
+        (anchor) => anchor.getAttribute("data-source-offset") === sourceOffset &&
+          anchor.getBoundingClientRect().height > 0,
       )
     : [];
   const anchor = anchors.reduce<HTMLElement | null>((best, candidate) => {
@@ -191,8 +202,29 @@ export function restorePreviewReadingAnchor(
     return;
   }
 
+  const textTop = snapshot.textAnchor ? getReadingTextAnchorTop(anchor, snapshot.textAnchor) : null;
+  if (textTop !== null && snapshot.textAnchor) {
+    container.scrollTop += textTop - containerTop - snapshot.textAnchor.viewportTop;
+    return;
+  }
   const anchorRect = anchor.getBoundingClientRect();
   const anchorPoint =
     anchorRect.top - containerTop + anchorRect.height * blockProgress;
   container.scrollTop += anchorPoint - viewportOffset;
+}
+
+/** Remap source identities before querying the replacement Markdown DOM. */
+export function remapPreviewReadingAnchor(
+  snapshot: PreviewReadingAnchorSnapshot,
+  mapOffset: (offset: number) => number | null,
+): PreviewReadingAnchorSnapshot {
+  const mapped = snapshot.sourceOffset === null ? null : mapOffset(Number(snapshot.sourceOffset));
+  if (mapped !== null) return { ...snapshot, sourceOffset: String(mapped) };
+  for (const neighbour of snapshot.neighbours ?? []) {
+    const offset = mapOffset(Number(neighbour));
+    if (offset !== null) return {
+      ...snapshot, sourceOffset: String(offset), textAnchor: null, blockProgress: 0,
+    };
+  }
+  return { ...snapshot, sourceOffset: null, textAnchor: null };
 }
