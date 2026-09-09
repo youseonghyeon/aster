@@ -19,13 +19,16 @@ beforeEach(() => {
   native.popup.mockResolvedValue(undefined); native.close.mockResolvedValue(undefined);
 });
 describe("outline context menu", () => {
-  it("replaces the outline's default menu with native copy without a reload item", async () => {
+  it("suppresses the outline menu without adding copy or reload actions", async () => {
     render(<DocumentOutline {...props} />);
     const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 32, clientY: 60 });
     fireEvent(screen.getByRole("navigation"), event);
     expect(event.defaultPrevented).toBe(true);
-    await waitFor(() => expect(native.create).toHaveBeenCalledWith({ items: [{ item: "Copy", text: "복사" }] }));
-    await waitFor(() => expect(native.close).toHaveBeenCalledOnce());
+    await Promise.resolve();
+    fireEvent.keyDown(screen.getByRole("button", { name: "제목" }), { key: "F10", shiftKey: true });
+    await Promise.resolve();
+    expect(native.create).not.toHaveBeenCalled();
+    expect(native.popup).not.toHaveBeenCalled();
     expect(props.onNavigate).not.toHaveBeenCalled();
   });
   it("preserves the search input's native editing commands and current query", async () => {
