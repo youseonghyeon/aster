@@ -5,6 +5,8 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { isTauri } from "@tauri-apps/api/core";
+import { showOutlineContextMenu } from "./outline-context-menu";
 import type { MarkdownOutlineItem } from "../../lib/markdown-outline";
 import "./DocumentOutline.css";
 
@@ -165,7 +167,22 @@ export function DocumentOutline({
     setQuery("");
   }, [documentKey]);
 
+  function openOutlineMenu(target: HTMLElement, x: number, y: number) {
+    void showOutlineContextMenu(target, x, y).catch((error: unknown) => {
+      // Keep keyboard editing/copy available if a native menu cannot be opened.
+      console.error("목차 메뉴를 열지 못했습니다.", error);
+    });
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (isTauri() && (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey))) {
+      event.preventDefault();
+      event.stopPropagation();
+      const target = event.target instanceof HTMLElement ? event.target : event.currentTarget;
+      const bounds = target.getBoundingClientRect();
+      openOutlineMenu(target, bounds.left + 12, bounds.bottom);
+      return;
+    }
     if (!isModal || event.key !== "Tab") {
       return;
     }
@@ -200,6 +217,13 @@ export function DocumentOutline({
       aria-modal={isModal ? true : undefined}
       aria-labelledby="document-outline-title"
       onKeyDown={handleKeyDown}
+      onContextMenu={(event) => {
+        if (!isTauri()) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const target = event.target instanceof HTMLElement ? event.target : event.currentTarget;
+        openOutlineMenu(target, event.clientX, event.clientY);
+      }}
     >
       <header className="document-outline-header">
         <div>
