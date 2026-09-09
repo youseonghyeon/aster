@@ -9,11 +9,43 @@ export function selectedMarkdown(root: HTMLElement, range: Range): string | null
   };
   const selectedText = (node: Node): string => node.nodeType === Node.TEXT_NODE
     ? text(node as Text) : Array.from(node.childNodes).map(selectedText).join("");
-  const escape = (value: string) => value.replace(/([\\`*_{}\[\]<>#|~])/g, "\\$1")
+  const escape = (value: string) => value.replace(/([\\`*_{}\[\]<>|~])/g, "\\$1")
+    .replace(/(^|\n)( {0,3})(#{1,6})(?=\s|$)/g, "$1$2\\$3")
+    .replace(/(^|\n)( {0,3})(=+|-+)(?=\n|$)/g, "$1$2\\$3")
     .replace(/(^|\n)(\s*)([+\-]|\d+[.)])(?=\s)/g, (_, line, spaces, marker: string) =>
       `${line}${spaces}${/^\d/.test(marker) ? marker.slice(0, -1) + "\\" + marker.slice(-1) : "\\" + marker}`);
   const wrap = (marker: string, value: string) => value.trim()
     ? value.replace(/^(\s*)([\s\S]*?)(\s*)$/, (_, before, body, after) => `${before}${marker}${body}${marker}${after}`) : value;
+  // The renderer emits structural whitespace between blocks (and around tables).
+  // Only this composer adds block separators; code and hard-break contents stay intact.
+  const blockTags = new Set(["ARTICLE", "DIV", "P", "H1", "H2", "H3", "H4", "H5", "H6", "UL", "OL", "LI", "BLOCKQUOTE", "PRE", "TABLE", "HR"]);
+  const children = (parent: Element): string => {
+    const hasBlocks = Array.from(parent.children).some((child) => blockTags.has(child.tagName));
+    const list = parent.tagName === "UL" || parent.tagName === "OL";
+    const looseList = list && Array.from(parent.children).some((item) => item.querySelector(":scope > p"));
+    let result = "";
+    let previousBlock = false;
+    let previousTag = "";
+    for (const child of parent.childNodes) {
+      let value = visit(child);
+      const tag = child instanceof Element ? child.tagName : "";
+      const block = blockTags.has(tag);
+      if (!value || (hasBlocks && !value.trim())) continue;
+      // ReactMarkdown places a formatting newline immediately after <br>.
+      if (previousTag === "BR" && child.nodeType === Node.TEXT_NODE) value = value.replace(/^\n/, "");
+      if (!value) continue;
+      if (result && (previousBlock || block)) {
+        const compact = (list && !looseList) || (parent.tagName === "LI" && (tag === "UL" || tag === "OL"));
+        // Whitespace at a block edge belongs to the DOM layout, not its contents.
+        result = result.trimEnd() + (compact ? "\n" : "\n\n");
+        value = value.trimStart();
+      }
+      result += value;
+      previousBlock = block;
+      previousTag = tag;
+    }
+    return result;
+  };
   const visit = (node: Node): string => {
     if (!intersects(node)) return "";
     if (node.nodeType === Node.TEXT_NODE) return escape(text(node as Text));
@@ -23,13 +55,13 @@ export function selectedMarkdown(root: HTMLElement, range: Range): string | null
     if (tag === "svg" || node.classList.contains("mermaid-diagram")) throw new Error("diagram-selection");
     if (["button", "input", "script", "style"].includes(tag)) return "";
     if (tag === "br") return "  \n";
-    if (tag === "hr") return "\n\n---\n\n";
+    if (tag === "hr") return "---";
     if (tag === "pre") {
       const body = selectedText(node);
       if (!body) return "";
       const fence = "`".repeat(Math.max(3, ...Array.from(body.matchAll(/`+/g), (m) => m[0].length + 1)));
       const language = node.closest("[data-copy-language]")?.getAttribute("data-copy-language") ?? node.querySelector("code")?.className.match(/language-([\w+-]+)/)?.[1] ?? "";
-      return `\n\n${fence}${language}\n${body.replace(/\n$/, "")}\n${fence}\n\n`;
+      return `${fence}${language}\n${body.replace(/\n$/, "")}\n${fence}`;
     }
     if (tag === "code") {
       const body = selectedText(node);
@@ -48,17 +80,17 @@ export function selectedMarkdown(root: HTMLElement, range: Range): string | null
     if (tag === "table") {
       const rows = Array.from(node.querySelectorAll("tr"));
       const full = Array.from(node.querySelectorAll("th,td")).every((cell) => selectedText(cell) === cell.textContent);
-      if (!full) return `\n\n${rows.map((row) => Array.from(row.children).map((cell) => selectedText(cell)).filter(Boolean).join("\t")).filter(Boolean).join("\n")}\n\n`;
-      const lines = rows.map((row) => `| ${Array.from(row.children).map((cell) => Array.from(cell.childNodes).map(visit).join("").trim().replace(/(?<!\\)\|/g, "\\|").replace(/\n/g, "<br>")).join(" | ")} |`);
+      if (!full) return `${rows.map((row) => Array.from(row.children).map((cell) => selectedText(cell)).filter(Boolean).join("\t")).filter(Boolean).join("\n")}`;
+      const lines = rows.map((row) => `| ${Array.from(row.children).map((cell) => children(cell).trim().replace(/(?<!\\)\|/g, "\\|").replace(/\n/g, "<br>")).join(" | ")} |`);
       if (lines.length) lines.splice(1, 0, `| ${Array.from(rows[0].children).map((cell) => {
         const align = cell.getAttribute("align") ?? (cell as HTMLElement).style.textAlign;
         return align === "center" ? ":---:" : align === "right" ? "---:" : align === "left" ? ":---" : "---";
       }).join(" | ")} |`);
-      return `\n\n${lines.join("\n")}\n\n`;
+      return lines.join("\n");
     }
-    const body = Array.from(node.childNodes).map(visit).join("");
+    const body = children(node);
     if (!body.trim()) return body;
-    if (/^h[1-6]$/.test(tag)) return `\n\n${"#".repeat(Number(tag[1]))} ${body.trim()}\n\n`;
+    if (/^h[1-6]$/.test(tag)) return `${"#".repeat(Number(tag[1]))} ${body.trim().replace(/(\s)(#+)$/, "$1\\$2")}`;
     if (tag === "strong" || tag === "b") return wrap("**", body);
     if (tag === "em" || tag === "i") return wrap("*", body);
     if (tag === "del" || tag === "s") return wrap("~~", body);
@@ -66,21 +98,21 @@ export function selectedMarkdown(root: HTMLElement, range: Range): string | null
       const href = node.getAttribute("href");
       return href ? `[${body}](${destination(href)})` : body;
     }
-    if (tag === "blockquote") return `\n\n${body.trim().split("\n").map((line) => `> ${line}`).join("\n")}\n\n`;
+    if (tag === "blockquote") return body.trim().split("\n").map((line) => `> ${line}`).join("\n");
     if (tag === "li") {
       const parent = node.parentElement;
       const number = Number(parent?.getAttribute("start") ?? 1) + Array.from(parent?.children ?? []).indexOf(node);
       const marker = parent?.tagName === "OL" ? `${number}. ` : "- ";
       const checkbox = node.querySelector(":scope > input[type=checkbox], :scope > p > input[type=checkbox]") as HTMLInputElement | null;
       const task = checkbox ? `[${checkbox.checked ? "x" : " "}] ` : "";
-      return `${marker}${task}${body.trim().replace(/\n/g, `\n${" ".repeat(marker.length)}`)}\n`;
+      return `${marker}${task}${body.trim().replace(/\n/g, `\n${" ".repeat(marker.length)}`)}`;
     }
-    if (tag === "ul" || tag === "ol") return `\n\n${body.trimEnd()}\n\n`;
-    if (tag === "p" || tag === "div") return `\n\n${body.trim()}\n\n`;
+    if (tag === "ul" || tag === "ol") return body.trimEnd();
+    if (tag === "p" || tag === "div") return body.trim();
     return body;
   };
   try {
-    const result = Array.from(root.childNodes).map(visit).join("").trim();
+    const result = children(root).trim();
     return result || null;
   } catch { return null; }
 }
