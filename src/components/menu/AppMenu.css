@@ -1,0 +1,29 @@
+.app-menu-layer { position: fixed; inset: 0; z-index: 1000; pointer-events: none; }
+.app-context-menu {
+  position: absolute; pointer-events: auto; user-select: none; box-sizing: border-box;
+  min-width: min(204px, calc(100vw - 16px)); max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px); overflow: auto; overscroll-behavior: contain;
+  padding: 4px; border: 1px solid var(--border-strong); border-radius: 8px;
+  background: var(--preview-background); color: var(--text);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--text-heading) 10%, transparent);
+  font: 13px -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+}
+.app-context-menu-item {
+  display: grid; grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center; column-gap: 9px; min-height: 30px; width: 100%;
+  padding: 5px 9px; border: 0; border-radius: 4px; background: transparent;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.app-context-menu-item:not(:disabled):is(:hover, :focus) {
+  outline: none; background: color-mix(in srgb, var(--selection) 42%, var(--preview-background));
+  color: var(--accent-strong);
+}
+.app-context-menu-item:disabled { opacity: .36; cursor: default; }
+.app-context-menu-icon { width: 16px; height: 16px; }
+.app-context-menu-icon[style] {
+  background: currentColor; mask: var(--menu-icon) center / contain no-repeat;
+  -webkit-mask: var(--menu-icon) center / contain no-repeat;
+}
+.app-context-menu-label { overflow-wrap: anywhere; }
+.app-context-menu-shortcut { font-size: 11px; opacity: .62; white-space: nowrap; }
+.app-context-menu-separator { height: 1px; margin: 4px 7px; background: var(--border-strong); }

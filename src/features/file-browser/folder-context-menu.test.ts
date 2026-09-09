@@ -1,84 +1,24 @@
-import { Menu } from "@tauri-apps/api/menu";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
+import { showAppMenu } from "../../components/menu/AppMenu";
 import { showFolderContextMenu } from "./folder-context-menu";
-
-vi.mock("@tauri-apps/api/menu", () => ({
-  Menu: { new: vi.fn() },
-}));
-
-describe("folder context menu", () => {
-  const popup = vi.fn(() => Promise.resolve());
-  const close = vi.fn(() => Promise.resolve());
-
-  beforeEach(() => {
-    popup.mockClear();
-    close.mockClear();
-    vi.mocked(Menu.new).mockReset();
-    vi.mocked(Menu.new).mockResolvedValue({ popup, close } as never);
-  });
-
-  it("keeps the native Reload item and adds confirmed file removal", async () => {
-    const onReload = vi.fn();
-    const onRemoveFile = vi.fn();
-
-    await showFolderContextMenu({
-      entry: {
-        name: "guide.md",
-        relativePath: "guide.md",
-        path: "/docs/guide.md",
-        kind: "markdown",
-      },
-      x: 120,
-      y: 80,
-      canRemoveFile: true,
-      onReload,
-      onRemoveFile,
-    });
-
-    const items = vi.mocked(Menu.new).mock.calls[0]?.[0]?.items ?? [];
-    expect(items).toHaveLength(6);
-    for (const item of items) expect(item).not.toHaveProperty("icon");
-    expect(items[0]).toMatchObject({
-      text: "Reload",
-    });
-    expect(items[1]).toEqual({ item: "Separator" });
-    expect(items[2]).toMatchObject({ text: "파일 복사", accelerator: "CmdOrCtrl+C" });
-    expect(items[3]).toMatchObject({ text: "파일 이름 복사", accelerator: "CmdOrCtrl+Shift+C" });
-    expect(items[5]).toMatchObject({
-      text: "Delete",
-      enabled: true,
-    });
-    if ("action" in items[0]!) items[0].action?.("reload");
-    if ("action" in items[5]!) items[5].action?.("remove");
-    expect(onReload).toHaveBeenCalledOnce();
-    expect(onRemoveFile).toHaveBeenCalledOnce();
-    expect(popup).toHaveBeenCalledWith(
-      expect.objectContaining({ x: 120, y: 80 }),
-    );
-    expect(close).toHaveBeenCalledOnce();
-  });
-
-  it("shows a text-only directory menu with only Reload", async () => {
-    await showFolderContextMenu({
-      entry: {
-        name: "guide",
-        relativePath: "guide",
-        path: "/docs/guide",
-        kind: "directory",
-      },
-      x: 0,
-      y: 0,
-      canRemoveFile: false,
-      onReload: vi.fn(),
-      onRemoveFile: vi.fn(),
-    });
-
-    const items = vi.mocked(Menu.new).mock.calls[0]?.[0]?.items ?? [];
-    for (const item of items) expect(item).not.toHaveProperty("icon");
-    expect(items).toEqual([
-      expect.objectContaining({
-        text: "Reload",
-      }),
-    ]);
-  });
+vi.mock("../../components/menu/AppMenu", () => ({ showAppMenu: vi.fn(async () => undefined) }));
+beforeEach(() => vi.clearAllMocks());
+it("uses aligned application menu items with existing file actions", async () => {
+  const reload = vi.fn(), remove = vi.fn(), copy = vi.fn(), name = vi.fn();
+  await showFolderContextMenu({ entry: { name: "한글.md", relativePath: "한글.md", path: "/docs/한글.md", kind: "markdown" },
+    x: 120, y: 80, canRemoveFile: false, onReload: reload, onRemoveFile: remove, onCopyFile: copy, onCopyName: name });
+  const options = vi.mocked(showAppMenu).mock.calls[0][0];
+  expect(options).toMatchObject({ x: 120, y: 80 });
+  const items = options.items.flatMap((item) => "separator" in item ? [] : [item]);
+  expect(items.map((item) => item.label)).toEqual(["다시 로드", "복사", "이름 복사", "삭제..."]);
+  expect(items[0].icon).toBeTruthy(); expect(items[1].icon).toBeTruthy();
+  expect(items[2].icon).toBeUndefined(); expect(items[3].icon).toBeTruthy();
+  expect(items[3].enabled).toBe(false);
+  items.forEach((item) => item.action());
+  for (const action of [reload, remove, copy, name]) expect(action).toHaveBeenCalledOnce();
+});
+it("only offers reload for directories", async () => {
+  await showFolderContextMenu({ entry: { name: "docs", relativePath: "docs", path: "/docs", kind: "directory" },
+    x: 0, y: 0, canRemoveFile: false, onReload: vi.fn(), onRemoveFile: vi.fn() });
+  expect(vi.mocked(showAppMenu).mock.calls[0][0].items).toEqual([expect.objectContaining({ id: "reload" })]);
 });

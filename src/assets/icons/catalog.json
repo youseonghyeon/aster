@@ -1,0 +1,74 @@
+[
+  {
+    "file": "proposals/outline-01/reload.svg",
+    "name": "reload",
+    "label": "다시 로드",
+    "note": "순환 화살표"
+  },
+  {
+    "file": "proposals/outline-01/copy.svg",
+    "name": "copy",
+    "label": "복사",
+    "note": "겹친 문서"
+  },
+  {
+    "file": "proposals/outline-01/copy-name.svg",
+    "name": "copy-name",
+    "label": "이름 복사",
+    "note": "문서와 텍스트 · 요청할 때만 사용"
+  },
+  {
+    "file": "trash.svg",
+    "name": "trash",
+    "label": "삭제",
+    "note": "뚜껑과 손잡이가 있는 단색 휴지통"
+  },
+  {
+    "file": "proposals/outline-01/folder.svg",
+    "name": "folder",
+    "label": "폴더",
+    "note": "닫힌 폴더"
+  },
+  {
+    "file": "proposals/outline-01/folder-open.svg",
+    "name": "folder-open",
+    "label": "폴더 열기",
+    "note": "앞면이 열린 폴더"
+  },
+  {
+    "file": "proposals/outline-01/document.svg",
+    "name": "document",
+    "label": "문서",
+    "note": "접힌 모서리와 본문"
+  },
+  {
+    "file": "proposals/outline-01/image.svg",
+    "name": "image",
+    "label": "이미지",
+    "note": "사진 프레임"
+  },
+  {
+    "file": "proposals/outline-01/search.svg",
+    "name": "search",
+    "label": "검색",
+    "note": "돋보기"
+  },
+  {
+    "file": "proposals/outline-01/outline.svg",
+    "name": "outline",
+    "label": "목차",
+    "note": "깊이가 구분되는 제목 목록"
+  },
+  {
+    "file": "proposals/outline-01/recent.svg",
+    "name": "recent",
+    "label": "최근 문서",
+    "note": "되돌아보는 시계 · 기능 유지 시 후보"
+  },
+  {
+    "file": "proposals/outline-01/close.svg",
+    "name": "close",
+    "label": "닫기",
+    "note": "닫기 기호"
+  }
+]
