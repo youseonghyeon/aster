@@ -1,13 +1,9 @@
-import { Menu, NativeIcon } from "@tauri-apps/api/menu";
+import { Menu } from "@tauri-apps/api/menu";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { showFolderContextMenu } from "./folder-context-menu";
 
 vi.mock("@tauri-apps/api/menu", () => ({
   Menu: { new: vi.fn() },
-  NativeIcon: {
-    Refresh: "Refresh",
-    TrashEmpty: "TrashEmpty",
-  },
 }));
 
 describe("folder context menu", () => {
@@ -41,16 +37,15 @@ describe("folder context menu", () => {
 
     const items = vi.mocked(Menu.new).mock.calls[0]?.[0]?.items ?? [];
     expect(items).toHaveLength(6);
+    for (const item of items) expect(item).not.toHaveProperty("icon");
     expect(items[0]).toMatchObject({
       text: "Reload",
-      icon: NativeIcon.Refresh,
     });
     expect(items[1]).toEqual({ item: "Separator" });
     expect(items[2]).toMatchObject({ text: "파일 복사", accelerator: "CmdOrCtrl+C" });
     expect(items[3]).toMatchObject({ text: "파일 이름 복사", accelerator: "CmdOrCtrl+Shift+C" });
     expect(items[5]).toMatchObject({
       text: "Delete",
-      icon: NativeIcon.TrashEmpty,
       enabled: true,
     });
     if ("action" in items[0]!) items[0].action?.("reload");
@@ -63,7 +58,7 @@ describe("folder context menu", () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
-  it("leaves directory menus unchanged with only Reload", async () => {
+  it("shows a text-only directory menu with only Reload", async () => {
     await showFolderContextMenu({
       entry: {
         name: "guide",
@@ -78,10 +73,11 @@ describe("folder context menu", () => {
       onRemoveFile: vi.fn(),
     });
 
-    expect(vi.mocked(Menu.new).mock.calls[0]?.[0]?.items).toEqual([
+    const items = vi.mocked(Menu.new).mock.calls[0]?.[0]?.items ?? [];
+    for (const item of items) expect(item).not.toHaveProperty("icon");
+    expect(items).toEqual([
       expect.objectContaining({
         text: "Reload",
-        icon: NativeIcon.Refresh,
       }),
     ]);
   });

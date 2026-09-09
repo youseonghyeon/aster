@@ -1,5 +1,4 @@
 import type {
-  IconMenuItemOptions,
   MenuItemOptions,
   PredefinedMenuItemOptions,
 } from "@tauri-apps/api/menu";
@@ -26,16 +25,15 @@ export async function showFolderContextMenu({
   onCopyFile,
   onCopyName,
 }: ShowFolderContextMenuOptions) {
-  const [{ LogicalPosition }, { Menu, NativeIcon }] = await Promise.all([
+  const [{ LogicalPosition }, { Menu }] = await Promise.all([
     import("@tauri-apps/api/dpi"),
     import("@tauri-apps/api/menu"),
   ]);
   const items: Array<
-    IconMenuItemOptions | MenuItemOptions | PredefinedMenuItemOptions
+    MenuItemOptions | PredefinedMenuItemOptions
   > = [
     {
       text: "Reload",
-      icon: NativeIcon.Refresh,
       action: onReload,
     },
   ];
@@ -47,7 +45,6 @@ export async function showFolderContextMenu({
       { item: "Separator" },
       {
         text: "Delete",
-        icon: NativeIcon.TrashEmpty,
         enabled: canRemoveFile,
         action: onRemoveFile,
       },
