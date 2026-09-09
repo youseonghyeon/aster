@@ -272,6 +272,37 @@ impl FolderTreeState {
         fs::remove_file(&canonical).map_err(|error| format!("파일을 제거할 수 없습니다: {error}"))
     }
 
+    pub(crate) fn resolve_copy_file(
+        &self,
+        root_token: u64,
+        relative_path: String,
+    ) -> Result<PathBuf, String> {
+        let session = self.current_session(root_token)?;
+        let relative = validate_relative_file(&relative_path)?;
+        if relative.components().any(|component| match component {
+            Component::Normal(name) => name.to_string_lossy().starts_with('.'),
+            _ => false,
+        }) {
+            return Err("숨김 파일은 폴더 탐색기에서 복사할 수 없습니다.".into());
+        }
+        let path = session.root.join(relative);
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|error| format!("파일 정보를 읽을 수 없습니다: {error}"))?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err("선택한 항목은 복사할 수 있는 파일이 아닙니다.".into());
+        }
+        if supported_file_kind(&path).is_none() {
+            return Err("지원하는 Markdown이나 이미지 파일만 복사할 수 있습니다.".into());
+        }
+        let canonical = path
+            .canonicalize()
+            .map_err(|error| format!("파일 경로를 확인할 수 없습니다: {error}"))?;
+        if canonical != path || !canonical.starts_with(&session.root) {
+            return Err("선택한 파일이 현재 폴더 안에 있지 않습니다.".into());
+        }
+        Ok(canonical)
+    }
+
     fn current_session(&self, token: u64) -> Result<FolderSession, String> {
         let sessions = self
             .inner
@@ -427,6 +458,66 @@ mod tests {
 
         assert_eq!(root_listing.entries.len(), 1);
         assert_eq!(nested_listing.entries[0].relative_path, "guide/start.md");
+    }
+
+    #[test]
+    fn resolves_copy_files_without_mutation_and_rejects_invalid_targets() {
+        let directory = TempDir::new().unwrap();
+        let file = directory.path().join("한글 공백.markdown");
+        fs::write(&file, "# Original").unwrap();
+        fs::create_dir(directory.path().join("nested")).unwrap();
+        fs::write(directory.path().join(".hidden.md"), "hidden").unwrap();
+        fs::write(directory.path().join("unsupported.txt"), "text").unwrap();
+        let (state, root) = open_test_root(&directory);
+        assert_eq!(
+            state
+                .resolve_copy_file(root.token, "한글 공백.markdown".into())
+                .unwrap(),
+            file.canonicalize().unwrap()
+        );
+        assert_eq!(fs::read_to_string(&file).unwrap(), "# Original");
+        for invalid in [
+            "nested",
+            ".hidden.md",
+            "unsupported.txt",
+            "missing.md",
+            "../outside.md",
+            "/outside.md",
+        ] {
+            assert!(
+                state.resolve_copy_file(root.token, invalid.into()).is_err(),
+                "{invalid}"
+            );
+        }
+        fs::remove_file(&file).unwrap();
+        assert!(state
+            .resolve_copy_file(root.token, "한글 공백.markdown".into())
+            .is_err());
+        state.close_folder(Some(root.token)).unwrap();
+        assert!(state
+            .resolve_copy_file(root.token, "한글 공백.markdown".into())
+            .is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_copy_through_symbolic_links() {
+        let directory = TempDir::new().unwrap();
+        let external = TempDir::new().unwrap();
+        fs::write(external.path().join("outside.md"), "# Outside").unwrap();
+        std::os::unix::fs::symlink(
+            external.path().join("outside.md"),
+            directory.path().join("link.md"),
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(external.path(), directory.path().join("linked")).unwrap();
+        let (state, root) = open_test_root(&directory);
+        assert!(state
+            .resolve_copy_file(root.token, "link.md".into())
+            .is_err());
+        assert!(state
+            .resolve_copy_file(root.token, "linked/outside.md".into())
+            .is_err());
     }
 
     #[test]

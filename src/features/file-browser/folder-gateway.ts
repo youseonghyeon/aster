@@ -92,3 +92,11 @@ export function removeFolderFile(
 ): Promise<void> {
   return invoke<void>("remove_folder_file", { rootToken, relativePath });
 }
+
+export async function copyFolderEntry(
+  rootToken: number,
+  relativePath: string,
+  nameOnly: boolean,
+): Promise<void> {
+  await invoke<void>("copy_folder_file", { rootToken, relativePath, nameOnly });
+}

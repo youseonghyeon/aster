@@ -1,9 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FolderTree, flattenVisibleFolderEntries } from "./FolderTree";
+import { copyFolderEntry } from "./folder-gateway";
 import { showFolderContextMenu } from "./folder-context-menu";
 import type { FolderTreeState } from "./folder-tree-state";
+
+vi.mock("./folder-gateway", () => ({ copyFolderEntry: vi.fn(() => Promise.resolve()) }));
 
 vi.mock("./folder-context-menu", () => ({
   showFolderContextMenu: vi.fn(() => Promise.resolve()),
@@ -83,6 +86,53 @@ function renderTree(state = treeState()) {
 describe("FolderTree", () => {
   beforeEach(() => {
     vi.mocked(showFolderContextMenu).mockClear();
+    vi.mocked(copyFolderEntry).mockReset().mockResolvedValue(undefined);
+  });
+
+  it("copies the clicked file and Shift copies its name without opening it", async () => {
+    const props = renderTree();
+    const row = screen.getByRole("treeitem", { name: "cover.png" });
+    fireEvent.click(row);
+    expect(row).toHaveFocus();
+    fireEvent.keyDown(row, { key: "c", metaKey: true });
+    await waitFor(() => expect(copyFolderEntry).toHaveBeenLastCalledWith(1, "cover.png", false));
+    fireEvent.keyDown(row, { key: "C", ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(copyFolderEntry).toHaveBeenLastCalledWith(1, "cover.png", true));
+    expect(props.onOpenImage).not.toHaveBeenCalled();
+  });
+
+  it("copies the keyboard focused file rather than the old selection", async () => {
+    renderTree();
+    const row = screen.getByRole("treeitem", { name: "README.md, 현재 문서" });
+    fireEvent.keyDown(row, { key: "ArrowDown" });
+    fireEvent.keyDown(document.activeElement!, { key: "c", ctrlKey: true });
+    await waitFor(() => expect(copyFolderEntry).toHaveBeenCalledWith(1, "cover.png", false));
+  });
+
+  it("keeps copy outside the tree and directory copies untouched", () => {
+    renderTree();
+    fireEvent.keyDown(document.body, { key: "c", ctrlKey: true, shiftKey: true });
+    fireEvent.keyDown(screen.getByRole("treeitem", { name: "guide" }), { key: "c", metaKey: true });
+    expect(copyFolderEntry).not.toHaveBeenCalled();
+  });
+
+  it("targets the right-clicked file for both context commands", async () => {
+    renderTree();
+    const row = screen.getByRole("treeitem", { name: "cover.png" });
+    fireEvent.contextMenu(row);
+    expect(row).toHaveFocus();
+    const menu = vi.mocked(showFolderContextMenu).mock.calls[0][0];
+    menu.onCopyFile?.();
+    await waitFor(() => expect(copyFolderEntry).toHaveBeenLastCalledWith(1, "cover.png", false));
+    menu.onCopyName?.();
+    await waitFor(() => expect(copyFolderEntry).toHaveBeenLastCalledWith(1, "cover.png", true));
+  });
+
+  it("reports clipboard failures without claiming success", async () => {
+    vi.mocked(copyFolderEntry).mockRejectedValue(new Error("clipboard unavailable"));
+    renderTree();
+    fireEvent.copy(screen.getByRole("treeitem", { name: "cover.png" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("복사하지 못했습니다");
   });
 
   it("flattens only expanded directory branches", () => {

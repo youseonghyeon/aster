@@ -12,6 +12,8 @@ type ShowFolderContextMenuOptions = {
   canRemoveFile: boolean;
   onReload: () => void;
   onRemoveFile: () => void;
+  onCopyFile?: () => void;
+  onCopyName?: () => void;
 };
 
 export async function showFolderContextMenu({
@@ -21,6 +23,8 @@ export async function showFolderContextMenu({
   canRemoveFile,
   onReload,
   onRemoveFile,
+  onCopyFile,
+  onCopyName,
 }: ShowFolderContextMenuOptions) {
   const [{ LogicalPosition }, { Menu, NativeIcon }] = await Promise.all([
     import("@tauri-apps/api/dpi"),
@@ -37,6 +41,9 @@ export async function showFolderContextMenu({
   ];
   if (entry.kind !== "directory") {
     items.push(
+      { item: "Separator" },
+      { text: "파일 복사", accelerator: "CmdOrCtrl+C", action: onCopyFile },
+      { text: "파일 이름 복사", accelerator: "CmdOrCtrl+Shift+C", action: onCopyName },
       { item: "Separator" },
       {
         text: "Delete",

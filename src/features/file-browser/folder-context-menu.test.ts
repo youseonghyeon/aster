@@ -40,19 +40,21 @@ describe("folder context menu", () => {
     });
 
     const items = vi.mocked(Menu.new).mock.calls[0]?.[0]?.items ?? [];
-    expect(items).toHaveLength(3);
+    expect(items).toHaveLength(6);
     expect(items[0]).toMatchObject({
       text: "Reload",
       icon: NativeIcon.Refresh,
     });
     expect(items[1]).toEqual({ item: "Separator" });
-    expect(items[2]).toMatchObject({
+    expect(items[2]).toMatchObject({ text: "파일 복사", accelerator: "CmdOrCtrl+C" });
+    expect(items[3]).toMatchObject({ text: "파일 이름 복사", accelerator: "CmdOrCtrl+Shift+C" });
+    expect(items[5]).toMatchObject({
       text: "Delete",
       icon: NativeIcon.TrashEmpty,
       enabled: true,
     });
     if ("action" in items[0]!) items[0].action?.("reload");
-    if ("action" in items[2]!) items[2].action?.("remove");
+    if ("action" in items[5]!) items[5].action?.("remove");
     expect(onReload).toHaveBeenCalledOnce();
     expect(onRemoveFile).toHaveBeenCalledOnce();
     expect(popup).toHaveBeenCalledWith(

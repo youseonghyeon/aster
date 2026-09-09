@@ -1,6 +1,7 @@
 mod app_update;
 mod close_guard;
 mod document_io;
+mod file_clipboard;
 mod file_watch;
 mod folder_tree;
 mod linked_resources;
@@ -101,6 +102,30 @@ async fn read_folder_markdown(
     tauri::async_runtime::spawn_blocking(move || state.read_markdown(root_path, relative_path))
         .await
         .map_err(|error| format!("Markdown 읽기 작업을 완료하지 못했습니다: {error}"))?
+}
+
+#[tauri::command]
+async fn copy_folder_file(
+    app: AppHandle,
+    state: State<'_, FolderTreeState>,
+    root_token: u64,
+    relative_path: String,
+    name_only: bool,
+) -> Result<(), String> {
+    let state = state.inner().clone();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    app.run_on_main_thread(move || {
+        // Validate the active root immediately before touching the clipboard.
+        let result = state
+            .resolve_copy_file(root_token, relative_path)
+            .and_then(|path| file_clipboard::copy_file(&path, name_only));
+        let _ = sender.send(result);
+    })
+    .map_err(|error| format!("클립보드를 사용할 수 없습니다: {error}"))?;
+    tauri::async_runtime::spawn_blocking(move || receiver.recv())
+        .await
+        .map_err(|error| error.to_string())?
+        .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -340,6 +365,7 @@ pub fn run() {
             open_folder_image,
             read_folder_markdown,
             remove_folder_file,
+            copy_folder_file,
             resolve_relative_markdown_path,
             read_relative_image,
             watch_markdown_file,

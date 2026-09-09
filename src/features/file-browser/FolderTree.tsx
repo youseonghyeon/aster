@@ -6,6 +6,7 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { copyFolderEntry } from "./folder-gateway";
 import type { FolderEntry } from "./folder-gateway";
 import type { FolderTreeState } from "./folder-tree-state";
 import { showFolderContextMenu } from "./folder-context-menu";
@@ -162,6 +163,8 @@ export function FolderTree({
   const hasTreeFocusRef = useRef(false);
   const [activePath, setActivePath] = useState<string | null>(null);
   const entryRefs = useRef(new Map<string, HTMLElement>());
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const copyingRef = useRef(false);
   const typeaheadRef = useRef({ value: "", timer: 0 });
 
   useEffect(() => setVisiblePage(0), [state.root?.token]);
@@ -272,11 +275,25 @@ export function FolderTree({
     }
   }
 
+  async function copyEntry(entry: FolderEntry, nameOnly: boolean) {
+    if (!state.root || entry.kind === "directory" || copyingRef.current) return;
+    copyingRef.current = true;
+    setCopyError(null);
+    try {
+      await copyFolderEntry(state.root.token, entry.relativePath, nameOnly);
+    } catch {
+      setCopyError("복사하지 못했습니다. 파일이 있는지 확인하고 다시 시도해 주세요.");
+    } finally {
+      copyingRef.current = false;
+    }
+  }
+
   function openContextMenu(
     entry: FolderEntry,
     x: number,
     y: number,
   ) {
+    entryRefs.current.get(entry.relativePath)?.focus({ preventScroll: true });
     setActivePath(entry.relativePath);
     onSelect(entry.relativePath);
     void showFolderContextMenu({
@@ -291,6 +308,8 @@ export function FolderTree({
           : parentPath(entry.relativePath) ?? "",
       ),
       onRemoveFile: () => onRemoveFile(entry),
+      onCopyFile: () => { void copyEntry(entry, false); },
+      onCopyName: () => { void copyEntry(entry, true); },
     }).catch((error) => {
       console.error("파일 문맥 메뉴를 열지 못했습니다.", error);
     });
@@ -307,6 +326,12 @@ export function FolderTree({
       event.preventDefault();
       const bounds = event.currentTarget.getBoundingClientRect();
       openContextMenu(entry, bounds.left + 24, bounds.top + bounds.height);
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "c") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat) void copyEntry(entry, event.shiftKey);
       return;
     }
     const index = visibleEntries.findIndex(
@@ -456,7 +481,8 @@ export function FolderTree({
                   );
                   setActivePath(entry.relativePath);
                 }}
-                onClick={() => {
+                onClick={(event) => {
+                  event.currentTarget.focus({ preventScroll: true });
                   setActivePath(entry.relativePath);
                   onSelect(entry.relativePath);
                 }}
@@ -474,6 +500,11 @@ export function FolderTree({
                   event.preventDefault();
                   event.stopPropagation();
                   openContextMenu(entry, event.clientX, event.clientY);
+                }}
+                onCopy={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void copyEntry(entry, false);
                 }}
                 onKeyDown={(event) => handleKeyDown(event, entry)}
               >
@@ -533,6 +564,7 @@ export function FolderTree({
           })}
         </div>
       </div>
+      {copyError ? <p role="alert" className="folder-browser-error">{copyError}</p> : null}
       {pageCount > 1 ? (
         <div
           className="folder-tree-pagination"
