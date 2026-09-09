@@ -4,6 +4,7 @@ import {
   useRef,
   type KeyboardEvent,
 } from "react";
+import { useTransientScrollbar } from "../../hooks/useTransientScrollbar";
 import type { FolderEntry } from "./folder-gateway";
 import type { FolderTreeState } from "./folder-tree-state";
 import { FolderTree } from "./FolderTree";
@@ -66,6 +67,7 @@ export function FolderBrowser({
   onRemoveFile,
   removingFilePath,
 }: FolderBrowserProps) {
+  const scrollbarRef = useTransientScrollbar();
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const changeFolderButtonRef = useRef<HTMLButtonElement>(null);
@@ -221,6 +223,7 @@ export function FolderBrowser({
       </div>
 
       <div
+        ref={scrollbarRef}
         id="document-browser-panel"
         className={`folder-browser-content${hasVisibleTree ? " has-visible-tree" : ""}`}
         role="tabpanel"
@@ -285,12 +288,6 @@ export function FolderBrowser({
             removingFilePath={removingFilePath}
           />
         )}
-        {rootListing?.status === "loading" &&
-        rootListing.entries.length > 0 ? (
-          <p className="folder-browser-limit" role="status">
-            파일 목록을 새로고침하고 있습니다.
-          </p>
-        ) : null}
         {rootListing?.status === "error" && hasCachedEntries ? (
           <p className="folder-browser-inline-error" role="alert">
             파일 목록을 새로고침하지 못했습니다: {rootListing.error}. 잠시 후

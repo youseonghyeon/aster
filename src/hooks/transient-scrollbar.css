@@ -1,0 +1,30 @@
+/* Never toggle overflow or scrollbar width while fading: text/reading anchors
+   keep the same available width. The native scrollbar remains draggable. */
+[data-transient-scrollbar] {
+  --scrollbar-opacity: 0;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-faint) calc(var(--scrollbar-opacity) * 65%), transparent) transparent;
+}
+
+[data-transient-scrollbar]::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+[data-transient-scrollbar]::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text-faint) calc(var(--scrollbar-opacity) * 65%), transparent);
+  background-clip: padding-box;
+}
+
+[data-transient-scrollbar]::-webkit-scrollbar-track,
+[data-transient-scrollbar]::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@media (forced-colors: active) {
+  [data-transient-scrollbar] { scrollbar-color: auto; }
+  [data-transient-scrollbar]::-webkit-scrollbar-thumb { background: ButtonText; }
+}
