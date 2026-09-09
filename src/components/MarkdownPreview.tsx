@@ -4,6 +4,7 @@ import {
   isValidElement,
   memo,
   useContext,
+  useRef,
   type AnchorHTMLAttributes,
   type HTMLAttributes,
   type ReactNode,
@@ -29,6 +30,8 @@ import {
   type RelativeImageResolver,
 } from "./RelativeMarkdownImage";
 import { SyntaxHighlightedCode } from "./SyntaxHighlightedCode";
+
+import { usePreviewMarkdownCopy } from "./usePreviewMarkdownCopy";
 
 const markdownPlugins = [remarkGfm];
 const markdownRehypePlugins: PluggableList = [
@@ -128,7 +131,7 @@ const markdownComponents = {
   img: function MarkdownImage({ node, ...imageProps }) {
     const resolveImage = useContext(MarkdownImageContext);
     void node;
-    return <RelativeMarkdownImage {...imageProps} resolveImage={resolveImage} />;
+    return <RelativeMarkdownImage {...imageProps} data-copy-src={imageProps.src} resolveImage={resolveImage} />;
   },
   pre: function MarkdownCodeBlock({ node, children, ...preProps }) {
     const appearanceKey = useContext(MarkdownAppearanceContext);
@@ -217,12 +220,14 @@ export const MarkdownPreview = memo(function MarkdownPreview({
   onLinkActivate?: (href: string) => void | Promise<void>;
   resolveRelativeImage?: RelativeImageResolver;
 }) {
+  const rootRef = useRef<HTMLElement>(null);
+  const copy = usePreviewMarkdownCopy(rootRef, content);
   return (
     <MarkdownLinkContext value={onLinkActivate}>
       <MarkdownImageContext value={resolveRelativeImage}>
         <MarkdownAppearanceContext value={appearanceKey}>
           <MermaidCurveContext value={mermaidCurve}>
-            <article className="markdown-body">
+            <article ref={rootRef} className="markdown-body" onContextMenu={copy.onContextMenu}>
               <ReactMarkdown
                 remarkPlugins={markdownPlugins}
                 rehypePlugins={markdownRehypePlugins}
@@ -231,6 +236,7 @@ export const MarkdownPreview = memo(function MarkdownPreview({
                 {content}
               </ReactMarkdown>
             </article>
+            {copy.error && <p role="status">{copy.error}</p>}
           </MermaidCurveContext>
         </MarkdownAppearanceContext>
       </MarkdownImageContext>

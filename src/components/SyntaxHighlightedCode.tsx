@@ -62,6 +62,7 @@ export const SyntaxHighlightedCode = memo(function SyntaxHighlightedCode({
   return (
     <div
       className="syntax-highlighted-code"
+      data-copy-language={language}
       translate="no"
       data-source-offset={sourceOffset}
       dangerouslySetInnerHTML={{ __html: highlightedCode }}
