@@ -1,60 +1,28 @@
-import type {
-  MenuItemOptions,
-  PredefinedMenuItemOptions,
-} from "@tauri-apps/api/menu";
+import { showAppMenu, type AppMenuItem } from "../../components/menu/AppMenu";
+import reloadIconUrl from "../../assets/icons/proposals/outline-01/reload.svg";
+import trashIconUrl from "../../assets/icons/trash.svg";
+import copyIconUrl from "../../assets/icons/copy.svg";
 import type { FolderEntry } from "./folder-gateway";
 
 type ShowFolderContextMenuOptions = {
-  entry: FolderEntry;
-  x: number;
-  y: number;
-  canRemoveFile: boolean;
-  onReload: () => void;
-  onRemoveFile: () => void;
-  onCopyFile?: () => void;
-  onCopyName?: () => void;
+  entry: FolderEntry; x: number; y: number; canRemoveFile: boolean;
+  onReload: () => void; onRemoveFile: () => void;
+  onCopyFile?: () => void; onCopyName?: () => void;
+  target?: HTMLElement; isValid?: () => boolean;
 };
 
-export async function showFolderContextMenu({
-  entry,
-  x,
-  y,
-  canRemoveFile,
-  onReload,
-  onRemoveFile,
-  onCopyFile,
-  onCopyName,
-}: ShowFolderContextMenuOptions) {
-  const [{ LogicalPosition }, { Menu }] = await Promise.all([
-    import("@tauri-apps/api/dpi"),
-    import("@tauri-apps/api/menu"),
-  ]);
-  const items: Array<
-    MenuItemOptions | PredefinedMenuItemOptions
-  > = [
-    {
-      text: "Reload",
-      action: onReload,
-    },
-  ];
-  if (entry.kind !== "directory") {
+export function showFolderContextMenu(options: ShowFolderContextMenuOptions) {
+  const items: AppMenuItem[] = [{ id: "reload", label: "다시 로드", icon: reloadIconUrl, action: options.onReload }];
+  if (options.entry.kind !== "directory") {
     items.push(
-      { item: "Separator" },
-      { text: "파일 복사", accelerator: "CmdOrCtrl+C", action: onCopyFile },
-      { text: "파일 이름 복사", accelerator: "CmdOrCtrl+Shift+C", action: onCopyName },
-      { item: "Separator" },
-      {
-        text: "Delete",
-        enabled: canRemoveFile,
-        action: onRemoveFile,
-      },
+      { separator: true },
+      { id: "copy", label: "복사", icon: copyIconUrl, shortcut: "⌘C", key: "c", action: () => options.onCopyFile?.() },
+      { id: "copy-name", label: "이름 복사", shortcut: "⇧⌘C", key: "c", shift: true, action: () => options.onCopyName?.() },
+      { separator: true },
+      { id: "delete", label: "삭제...", icon: trashIconUrl, enabled: options.canRemoveFile, action: options.onRemoveFile },
     );
   }
-
-  const menu = await Menu.new({ items });
-  try {
-    await menu.popup(new LogicalPosition(x, y));
-  } finally {
-    await menu.close();
-  }
+  return showAppMenu({ label: "파일 메뉴", items, x: options.x, y: options.y,
+    target: options.target ?? (document.activeElement instanceof HTMLElement ? document.activeElement : document.body),
+    isValid: options.isValid });
 }

@@ -162,6 +162,7 @@ export function FolderBrowser({
       aria-modal={isModal ? true : undefined}
       aria-labelledby="folder-browser-title"
       onKeyDown={handleKeyDown}
+      onContextMenu={(event) => event.preventDefault()}
       onFocusCapture={(event) => {
         hadTreeFocusRef.current =
           (event.target as HTMLElement).getAttribute("role") === "treeitem";
