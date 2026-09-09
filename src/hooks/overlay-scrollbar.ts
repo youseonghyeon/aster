@@ -103,6 +103,7 @@ export function attachOverlayScrollbar(viewport: HTMLElement, host: HTMLElement)
     setPosition(vertical, next);
   };
   const wheel = (event: WheelEvent) => {
+    if (event.ctrlKey) return; // Preserve pinch/zoom gestures.
     // The overlay is a sibling, so route wheel input on its visible track to
     // the viewport rather than letting it scroll an unrelated outer panel.
     const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewport.clientHeight : 1;

@@ -165,3 +165,17 @@ it("reserves a single corner and clamps horizontal dragging to the content end",
   expect(viewport.scrollLeft).toBe(0);
   pointer(window, "pointerup", -1000, 195);
 });
+
+
+it("restores a keyboard-focused track after app activation and preserves zoom gestures", () => {
+  const { viewport, host } = prepare();
+  const track = screen.getByRole("scrollbar", { name: "파일 목록 세로 스크롤" });
+  act(() => { track.focus(); });
+  expect(host).toHaveClass("is-visible");
+  fireEvent(window, new Event("blur"));
+  expect(host).not.toHaveClass("is-visible");
+  fireEvent(window, new Event("focus"));
+  expect(host).toHaveClass("is-visible");
+  fireEvent.wheel(track, { deltaY: 50, ctrlKey: true });
+  expect(viewport.scrollTop).toBe(0);
+});

@@ -131,6 +131,7 @@ export function useTransientScrollbar(mode: "native" | "overlay" = "native") {
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
     window.addEventListener("blur", blur);
+    window.addEventListener("focus", focus);
     return () => {
       cancel();
       surface.removeEventListener("focusin", focus);
@@ -146,6 +147,7 @@ export function useTransientScrollbar(mode: "native" | "overlay" = "native") {
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
       window.removeEventListener("blur", blur);
+      window.removeEventListener("focus", focus);
       removeOverlay?.();
       host?.classList.remove("is-visible");
       host?.style.removeProperty("opacity");
