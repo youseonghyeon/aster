@@ -23,6 +23,7 @@ import {
 import type { PaneContent } from "./workspace-types";
 import type { MermaidCurvePreference } from "../../lib/mermaid-curve";
 import type { RelativeImageResolver } from "../../components/RelativeMarkdownImage";
+import { useTransientScrollbar } from "../../hooks/useTransientScrollbar";
 import { usePreviewSelectionDismissal } from "./usePreviewSelectionDismissal";
 
 export type NoteSaveStatus = "saved" | "saving" | "error";
@@ -102,6 +103,8 @@ export function WorkspacePane({
   onLinkActivate,
   resolveRelativeImage,
 }: WorkspacePaneProps) {
+  const sourceScrollbarRef = useTransientScrollbar();
+  const previewScrollbarRef = useTransientScrollbar();
   const isEditor = activePane === "editor";
   const isNotes = activePane === "notes";
   const isSourcePane = isEditor || isNotes;
@@ -167,17 +170,19 @@ export function WorkspacePane({
   const handleSourceElementChange = useCallback(
     (element: HTMLTextAreaElement | null) => {
       sourceElementRef.current = element;
+      sourceScrollbarRef(searchArea === "editor" ? element : null);
       onContentElementChange(searchArea, element);
     },
-    [onContentElementChange, searchArea],
+    [onContentElementChange, searchArea, sourceScrollbarRef],
   );
   const handlePreviewElementChange = useCallback(
     (element: HTMLDivElement | null) => {
       setPreviewElement(element);
+      previewScrollbarRef(element);
       onPreviewScrollElementChange(element);
       onContentElementChange("preview", element);
     },
-    [onContentElementChange, onPreviewScrollElementChange],
+    [onContentElementChange, onPreviewScrollElementChange, previewScrollbarRef],
   );
   const handleSearchInputElementChange = useCallback(
     (element: HTMLInputElement | null) => {

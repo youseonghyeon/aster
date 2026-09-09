@@ -156,3 +156,22 @@ describe("FolderBrowser", () => {
     );
   });
 });
+
+
+it("preserves the cached tree during refresh without inserting a second overflow message", () => {
+  const state = browserState();
+  const props = browserProps(state);
+  const { rerender } = render(<FolderBrowser {...props} />);
+  const item = screen.getByRole("treeitem");
+  const viewport = item.closest(".folder-tree-viewport")!;
+  viewport.scrollTop = 120;
+  const loading = { ...state, directories: { "": { ...state.directories[""], status: "loading" as const } } };
+  rerender(<FolderBrowser {...props} state={loading} />);
+  expect(screen.getByRole("treeitem")).toBe(item);
+  expect(viewport.scrollTop).toBe(120);
+  expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-busy", "true");
+  expect(screen.queryByText("파일 목록을 새로고침하고 있습니다.")).not.toBeInTheDocument();
+  rerender(<FolderBrowser {...props} />);
+  expect(screen.getByRole("treeitem")).toBe(item);
+  expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-busy", "false");
+});

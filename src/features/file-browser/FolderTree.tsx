@@ -9,6 +9,7 @@ import {
 import type { FolderEntry } from "./folder-gateway";
 import type { FolderTreeState } from "./folder-tree-state";
 import { showFolderContextMenu } from "./folder-context-menu";
+import { useTransientScrollbar } from "../../hooks/useTransientScrollbar";
 
 export type VisibleFolderEntry = FolderEntry & { level: number };
 const folderTreePageSize = 300;
@@ -114,6 +115,7 @@ export function FolderTree({
   onRemoveFile,
   removingFilePath,
 }: FolderTreeProps) {
+  const scrollbarRef = useTransientScrollbar();
   const allVisibleEntries = useMemo(
     () => flattenVisibleFolderEntries(state, maximumVisibleTreeEntries + 1),
     [state],
@@ -374,7 +376,7 @@ export function FolderTree({
 
   return (
     <div className="folder-tree-frame">
-      <div className="folder-tree-viewport">
+      <div ref={scrollbarRef} className="folder-tree-viewport">
         <div
           className="folder-tree"
           role="tree"
