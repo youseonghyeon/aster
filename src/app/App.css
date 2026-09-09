@@ -1935,7 +1935,6 @@ html[data-platform="macos"] .header-group-divider {
 .preview-scroll {
   position: relative;
   overflow: auto;
-  transition: opacity 120ms ease;
 }
 
 .preview-scroll:focus-visible {
@@ -1943,9 +1942,6 @@ html[data-platform="macos"] .header-group-divider {
   outline: 0;
 }
 
-.preview-scroll.is-updating {
-  opacity: 0.72;
-}
 
 ::highlight(aster-preview-search-match) {
   color: inherit;

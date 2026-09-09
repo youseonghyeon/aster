@@ -38,6 +38,23 @@ vi.mock("./MermaidDiagram", () => ({
 }));
 
 describe("MarkdownPreview", () => {
+  it("updates ordinary text while preserving the article and unchanged reading blocks", () => {
+    const props = { appearanceKey: "paper", mermaidCurve: "straight" as const };
+    const { container, rerender } = render(
+      <MarkdownPreview {...props} content={"# 제목\n\n읽고 있는 문단\n\n작성 중"} />,
+    );
+    const article = container.querySelector("article");
+    const heading = container.querySelector("h1");
+    const paragraph = screen.getByText("읽고 있는 문단");
+    for (const text of ["작성 중인", "작성 중인 한글", "작성 중인 한글 문장"]) {
+      rerender(<MarkdownPreview {...props} content={`# 제목\n\n읽고 있는 문단\n\n${text}`} />);
+      expect(container.querySelector("article")).toBe(article);
+      expect(container.querySelector("h1")).toBe(heading);
+      expect(screen.getByText("읽고 있는 문단")).toBe(paragraph);
+      expect(screen.getByText(text)).toBeInTheDocument();
+    }
+  });
+
   it("routes Mermaid fences to the diagram component", () => {
     render(
       <MarkdownPreview
