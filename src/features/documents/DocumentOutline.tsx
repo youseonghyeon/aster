@@ -132,7 +132,7 @@ export function DocumentOutline({
   onClose,
   onNavigate,
 }: DocumentOutlineProps) {
-  const scrollbarRef = useTransientScrollbar();
+  const scrollbarRef = useTransientScrollbar("overlay");
   const [query, setQuery] = useState("");
   const outlineRef = useRef<HTMLElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -191,7 +191,7 @@ export function DocumentOutline({
 
     const focusableElements = Array.from(
       outlineRef.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"]):not([hidden])',
       ) ?? [],
     );
     const firstElement = focusableElements[0];
@@ -263,25 +263,28 @@ export function DocumentOutline({
         </span>
       </div>
 
-      <nav ref={scrollbarRef} className="outline-navigation" aria-label="문서 제목">
-        {items.length === 0 ? (
-          <div className="outline-empty-state">
-            <strong>표시할 제목이 없습니다</strong>
-            <span>Markdown 제목을 추가하면 이곳에 구조가 나타납니다.</span>
-          </div>
-        ) : filteredTree.length === 0 ? (
-          <div className="outline-empty-state">
-            <strong>일치하는 제목이 없습니다</strong>
-            <span>다른 검색어를 입력해 보세요.</span>
-          </div>
-        ) : (
-          <OutlineList
-            items={filteredTree}
-            activeHeadingId={activeHeadingId}
-            onNavigate={onNavigate}
-          />
-        )}
-      </nav>
+      <div className="overlay-scroll-frame reserved-scroll-frame outline-scroll-frame">
+        <nav ref={scrollbarRef} className="outline-navigation" aria-label="문서 제목">
+          {items.length === 0 ? (
+            <div className="outline-empty-state">
+              <strong>표시할 제목이 없습니다</strong>
+              <span>Markdown 제목을 추가하면 이곳에 구조가 나타납니다.</span>
+            </div>
+          ) : filteredTree.length === 0 ? (
+            <div className="outline-empty-state">
+              <strong>일치하는 제목이 없습니다</strong>
+              <span>다른 검색어를 입력해 보세요.</span>
+            </div>
+          ) : (
+            <OutlineList
+              items={filteredTree}
+              activeHeadingId={activeHeadingId}
+              onNavigate={onNavigate}
+            />
+          )}
+        </nav>
+        <div className="overlay-scrollbar-host" />
+      </div>
     </aside>
   );
 }

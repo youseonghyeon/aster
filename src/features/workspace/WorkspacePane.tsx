@@ -103,7 +103,7 @@ export function WorkspacePane({
   onLinkActivate,
   resolveRelativeImage,
 }: WorkspacePaneProps) {
-  const sourceScrollbarRef = useTransientScrollbar();
+  const sourceScrollbarRef = useTransientScrollbar("overlay");
   const previewScrollbarRef = useTransientScrollbar();
   const isEditor = activePane === "editor";
   const isNotes = activePane === "notes";
@@ -374,7 +374,7 @@ export function WorkspacePane({
 
       {isSourcePane ? (
         <div
-          className={`source-editor-stack ${isEditor ? "is-markdown" : "is-notes"}`}
+          className={`source-editor-stack ${isEditor ? "is-markdown reserved-scroll-frame" : "is-notes"}`}
         >
           {hasSourceSearchHighlights ? (
             <SourceSearchHighlights
@@ -420,6 +420,7 @@ export function WorkspacePane({
               onPointerDown={() => onSearchAreaActivate("notes")}
             />
           )}
+          {isEditor ? <div className="overlay-scrollbar-host" /> : null}
         </div>
       ) : (
         <div

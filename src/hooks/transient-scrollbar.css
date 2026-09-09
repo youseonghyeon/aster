@@ -35,8 +35,8 @@
   min-width: 0;
 }
 
-/* Only opted-in file viewports lose the dedicated native gutter. Scrolling
-   remains native; the sibling tracks paint over the file names temporarily. */
+/* Only opted-in viewports lose the dedicated native gutter. Scrolling
+   remains native; the sibling tracks paint over the content temporarily. */
 [data-transient-scrollbar][data-overlay-scrollbar] {
   scrollbar-gutter: auto;
   scrollbar-width: none;
@@ -81,4 +81,12 @@
   .overlay-scrollbar-host { opacity: 1 !important; }
   .overlay-scrollbar-host > .overlay-scrollbar-track { pointer-events: auto; }
   .overlay-scrollbar-thumb { background-color: ButtonText; }
+}
+
+/* This space belongs to the frame, never to its scrolling contents. Both
+   rails stay reserved while their thumbs fade; descendants cannot paint here. */
+.reserved-scroll-frame {
+  box-sizing: border-box;
+  padding-right: 10px;
+  padding-bottom: 10px;
 }

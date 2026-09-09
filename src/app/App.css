@@ -1841,6 +1841,7 @@ html[data-platform="macos"] .header-group-divider {
 }
 
 .source-editor-stack.is-markdown {
+  --source-editor-padding: 30px 0 80px 32px;
   --source-editor-font-family: "SFMono-Regular", Consolas, "Liberation Mono",
     monospace;
   --source-editor-font-size: 14px;

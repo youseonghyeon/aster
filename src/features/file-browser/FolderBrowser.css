@@ -53,6 +53,9 @@
 }
 
 .folder-browser-content.has-visible-tree {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding-bottom: 0;
 }
 
@@ -76,6 +79,7 @@
 }
 
 .folder-tree-frame {
+  flex: 1;
   display: grid;
   height: 100%;
   min-height: 0;

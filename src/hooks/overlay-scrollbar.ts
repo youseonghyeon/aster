@@ -3,7 +3,9 @@ let scrollportSequence = 0;
 /** Overlay controls for a native scrolling viewport. The host is an empty,
  * dedicated sibling owned by React; its children belong to this adapter. */
 export function attachOverlayScrollbar(viewport: HTMLElement, host: HTMLElement) {
+  const reserved = host.parentElement?.classList.contains("reserved-scroll-frame");
   const originalId = viewport.id;
+  const label = viewport.getAttribute("aria-label") ?? "파일 목록";
   if (!originalId) viewport.id = `aster-overlay-scrollport-${++scrollportSequence}`;
   const tracks = (["vertical", "horizontal"] as const).map((axis) => {
     const track = document.createElement("div");
@@ -12,7 +14,7 @@ export function attachOverlayScrollbar(viewport: HTMLElement, host: HTMLElement)
     thumb.className = "overlay-scrollbar-thumb";
     track.setAttribute("role", "scrollbar");
     track.setAttribute("aria-orientation", axis);
-    track.setAttribute("aria-label", axis === "vertical" ? "파일 목록 세로 스크롤" : "파일 목록 가로 스크롤");
+    track.setAttribute("aria-label", `${label} ${axis === "vertical" ? "세로" : "가로"} 스크롤`);
     track.setAttribute("aria-valuemin", "0");
     track.setAttribute("aria-controls", viewport.id);
     track.tabIndex = 0;
@@ -27,7 +29,7 @@ export function attachOverlayScrollbar(viewport: HTMLElement, host: HTMLElement)
     const content = vertical ? viewport.scrollHeight : viewport.scrollWidth;
     const position = vertical ? viewport.scrollTop : viewport.scrollLeft;
     // Reserve the corner only when both axes overflow.
-    const corner = viewport.scrollHeight > viewport.clientHeight && viewport.scrollWidth > viewport.clientWidth ? 10 : 0;
+    const corner = !reserved && viewport.scrollHeight > viewport.clientHeight && viewport.scrollWidth > viewport.clientWidth ? 10 : 0;
     const length = Math.max(0, visible - corner);
     const size = Math.min(length, Math.max(24, content ? length * visible / content : length));
     const maximum = Math.max(0, content - visible);
@@ -125,6 +127,7 @@ export function attachOverlayScrollbar(viewport: HTMLElement, host: HTMLElement)
   mutations.observe(viewport, { childList: true, subtree: true, characterData: true });
   observeContent();
   viewport.addEventListener("scroll", update, { passive: true });
+  viewport.addEventListener("input", schedule);
   host.addEventListener("pointerdown", down);
   host.addEventListener("keydown", keydown);
   host.addEventListener("wheel", wheel, { passive: false });
@@ -139,6 +142,7 @@ export function attachOverlayScrollbar(viewport: HTMLElement, host: HTMLElement)
     observer.disconnect();
     mutations.disconnect();
     viewport.removeEventListener("scroll", update);
+    viewport.removeEventListener("input", schedule);
     host.removeEventListener("pointerdown", down);
     host.removeEventListener("keydown", keydown);
     host.removeEventListener("wheel", wheel);

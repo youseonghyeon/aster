@@ -2,15 +2,15 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useTransientScrollbar } from "./useTransientScrollbar";
 
-function Fixture() {
+function Fixture({ reserved = false }: { reserved?: boolean }) {
   const ref = useTransientScrollbar("overlay");
-  return <div data-testid="frame" className="overlay-scroll-frame">
+  return <div data-testid="frame" className={`overlay-scroll-frame${reserved ? " reserved-scroll-frame" : ""}`}>
     <div ref={ref} data-testid="viewport"><button>긴 한글 파일명.md</button></div>
     <div className="overlay-scrollbar-host" data-testid="host" />
   </div>;
 }
-function prepare(horizontal = false) {
-  const result = render(<Fixture />);
+function prepare(horizontal = false, reserved = false) {
+  const result = render(<Fixture reserved={reserved} />);
   const viewport = screen.getByTestId("viewport");
   Object.defineProperties(viewport, {
     clientWidth: { value: 200 }, clientHeight: { value: 200 },
@@ -178,4 +178,52 @@ it("restores a keyboard-focused track after app activation and preserves zoom ge
   expect(host).toHaveClass("is-visible");
   fireEvent.wheel(track, { deltaY: 50, ctrlKey: true });
   expect(viewport.scrollTop).toBe(0);
+});
+
+it("refreshes textarea thumb metrics on edits without scrolling or revealing it", () => {
+  vi.useFakeTimers();
+  function Editor() {
+    const ref = useTransientScrollbar("overlay");
+    return <div className="overlay-scroll-frame">
+      <textarea ref={ref} aria-label="마크다운 입력" defaultValue="내용" />
+      <div className="overlay-scrollbar-host" data-testid="editor-host" />
+    </div>;
+  }
+  render(<Editor />);
+  const editor = screen.getByRole("textbox");
+  Object.defineProperties(editor, {
+    clientWidth: { value: 200 }, clientHeight: { value: 200 },
+    scrollWidth: { value: 200 }, scrollHeight: { value: 800 },
+  });
+  fireEvent.input(editor, { target: { value: "긴 내용\n".repeat(40) } });
+  act(() => { vi.advanceTimersByTime(32); });
+  expect(screen.getByRole("scrollbar", { name: "마크다운 입력 세로 스크롤" })).toHaveAttribute("aria-valuemax", "600");
+  expect(screen.getByTestId("editor-host")).not.toHaveClass("is-visible");
+  expect(editor.scrollTop).toBe(0);
+});
+
+
+it("keeps reserved rails outside the content and reaches both content ends without double subtracting the corner", () => {
+  vi.useFakeTimers();
+  const { viewport, host, frame } = prepare(true, true);
+  vi.spyOn(frame, "getBoundingClientRect").mockReturnValue({
+    x: 0, y: 0, top: 0, left: 0, right: 210, bottom: 210, width: 210, height: 210, toJSON: () => ({}),
+  });
+  const vertical = screen.getByRole("scrollbar", { name: "파일 목록 세로 스크롤" });
+  const horizontal = screen.getByRole("scrollbar", { name: "파일 목록 가로 스크롤" });
+  expect(vertical.style.height).toBe("200px");
+  expect(horizontal.style.width).toBe("200px");
+  pointer(frame, "pointermove", 205, 40); // outside the viewport, inside the rail
+  expect(host).toHaveClass("is-visible");
+  pointer(horizontal.firstElementChild as HTMLElement, "pointerdown", 10, 205);
+  pointer(window, "pointermove", 210, 205);
+  pointer(window, "pointerup", 210, 205);
+  expect(viewport.scrollLeft + viewport.clientWidth).toBe(viewport.scrollWidth);
+  fireEvent.keyDown(vertical, { key: "End" });
+  expect(viewport.scrollTop + viewport.clientHeight).toBe(viewport.scrollHeight);
+  pointer(frame, "pointerleave", 230, 230);
+  act(() => { vi.advanceTimersByTime(1250); });
+  expect(host).not.toHaveClass("is-visible");
+  expect(frame).toHaveClass("reserved-scroll-frame");
+  expect(viewport.clientWidth).toBe(200);
 });

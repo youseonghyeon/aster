@@ -95,8 +95,9 @@
 }
 
 .recent-document-content {
+  height: 100%;
   min-height: 0;
-  padding: 10px 8px 18px;
+  padding: 10px 0 18px 8px;
   overflow: auto;
   overscroll-behavior: contain;
 }
@@ -116,7 +117,7 @@
   grid-template-columns: 26px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
-  padding: 9px 10px;
+  padding: 9px 0 9px 10px;
   color: var(--text-subtle);
   background: transparent;
   border: 1px solid transparent;

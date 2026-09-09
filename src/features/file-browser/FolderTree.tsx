@@ -401,7 +401,7 @@ export function FolderTree({
 
   return (
     <div className="folder-tree-frame">
-      <div className="overlay-scroll-frame folder-tree-scroll-frame">
+      <div className="overlay-scroll-frame reserved-scroll-frame folder-tree-scroll-frame">
       <div ref={scrollbarRef} className="folder-tree-viewport">
         <div
           className="folder-tree"
