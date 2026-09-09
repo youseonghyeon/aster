@@ -1589,61 +1589,16 @@ html[data-platform="macos"] .header-group-divider {
 }
 
 .panel-layout-menu {
-  position: absolute;
   z-index: 40;
   top: calc(100% + 8px);
   left: 50%;
-  display: grid;
   width: min(252px, calc(100vw - 24px));
-  gap: 2px;
-  padding: 6px;
-  color: var(--text-strong);
-  background: var(--control-background);
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  box-shadow:
-    0 16px 38px rgba(23, 26, 24, 0.16),
-    0 2px 8px rgba(23, 26, 24, 0.08);
   transform: translateX(-50%);
 }
 
-.panel-layout-menu-item {
-  display: grid;
-  width: 100%;
-  min-height: 38px;
-  grid-template-columns: 20px minmax(0, 1fr) 18px;
-  align-items: center;
-  gap: 9px;
-  padding: 7px 9px;
-  color: var(--text-strong);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  cursor: pointer;
-  font-size: 12px;
-  text-align: left;
-}
-
-.panel-layout-menu-item:hover,
-.panel-layout-menu-item:focus-visible {
-  color: var(--accent-hover);
-  background: var(--table-row-hover);
-  border-color: var(--border-soft);
-}
-
-.panel-layout-menu-item:focus-visible {
-  outline: 2px solid var(--accent-soft);
-  outline-offset: -2px;
-}
-
-.panel-layout-menu-item[aria-disabled="true"] {
-  cursor: default;
-  opacity: 0.62;
-}
-
 .panel-layout-menu-item > svg {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;

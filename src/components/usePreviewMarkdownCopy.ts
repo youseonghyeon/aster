@@ -1,3 +1,6 @@
+import { showAppMenu } from "./menu/AppMenu";
+import { captureTextSelection, performEditCommand } from "./menu/edit-menu";
+import copyIcon from "../assets/icons/copy.svg";
 import { useEffect, useRef, useState, type RefObject, type MouseEvent } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { selectedMarkdown, writeMarkdownClipboard } from "../lib/preview-markdown-copy";
@@ -46,17 +49,22 @@ export function usePreviewMarkdownCopy(rootRef: RefObject<HTMLElement | null>, r
   }, [rootRef]);
   const onContextMenu = async (event: MouseEvent<HTMLElement>) => {
     if (!isTauri()) return;
-    const captured = capture();
-    if (!captured) return;
     event.preventDefault(); event.stopPropagation();
-    const { clientX, clientY } = event;
+    const captured = capture();
+    const root = rootRef.current;
+    if (!root || !captured) return;
+    const selection = captureTextSelection(root);
+    if (!selection) return;
+    const capturedRevision = revisionRef.current;
     try {
-      const [{ Menu }, { LogicalPosition }] = await Promise.all([import("@tauri-apps/api/menu"), import("@tauri-apps/api/dpi")]);
-      const menu = await Menu.new({ items: [
-        { item: "Copy", text: "복사" },
-        { text: "Markdown으로 복사", action: () => void captured.copy() },
-      ] });
-      try { await menu.popup(new LogicalPosition(clientX, clientY)); } finally { await menu.close(); }
+      await showAppMenu({ label: "미리보기 복사", target: root, x: event.clientX, y: event.clientY,
+        isValid: () => selection.valid() && capturedRevision === revisionRef.current,
+        items: [
+          { id: "copy", label: "복사", icon: copyIcon, shortcut: "⌘C", key: "c", action: () => {
+            if (selection.restore()) void performEditCommand("copy").catch(() => setError("복사하지 못했습니다. 다시 시도해 주세요."));
+          } },
+          { id: "markdown", label: "Markdown으로 복사", shortcut: "⇧⌘C", key: "c", shift: true, action: () => void captured.copy() },
+        ] });
     } catch { setError("복사 메뉴를 열지 못했습니다. 단축키를 사용해 주세요."); }
   };
   return { onContextMenu, error };

@@ -7,7 +7,7 @@ const native = vi.hoisted(() => ({
   create: vi.fn(), popup: vi.fn(), close: vi.fn(),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => native.isTauri }));
-vi.mock("@tauri-apps/api/menu", () => ({ Menu: { new: native.create } }));
+vi.mock("../../components/menu/AppMenu", () => ({ showAppMenu: native.create }));
 const props = {
   items: [{ id: "heading-0", title: "제목", depth: 2, offset: 0 }],
   activeHeadingId: null, documentKey: "/doc.md", isModal: true,
@@ -31,15 +31,15 @@ describe("outline context menu", () => {
     expect(native.popup).not.toHaveBeenCalled();
     expect(props.onNavigate).not.toHaveBeenCalled();
   });
-  it("preserves the search input's native editing commands and current query", async () => {
+  it("preserves the search input's editing commands and current query", async () => {
     render(<DocumentOutline {...props} />);
     const input = screen.getByRole("searchbox");
     fireEvent.change(input, { target: { value: "제목" } });
     screen.getByRole("button", {name:"목차 닫기"}).focus();
     fireEvent.contextMenu(input);
     await waitFor(() => expect(native.create).toHaveBeenCalled());
-    expect(native.create.mock.calls[0][0].items.map((item: {item: string}) => item.item))
-      .toEqual(["Undo", "Redo", "Separator", "Cut", "Copy", "Paste", "SelectAll"]);
+    expect(native.create.mock.calls[0][0].items.map((item: {id?: string; separator?: boolean}) => item.separator ? "separator" : item.id))
+      .toEqual(["undo", "redo", "separator", "cut", "copy", "paste", "selectAll"]);
     expect(input).toHaveValue("제목"); expect(input).toHaveFocus();
   });
   it("handles keyboard menu access without intercepting copy or reload shortcuts", async () => {
