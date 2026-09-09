@@ -116,7 +116,7 @@ export function FolderTree({
   onRemoveFile,
   removingFilePath,
 }: FolderTreeProps) {
-  const scrollbarRef = useTransientScrollbar();
+  const scrollbarRef = useTransientScrollbar("overlay");
   const allVisibleEntries = useMemo(
     () => flattenVisibleFolderEntries(state, maximumVisibleTreeEntries + 1),
     [state],
@@ -401,6 +401,7 @@ export function FolderTree({
 
   return (
     <div className="folder-tree-frame">
+      <div className="overlay-scroll-frame folder-tree-scroll-frame">
       <div ref={scrollbarRef} className="folder-tree-viewport">
         <div
           className="folder-tree"
@@ -565,6 +566,8 @@ export function FolderTree({
             );
           })}
         </div>
+      </div>
+      <div className="overlay-scrollbar-host" />
       </div>
       {copyError ? <p role="alert" className="folder-browser-error">{copyError}</p> : null}
       {pageCount > 1 ? (

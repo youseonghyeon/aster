@@ -67,7 +67,7 @@ export function FolderBrowser({
   onRemoveFile,
   removingFilePath,
 }: FolderBrowserProps) {
-  const scrollbarRef = useTransientScrollbar();
+  const scrollbarRef = useTransientScrollbar("overlay");
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const changeFolderButtonRef = useRef<HTMLButtonElement>(null);
@@ -222,6 +222,7 @@ export function FolderBrowser({
         </button>
       </div>
 
+      <div className="overlay-scroll-frame folder-browser-scroll-frame">
       <div
         ref={scrollbarRef}
         id="document-browser-panel"
@@ -304,6 +305,9 @@ export function FolderBrowser({
             항목이 많아 이 폴더의 일부만 표시합니다.
           </p>
         ) : null}
+      </div>
+
+      <div className="overlay-scrollbar-host" />
       </div>
 
       <footer className="document-sidebar-footer folder-browser-footer">
