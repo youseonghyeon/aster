@@ -1,4 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useTransientScrollbar } from "../../hooks/useTransientScrollbar";
 import type { RecentDocument } from "./recent-documents";
 import "./DocumentSidebar.css";
 
@@ -76,6 +77,7 @@ export function DocumentSidebar({
   onOpenFile,
   onSelectDocument,
 }: DocumentSidebarProps) {
+  const scrollbarRef = useTransientScrollbar("overlay");
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const openFileButtonRef = useRef<HTMLButtonElement>(null);
@@ -122,7 +124,7 @@ export function DocumentSidebar({
 
     const focusableElements = Array.from(
       sidebarRef.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        'button:not([disabled]), [tabindex]:not([tabindex="-1"]):not([hidden])',
       ) ?? [],
     );
     const firstElement = focusableElements[0];
@@ -213,70 +215,75 @@ export function DocumentSidebar({
         </button>
       </div>
 
-      <div
-        id="document-browser-panel"
-        className="recent-document-content"
-        role="tabpanel"
-        aria-labelledby="document-recent-tab"
-      >
-        {documents.length > 0 ? (
-          <nav aria-label="최근에 연 Markdown 문서">
-            <ol className="recent-document-list">
-              {documents.map((document) => {
-                const isCurrent = document.path === currentDocumentPath;
-                const isUnavailable = unavailableDocumentPaths.has(document.path);
-                const isFirstTransition =
-                  document.path === firstTransitionDocument?.path;
+      <div className="overlay-scroll-frame reserved-scroll-frame recent-scroll-frame">
+        <div
+          ref={scrollbarRef}
+          aria-label="최근 문서"
+          id="document-browser-panel"
+          className="recent-document-content"
+          role="tabpanel"
+          aria-labelledby="document-recent-tab"
+        >
+          {documents.length > 0 ? (
+            <nav aria-label="최근에 연 Markdown 문서">
+              <ol className="recent-document-list">
+                {documents.map((document) => {
+                  const isCurrent = document.path === currentDocumentPath;
+                  const isUnavailable = unavailableDocumentPaths.has(document.path);
+                  const isFirstTransition =
+                    document.path === firstTransitionDocument?.path;
 
-                return (
-                  <li key={document.path}>
-                    <button
-                      ref={isFirstTransition ? firstTransitionButtonRef : undefined}
-                      type="button"
-                      className="recent-document-button"
-                      aria-current={isCurrent ? "page" : undefined}
-                      aria-label={`${document.name}${isCurrent ? ", 현재 문서" : ""}${isUnavailable ? ", 연결 끊김" : ""}`}
-                      title={document.path}
-                      disabled={isBusy}
-                      onClick={() => onSelectDocument(document)}
-                    >
-                      <span className="recent-document-icon">
-                        <FileIcon />
-                      </span>
-                      <span className="recent-document-details">
-                        <span className="recent-document-name">{document.name}</span>
-                        <span className="recent-document-location">
-                          {formatParentPath(document.path)}
+                  return (
+                    <li key={document.path}>
+                      <button
+                        ref={isFirstTransition ? firstTransitionButtonRef : undefined}
+                        type="button"
+                        className="recent-document-button"
+                        aria-current={isCurrent ? "page" : undefined}
+                        aria-label={`${document.name}${isCurrent ? ", 현재 문서" : ""}${isUnavailable ? ", 연결 끊김" : ""}`}
+                        title={document.path}
+                        disabled={isBusy}
+                        onClick={() => onSelectDocument(document)}
+                      >
+                        <span className="recent-document-icon">
+                          <FileIcon />
                         </span>
-                        {isCurrent || isUnavailable ? (
-                          <span className="recent-document-statuses">
-                            {isCurrent ? (
-                              <span className="recent-document-status is-current">
-                                현재
-                              </span>
-                            ) : null}
-                            {isUnavailable ? (
-                              <span className="recent-document-status is-unavailable">
-                                <UnavailableIcon />
-                                연결 끊김
-                              </span>
-                            ) : null}
+                        <span className="recent-document-details">
+                          <span className="recent-document-name">{document.name}</span>
+                          <span className="recent-document-location">
+                            {formatParentPath(document.path)}
                           </span>
-                        ) : null}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          </nav>
-        ) : (
-          <div className="recent-document-empty">
-            <FileIcon />
-            <strong>최근에 연 문서가 없습니다</strong>
-            <span>Markdown 파일을 열면 이곳에서 다시 열 수 있습니다.</span>
-          </div>
-        )}
+                          {isCurrent || isUnavailable ? (
+                            <span className="recent-document-statuses">
+                              {isCurrent ? (
+                                <span className="recent-document-status is-current">
+                                  현재
+                                </span>
+                              ) : null}
+                              {isUnavailable ? (
+                                <span className="recent-document-status is-unavailable">
+                                  <UnavailableIcon />
+                                  연결 끊김
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </nav>
+          ) : (
+            <div className="recent-document-empty">
+              <FileIcon />
+              <strong>최근에 연 문서가 없습니다</strong>
+              <span>Markdown 파일을 열면 이곳에서 다시 열 수 있습니다.</span>
+            </div>
+          )}
+        </div>
+        <div className="overlay-scrollbar-host" />
       </div>
 
       <footer className="document-sidebar-footer">

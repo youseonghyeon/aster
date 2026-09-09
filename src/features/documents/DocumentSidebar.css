@@ -17,17 +17,18 @@
 
 .document-sidebar-header {
   display: flex;
-  min-height: 68px;
+  height: 60px;
+  min-height: 60px;
   align-items: center;
   justify-content: space-between;
-  padding: 13px 14px 11px 18px;
+  padding: 0 14px 0 18px;
   border-bottom: 1px solid var(--border-soft);
 }
 
 .document-sidebar-header > div {
   display: grid;
   min-width: 0;
-  gap: 3px;
+  gap: 1px;
 }
 
 .document-sidebar-eyebrow {
@@ -95,8 +96,9 @@
 }
 
 .recent-document-content {
+  height: 100%;
   min-height: 0;
-  padding: 10px 8px 18px;
+  padding: 10px 0 18px 8px;
   overflow: auto;
   overscroll-behavior: contain;
 }
@@ -116,7 +118,7 @@
   grid-template-columns: 26px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
-  padding: 9px 10px;
+  padding: 9px 0 9px 10px;
   color: var(--text-subtle);
   background: transparent;
   border: 1px solid transparent;

@@ -9,6 +9,7 @@ import {
 import { copyFolderEntry } from "./folder-gateway";
 import type { FolderEntry } from "./folder-gateway";
 import type { FolderTreeState } from "./folder-tree-state";
+import { dismissAppMenu } from "../../components/menu/AppMenu";
 import { showFolderContextMenu } from "./folder-context-menu";
 import { useTransientScrollbar } from "../../hooks/useTransientScrollbar";
 
@@ -126,6 +127,10 @@ export function FolderTree({
     () => allVisibleEntries.slice(0, maximumVisibleTreeEntries),
     [allVisibleEntries],
   );
+  const latestMenuState = useRef({ state, isDocumentBusy, removingFilePath });
+  latestMenuState.current = { state, isDocumentBusy, removingFilePath };
+  useEffect(() => () => dismissAppMenu(), []);
+  useEffect(() => { dismissAppMenu(); }, [state.root?.token, isDocumentBusy, removingFilePath]);
   const [visiblePage, setVisiblePage] = useState(0);
   const pageCount = Math.max(
     1,
@@ -298,7 +303,16 @@ export function FolderTree({
     entryRefs.current.get(entry.relativePath)?.focus({ preventScroll: true });
     setActivePath(entry.relativePath);
     onSelect(entry.relativePath);
+    const rootToken = state.root?.token;
     void showFolderContextMenu({
+      target: entryRefs.current.get(entry.relativePath),
+      isValid: () => {
+        const latest = latestMenuState.current;
+        return latest.state.root?.token === rootToken &&
+          latest.isDocumentBusy === isDocumentBusy && latest.removingFilePath === removingFilePath &&
+          Object.values(latest.state.directories).some((listing) => listing.entries.some((candidate) =>
+            candidate.path === entry.path && candidate.relativePath === entry.relativePath && candidate.kind === entry.kind));
+      },
       entry,
       x,
       y,
@@ -401,7 +415,7 @@ export function FolderTree({
 
   return (
     <div className="folder-tree-frame">
-      <div className="overlay-scroll-frame folder-tree-scroll-frame">
+      <div className="overlay-scroll-frame reserved-scroll-frame folder-tree-scroll-frame">
       <div ref={scrollbarRef} className="folder-tree-viewport">
         <div
           className="folder-tree"

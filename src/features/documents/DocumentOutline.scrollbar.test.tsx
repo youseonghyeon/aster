@@ -12,7 +12,7 @@ it("connects idle hiding to the actual outline navigation while preserving searc
   const { rerender } = render(<DocumentOutline {...props} />);
   const nav = screen.getByRole("navigation", { name: "문서 제목" });
   expect(nav).toHaveAttribute("data-transient-scrollbar", "true");
-  expect(nav).not.toHaveAttribute("data-overlay-scrollbar");
+  expect(nav).toHaveAttribute("data-overlay-scrollbar", "true");
   nav.scrollTop = 45;
   rerender(<DocumentOutline {...props} activeHeadingId="two" />);
   fireEvent.scroll(nav);
@@ -27,4 +27,26 @@ it("connects idle hiding to the actual outline navigation while preserving searc
   expect(screen.queryByRole("button", { name: "두 번째" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "한글 제목" }), { detail: 1 });
   expect(onNavigate).toHaveBeenCalledWith("one", false);
+});
+
+
+it("supports horizontal outline scrolling and keeps visible overlay controls inside the modal focus loop", () => {
+  render(<DocumentOutline items={[{ id: "long", depth: 1, title: "긴 한글 제목의 마지막 부분" }]}
+    activeHeadingId="long" documentKey="doc" isModal onClose={vi.fn()} onNavigate={vi.fn()} />);
+  const nav = screen.getByRole("navigation", { name: "문서 제목" });
+  Object.defineProperties(nav, {
+    clientWidth: { value: 200 }, clientHeight: { value: 200 },
+    scrollWidth: { value: 600 }, scrollHeight: { value: 200 },
+  });
+  fireEvent.scroll(nav);
+  const horizontal = screen.getByRole("scrollbar", { name: "문서 제목 가로 스크롤" });
+  expect(screen.queryByRole("scrollbar", { name: "문서 제목 세로 스크롤" })).not.toBeInTheDocument();
+  horizontal.focus();
+  fireEvent.keyDown(horizontal, { key: "End" });
+  expect(nav.scrollLeft).toBe(400);
+  fireEvent.keyDown(horizontal, { key: "Tab" });
+  const close = screen.getByRole("button", { name: "목차 닫기" });
+  expect(close).toHaveFocus();
+  fireEvent.keyDown(close, { key: "Tab", shiftKey: true });
+  expect(horizontal).toHaveFocus();
 });

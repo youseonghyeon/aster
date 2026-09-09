@@ -162,6 +162,7 @@ export function FolderBrowser({
       aria-modal={isModal ? true : undefined}
       aria-labelledby="folder-browser-title"
       onKeyDown={handleKeyDown}
+      onContextMenu={(event) => event.preventDefault()}
       onFocusCapture={(event) => {
         hadTreeFocusRef.current =
           (event.target as HTMLElement).getAttribute("role") === "treeitem";
@@ -222,9 +223,9 @@ export function FolderBrowser({
         </button>
       </div>
 
-      <div className="overlay-scroll-frame folder-browser-scroll-frame">
+      <div className={`overlay-scroll-frame folder-browser-scroll-frame${hasVisibleTree ? "" : " reserved-scroll-frame"}`}>
       <div
-        ref={scrollbarRef}
+        ref={hasVisibleTree ? null : scrollbarRef}
         id="document-browser-panel"
         className={`folder-browser-content${hasVisibleTree ? " has-visible-tree" : ""}`}
         role="tabpanel"

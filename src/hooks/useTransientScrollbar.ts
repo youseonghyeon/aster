@@ -75,7 +75,8 @@ export function useTransientScrollbar(mode: "native" | "overlay" = "native") {
       if (scrollKeys.has(event.key)) input();
     };
     const nearEdge = (event: PointerEvent) => {
-      const rect = element.getBoundingClientRect();
+      const bounds = surface.classList.contains("reserved-scroll-frame") ? surface : element;
+      const rect = bounds.getBoundingClientRect();
       // Includes both overlay and classic scrollbar gutters. No event is
       // prevented: the native thumb/track continues to handle dragging/clicks.
       const vertical = element.scrollHeight > element.clientHeight &&
