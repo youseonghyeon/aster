@@ -46,7 +46,7 @@
 
 .folder-browser-content {
   min-height: 0;
-  padding: 4px 7px 18px;
+  padding: 4px 0 18px 7px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -93,7 +93,7 @@
   gap: 3px;
   align-items: center;
   padding-block: 3px;
-  padding-inline-end: 7px;
+  padding-inline-end: 0;
   color: var(--text-subtle);
   background: transparent;
   border: 1px solid transparent;
@@ -372,4 +372,10 @@
   .folder-tree-disclosure {
     transition: none;
   }
+}
+
+
+.folder-browser-scroll-frame > .folder-browser-content,
+.folder-tree-scroll-frame > .folder-tree-viewport {
+  height: 100%;
 }

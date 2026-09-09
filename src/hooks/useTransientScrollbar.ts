@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./transient-scrollbar.css";
+import { attachOverlayScrollbar } from "./overlay-scrollbar";
 
 const idleDelay = 1_000;
 const fadeDuration = 180;
@@ -8,11 +9,17 @@ const scrollKeys = new Set([
   "PageUp", "PageDown", "Home", "End", " ",
 ]);
 
-/** Keep the native scrollbar and its hit area; only its paint is transient. */
-export function useTransientScrollbar() {
+/** Share the activity lifetime between native thumbs and opted-in overlays. */
+export function useTransientScrollbar(mode: "native" | "overlay" = "native") {
   const [element, setElement] = useState<HTMLElement | null>(null);
   useEffect(() => {
     if (!element) return;
+    const sibling = element.nextElementSibling;
+    const host = mode === "overlay" && sibling instanceof HTMLElement &&
+      sibling.classList.contains("overlay-scrollbar-host") ? sibling : null;
+    const surface = host ? (element.parentElement ?? element) : element;
+    const removeOverlay = host ? attachOverlayScrollbar(element, host) : undefined;
+    if (host) element.dataset.overlayScrollbar = "true";
     let timeout: number | undefined;
     let frame: number | undefined;
     let userScrollUntil = 0;
@@ -22,6 +29,10 @@ export function useTransientScrollbar() {
     element.dataset.transientScrollbar = "true";
     const paint = (alpha: number) => {
       element.style.setProperty("--scrollbar-opacity", String(alpha));
+      if (host) {
+        host.style.opacity = String(alpha);
+        host.classList.toggle("is-visible", alpha > 0);
+      }
     };
     paint(0);
     const cancel = () => {
@@ -30,7 +41,7 @@ export function useTransientScrollbar() {
       frame = undefined;
     };
     const hide = () => {
-      if (dragging || hoveringEdge) return;
+      if (dragging || hoveringEdge || host?.contains(document.activeElement)) return;
       if (reducedMotion.matches) {
         paint(0);
         return;
@@ -104,31 +115,45 @@ export function useTransientScrollbar() {
       paint(0);
       userScrollUntil = 0;
     };
-    element.addEventListener("wheel", input, { passive: true });
-    element.addEventListener("touchmove", input, { passive: true });
-    element.addEventListener("keydown", keydown);
+    const focus = () => { if (host?.contains(document.activeElement)) show(); };
+    const unfocus = (event: FocusEvent) => {
+      if (event.target instanceof Node && host?.contains(event.target)) show();
+    };
+    surface.addEventListener("focusin", focus);
+    surface.addEventListener("focusout", unfocus);
+    surface.addEventListener("wheel", input, { passive: true });
+    surface.addEventListener("touchmove", input, { passive: true });
+    surface.addEventListener("keydown", keydown);
     element.addEventListener("scroll", scroll, { passive: true });
-    element.addEventListener("pointermove", move);
-    element.addEventListener("pointerleave", leave);
-    element.addEventListener("pointerdown", down);
+    surface.addEventListener("pointermove", move);
+    surface.addEventListener("pointerleave", leave);
+    surface.addEventListener("pointerdown", down);
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
     window.addEventListener("blur", blur);
+    window.addEventListener("focus", focus);
     return () => {
       cancel();
-      element.removeEventListener("wheel", input);
-      element.removeEventListener("touchmove", input);
-      element.removeEventListener("keydown", keydown);
+      surface.removeEventListener("focusin", focus);
+      surface.removeEventListener("focusout", unfocus);
+      delete element.dataset.overlayScrollbar;
+      surface.removeEventListener("wheel", input);
+      surface.removeEventListener("touchmove", input);
+      surface.removeEventListener("keydown", keydown);
       element.removeEventListener("scroll", scroll);
-      element.removeEventListener("pointermove", move);
-      element.removeEventListener("pointerleave", leave);
-      element.removeEventListener("pointerdown", down);
+      surface.removeEventListener("pointermove", move);
+      surface.removeEventListener("pointerleave", leave);
+      surface.removeEventListener("pointerdown", down);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
       window.removeEventListener("blur", blur);
+      window.removeEventListener("focus", focus);
+      removeOverlay?.();
+      host?.classList.remove("is-visible");
+      host?.style.removeProperty("opacity");
       delete element.dataset.transientScrollbar;
       element.style.removeProperty("--scrollbar-opacity");
     };
-  }, [element]);
+  }, [element, mode]);
   return setElement;
 }

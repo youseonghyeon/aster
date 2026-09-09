@@ -8,6 +8,7 @@ import {
 import { isTauri } from "@tauri-apps/api/core";
 import { showOutlineContextMenu } from "./outline-context-menu";
 import type { MarkdownOutlineItem } from "../../lib/markdown-outline";
+import { useTransientScrollbar } from "../../hooks/useTransientScrollbar";
 import "./DocumentOutline.css";
 
 type OutlineTreeItem = MarkdownOutlineItem & {
@@ -131,6 +132,7 @@ export function DocumentOutline({
   onClose,
   onNavigate,
 }: DocumentOutlineProps) {
+  const scrollbarRef = useTransientScrollbar();
   const [query, setQuery] = useState("");
   const outlineRef = useRef<HTMLElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -261,7 +263,7 @@ export function DocumentOutline({
         </span>
       </div>
 
-      <nav className="outline-navigation" aria-label="문서 제목">
+      <nav ref={scrollbarRef} className="outline-navigation" aria-label="문서 제목">
         {items.length === 0 ? (
           <div className="outline-empty-state">
             <strong>표시할 제목이 없습니다</strong>
