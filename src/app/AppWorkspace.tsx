@@ -1,3 +1,4 @@
+import { useWorkspaceContextMenu } from "../components/menu/useWorkspaceContextMenu";
 import { useUpdateInstaller } from "../features/updates/useUpdateInstaller";
 import { saveUpdateReadingResume } from "../lib/update-reading-resume";
 import type { useDocumentSession } from "../features/documents/useDocumentSession";
@@ -47,6 +48,7 @@ export function AppWorkspace({
     previewElement: workspace.navigation.previewElement,
     openDocument: documents.openDocument,
   });
+  const contextMenu = useWorkspaceContextMenu();
   const updateCheck = useUpdateCheck();
   const installer = useUpdateInstaller(async () => {
     if (!(await documents.prepareUpdateRestart())) return false;
@@ -58,6 +60,7 @@ export function AppWorkspace({
     <>
     <div
       className="app-shell"
+      onContextMenu={contextMenu.onContextMenu}
       inert={installer.phase === "installing"}
       data-theme={reading.theme}
       data-font={reading.readingFont}
@@ -65,6 +68,7 @@ export function AppWorkspace({
       data-bullet-style={reading.bulletStyle}
       style={reading.readingStyle}
     >
+      {contextMenu.error && <div className="app-menu-error" role="alert">{contextMenu.error}</div>}
       <AppHeader
         documentName={documents.document.name}
         documentPath={documents.document.path}

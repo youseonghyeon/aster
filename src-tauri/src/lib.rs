@@ -1,6 +1,7 @@
 mod app_update;
 mod close_guard;
 mod document_io;
+mod edit_command;
 mod file_clipboard;
 mod file_watch;
 mod folder_tree;
@@ -356,6 +357,7 @@ pub fn run() {
             close_guard::handle_window_event(window, event);
         })
         .invoke_handler(tauri::generate_handler![
+            edit_command::perform_edit_command,
             read_markdown_file,
             get_markdown_file_status,
             save_markdown_file,

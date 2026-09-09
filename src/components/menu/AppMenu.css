@@ -27,3 +27,5 @@
 .app-context-menu-label { overflow-wrap: anywhere; }
 .app-context-menu-shortcut { font-size: 11px; opacity: .62; white-space: nowrap; }
 .app-context-menu-separator { height: 1px; margin: 4px 7px; background: var(--border-strong); }
+
+.app-menu-error { position: fixed; z-index: 1001; bottom: 16px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 32px); padding: 8px 12px; border-radius: 6px; background: var(--preview-background); color: var(--text); border: 1px solid var(--border-strong); font-size: 13px; }

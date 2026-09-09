@@ -1,3 +1,4 @@
+import "../../components/menu/AppMenu.css";
 import {
   useEffect,
   useRef,
@@ -212,14 +213,15 @@ function PanelLayoutMenu({
         <div
           ref={menuRef}
           id="panel-layout-menu"
-          className="panel-layout-menu"
+          className="panel-layout-menu app-context-menu"
           role="menu"
           aria-label="패널 배치"
           onKeyDown={handleMenuKeyDown}
+          onContextMenu={(event) => event.preventDefault()}
         >
           <button
             type="button"
-            className="panel-layout-menu-item"
+            className="panel-layout-menu-item app-context-menu-item"
             role="menuitemcheckbox"
             aria-checked={isScrollSyncEnabled}
             aria-disabled={!isScrollSyncAvailable}
@@ -241,7 +243,7 @@ function PanelLayoutMenu({
           </button>
           <button
             type="button"
-            className="panel-layout-menu-item"
+            className="panel-layout-menu-item app-context-menu-item"
             role="menuitem"
             onClick={() => runAndClose(onSwapPanes)}
           >
@@ -251,7 +253,7 @@ function PanelLayoutMenu({
           {!isStacked ? (
             <button
               type="button"
-              className="panel-layout-menu-item"
+              className="panel-layout-menu-item app-context-menu-item"
               role="menuitem"
               onClick={() => runAndClose(onResetSplit)}
             >
