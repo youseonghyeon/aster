@@ -1,3 +1,6 @@
+import { AssetIcon } from "../../components/icons/AssetIcon";
+import searchIconAsset from "../../assets/icons/search.svg";
+import closeIconAsset from "../../assets/icons/close.svg";
 import {
   useEffect,
   useMemo,
@@ -25,20 +28,11 @@ type DocumentOutlineProps = {
 };
 
 function SearchIcon() {
-  return (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <circle cx="7.75" cy="7.75" r="4.75" />
-      <path d="m11.25 11.25 3.5 3.5" />
-    </svg>
-  );
+  return <AssetIcon src={searchIconAsset} />;
 }
 
 function CloseIcon() {
-  return (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <path d="m4.5 4.5 9 9m0-9-9 9" />
-    </svg>
-  );
+  return <AssetIcon src={closeIconAsset} />;
 }
 
 function buildOutlineTree(items: MarkdownOutlineItem[]) {

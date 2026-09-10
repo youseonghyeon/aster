@@ -23,6 +23,9 @@ export function AppStageSidebar({
     return (
       <FolderBrowser
         state={folderBrowser.state}
+        revealRequest={folderBrowser.revealRequest}
+        isRevealing={folderBrowser.isRevealing}
+        onRevealCurrentFile={() => { if (documents.document.path) void folderBrowser.actions.revealCurrentFile(documents.document.path); }}
         currentDocumentPath={documents.document.path}
         isModal={!state.isSidebarInset}
         isDocumentBusy={documents.isBusy}

@@ -1,3 +1,8 @@
+import closeIconAsset from "../../assets/icons/close.svg";
+import folderIconAsset from "../../assets/icons/folder.svg";
+import { AssetIcon } from "../../components/icons/AssetIcon";
+import locateIcon from "../../assets/icons/locate-current-file.svg";
+import { relativeCurrentFile } from "./reveal-current-file";
 import {
   useEffect,
   useLayoutEffect,
@@ -12,6 +17,9 @@ import "./FolderBrowser.css";
 
 type FolderBrowserProps = {
   state: FolderTreeState;
+  revealRequest?: { path: string; rootToken: number; id: number } | null;
+  isRevealing?: boolean;
+  onRevealCurrentFile?: () => void;
   currentDocumentPath: string | null;
   isModal: boolean;
   isDocumentBusy: boolean;
@@ -32,23 +40,18 @@ type FolderBrowserProps = {
 };
 
 function CloseIcon() {
-  return (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <path d="m4.5 4.5 9 9m0-9-9 9" />
-    </svg>
-  );
+  return <AssetIcon src={closeIconAsset} />;
 }
 
 function FolderIcon() {
-  return (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M2.5 5h5l1.5 1.75h6.5v8.5h-13z" />
-    </svg>
-  );
+  return <AssetIcon src={folderIconAsset} />;
 }
 
 export function FolderBrowser({
   state,
+  revealRequest,
+  isRevealing = false,
+  onRevealCurrentFile,
   currentDocumentPath,
   isModal,
   isDocumentBusy,
@@ -173,6 +176,13 @@ export function FolderBrowser({
           <span className="document-sidebar-eyebrow">문서</span>
           <h2 id="folder-browser-title">{state.root?.name ?? "문서 탐색"}</h2>
         </div>
+        <div className="folder-browser-header-actions">
+        <button className="document-sidebar-close" type="button" aria-label="현재 파일 찾기"
+          title={state.root && relativeCurrentFile(state.root.path, currentDocumentPath) ? "현재 파일 찾기" : "열린 폴더 안의 문서에서 사용할 수 있습니다"}
+          disabled={!onRevealCurrentFile || isDocumentBusy || !state.root || !relativeCurrentFile(state.root.path, currentDocumentPath)}
+          onClick={() => { if (!isRevealing) onRevealCurrentFile?.(); }} aria-busy={isRevealing} aria-disabled={isRevealing}>
+          <AssetIcon src={locateIcon} />
+        </button>
         <button
           ref={closeButtonRef}
           type="button"
@@ -183,6 +193,7 @@ export function FolderBrowser({
         >
           <CloseIcon />
         </button>
+        </div>
       </header>
 
       <div
@@ -275,6 +286,7 @@ export function FolderBrowser({
           </div>
         ) : (
           <FolderTree
+            revealRequest={revealRequest}
             state={state}
             currentDocumentPath={currentDocumentPath}
             isDocumentBusy={isDocumentBusy}

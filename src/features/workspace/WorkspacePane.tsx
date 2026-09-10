@@ -1,3 +1,6 @@
+import { AssetIcon } from "../../components/icons/AssetIcon";
+import focusEnterIcon from "../../assets/icons/focus-enter.svg";
+import focusExitIcon from "../../assets/icons/focus-exit.svg";
 import {
   useCallback,
   useEffect,
@@ -64,15 +67,7 @@ type WorkspacePaneProps = {
 };
 
 function PreviewFocusIcon({ isActive }: { isActive: boolean }) {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      {isActive ? (
-        <path d="M3.5 7h3.5V3.5M16.5 7H13V3.5M3.5 13H7v3.5M16.5 13H13v3.5" />
-      ) : (
-        <path d="M7 3.5H3.5V7M13 3.5h3.5V7M7 16.5H3.5V13M13 16.5h3.5V13" />
-      )}
-    </svg>
-  );
+  return <AssetIcon src={isActive ? focusExitIcon : focusEnterIcon} />;
 }
 
 export function WorkspacePane({

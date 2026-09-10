@@ -1,3 +1,5 @@
+import { findCurrentFile } from "./reveal-current-file";
+import { flattenVisibleFolderEntries, maximumVisibleTreeEntries } from "./visible-folder-entries";
 import {
   useCallback,
   useEffect,
@@ -33,7 +35,7 @@ import {
   type FolderTreeAction,
 } from "./folder-tree-state";
 
-type UseFolderBrowserOptions = { isActive: boolean };
+type UseFolderBrowserOptions = { isActive: boolean; currentDocumentPath?: string | null };
 
 type FolderRefreshFlight = {
   rootToken: number;
@@ -47,7 +49,14 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
+export function useFolderBrowser({ isActive, currentDocumentPath }: UseFolderBrowserOptions) {
+  const documentPathRef = useRef(currentDocumentPath);
+  documentPathRef.current = currentDocumentPath;
+  const [isRevealing, setRevealing] = useState(false);
+  const revealFlight = useRef(false);
+  const [revealRequest, setRevealRequest] = useState<{ path: string; rootToken: number; id: number } | null>(null);
+  const revealEpochRef = useRef(0);
+  useEffect(() => { ++revealEpochRef.current; setRevealRequest(null); }, [currentDocumentPath, isActive]);
   const initialPreferencesRef = useRef<FolderBrowserPreferences | null>(null);
   if (initialPreferencesRef.current === null) {
     initialPreferencesRef.current = loadFolderBrowserPreferences();
@@ -417,6 +426,45 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
     [dispatch],
   );
 
+  const revealCurrentFile = useCallback(async (path: string) => {
+    const root = stateRef.current.root;
+    if (!root || revealFlight.current) return;
+    revealFlight.current = true; setRevealing(true); setOperationError(null);
+    const rootRequest = rootRequestRef.current;
+    const focus = document.activeElement;
+    const epoch = revealEpochRef.current;
+    let focusChanged = false;
+    const cancelOnFocusChange = () => { if (document.activeElement !== focus) focusChanged = true; };
+    document.addEventListener("focusin", cancelOnFocusChange);
+    const valid = () => mountedRef.current && isActiveRef.current && stateRef.current.root?.token === root.token &&
+      rootRequestRef.current === rootRequest && revealEpochRef.current === epoch && !focusChanged && (documentPathRef.current === undefined || documentPathRef.current === path) && document.activeElement === focus;
+    try {
+      const found = await findCurrentFile(root, path, async (directory) => {
+        await loadDirectory(root, directory);
+        const listing = stateRef.current.directories[directory];
+        if (!listing || listing.status !== "loaded") throw new Error(listing?.error ?? "목록을 확인하지 못했습니다. 다시 시도해 주세요.");
+        return listing;
+      }, valid);
+      if (!found || !valid()) return;
+      const expandedPaths = new Set([...stateRef.current.expandedPaths, ...found.ancestors]);
+      const candidate = { ...stateRef.current, expandedPaths };
+      if (!flattenVisibleFolderEntries(candidate, maximumVisibleTreeEntries).some(entry => entry.relativePath === found.path)) {
+        throw new Error("목록 표시 한도로 현재 파일을 표시하지 못했습니다. 다른 폴더를 접고 다시 시도해 주세요.");
+      }
+      for (const ancestor of found.ancestors) {
+        if (!stateRef.current.expandedPaths.has(ancestor)) dispatch({ type: "toggle-directory", path: ancestor });
+      }
+      persist({ expandedPaths: Array.from(stateRef.current.expandedPaths) });
+      dispatch({ type: "select-entry", path: found.path });
+      setRevealRequest(previous => ({ path: found.path, rootToken: root.token, id: (previous?.id ?? 0) + 1 }));
+    } catch (error) { if (valid()) setOperationError(errorMessage(error)); }
+    finally {
+      document.removeEventListener("focusin", cancelOnFocusChange);
+      revealFlight.current = false;
+      if (mountedRef.current) setRevealing(false);
+    }
+  }, [dispatch, loadDirectory, persist]);
+
   const retryDirectory = useCallback(
     (directory: string) => {
       void requestRefreshRef.current(directory);
@@ -508,12 +556,15 @@ export function useFolderBrowser({ isActive }: UseFolderBrowserOptions) {
     isPersistenceLimited,
     operationError,
     removingFilePath,
+    revealRequest,
+    isRevealing,
     actions: {
       chooseRoot,
       clearRoot,
       refresh,
       toggleDirectory,
       selectEntry,
+      revealCurrentFile,
       retryDirectory,
       openImage,
       removeFile,

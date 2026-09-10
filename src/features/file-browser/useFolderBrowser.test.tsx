@@ -64,6 +64,51 @@ describe("useFolderBrowser", () => {
     vi.mocked(confirmFolderFileRemoval).mockResolvedValue(false);
   });
 
+  it.each(["document", "sidebar", "focus", "document-return"])("discards a delayed reveal after %s changes and ignores duplicate clicks", async (change) => {
+    saveTestRoot();
+    const { result, rerender } = renderHook(
+      (props) => useFolderBrowser(props),
+      { initialProps: { isActive: true, currentDocumentPath: "/docs/a.md" } },
+    );
+    await waitFor(() => expect(result.current.state.directories[""]?.status).toBe("loaded"));
+    const pending = deferred<FolderListing>();
+    vi.mocked(listFolderChildren).mockReturnValue(pending.promise);
+    let request!: Promise<void>;
+    act(() => {
+      request = result.current.actions.revealCurrentFile("/docs/a.md");
+      void result.current.actions.revealCurrentFile("/docs/a.md");
+    });
+    expect(listFolderChildren).toHaveBeenCalledTimes(2);
+    const button = document.createElement("button");
+    if (change === "document-return") {
+      rerender({ isActive: true, currentDocumentPath: "/docs/b.md" });
+      rerender({ isActive: true, currentDocumentPath: "/docs/a.md" });
+    }
+    if (change === "document") rerender({ isActive: true, currentDocumentPath: "/docs/b.md" });
+    if (change === "sidebar") rerender({ isActive: false, currentDocumentPath: "/docs/a.md" });
+    if (change === "focus") { document.body.append(button); button.focus(); }
+    pending.resolve({ ...listing(""), entries: [{ kind: "markdown", name: "a.md", path: "/docs/a.md", relativePath: "a.md" }] });
+    await act(async () => request);
+    expect(result.current.revealRequest).toBeNull();
+    expect(result.current.isRevealing).toBe(false);
+    button.remove();
+  });
+
+  it("reveals a nested current document without changing the root or opening a file", async () => {
+    saveTestRoot();
+    const folder = { name: "nested", relativePath: "nested", path: "/docs/nested", kind: "directory" as const };
+    const file = { name: "문서.md", relativePath: "nested/문서.md", path: "/docs/nested/문서.md", kind: "markdown" as const };
+    vi.mocked(listFolderChildren).mockImplementation(async (_, directory) => ({ ...listing(directory), entries: directory === "" ? [folder] : [file] }));
+    const { result } = renderHook(() => useFolderBrowser({ isActive: true, currentDocumentPath: file.path }));
+    await waitFor(() => expect(result.current.state.directories[""]?.status).toBe("loaded"));
+    await act(async () => result.current.actions.revealCurrentFile(file.path));
+    expect(result.current.state.expandedPaths.has("nested")).toBe(true);
+    expect(result.current.state.selectedPath).toBe(file.relativePath);
+    expect(result.current.revealRequest?.path).toBe(file.relativePath);
+    expect(result.current.state.root).toEqual(root);
+    expect(openFolderRoot).toHaveBeenCalledTimes(1);
+  });
+
   afterEach(() => {
     vi.useRealTimers();
   });

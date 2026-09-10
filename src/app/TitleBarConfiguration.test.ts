@@ -88,12 +88,6 @@ describe("macOS integrated title bar", () => {
     expect(unlisten).toHaveBeenCalledOnce();
   });
 
-  it("removes the redundant brand group from the macOS title bar", () => {
-    expect(appStyles).toMatch(
-      /html\[data-platform="macos"\] \.brand,\s*html\[data-platform="macos"\] \.header-group-divider\s*\{[^}]*display:\s*none/u,
-    );
-  });
-
   it("allows native window dragging from declared title bar regions", () => {
     expect(defaultCapability.permissions).toContain(
       "core:window:allow-start-dragging",

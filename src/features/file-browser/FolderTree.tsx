@@ -1,3 +1,8 @@
+import { AssetIcon } from "../../components/icons/AssetIcon";
+import folderIcon from "../../assets/icons/folder.svg";
+import documentIcon from "../../assets/icons/document.svg";
+import imageIcon from "../../assets/icons/image.svg";
+import disclosureIcon from "../../assets/icons/history-forward.svg";
 import {
   useEffect,
   useLayoutEffect,
@@ -13,40 +18,10 @@ import { dismissAppMenu } from "../../components/menu/AppMenu";
 import { showFolderContextMenu } from "./folder-context-menu";
 import { useTransientScrollbar } from "../../hooks/useTransientScrollbar";
 
-export type VisibleFolderEntry = FolderEntry & { level: number };
+import { flattenVisibleFolderEntries, maximumVisibleTreeEntries, type VisibleFolderEntry } from "./visible-folder-entries";
+export { flattenVisibleFolderEntries } from "./visible-folder-entries";
 const folderTreePageSize = 300;
-const maximumVisibleTreeEntries = 6_000;
 const maximumVisualIndentLevel = 9;
-
-export function flattenVisibleFolderEntries(
-  state: FolderTreeState,
-  maximumEntries = Number.POSITIVE_INFINITY,
-): VisibleFolderEntry[] {
-  const visible: VisibleFolderEntry[] = [];
-
-  function appendDirectory(directory: string, level: number) {
-    const listing = state.directories[directory];
-    if (
-      !listing ||
-      (listing.status === "error" && listing.entries.length === 0)
-    ) {
-      return;
-    }
-    for (const entry of listing.entries) {
-      if (visible.length >= maximumEntries) return;
-      visible.push({ ...entry, level });
-      if (
-        entry.kind === "directory" &&
-        state.expandedPaths.has(entry.relativePath)
-      ) {
-        appendDirectory(entry.relativePath, level + 1);
-      }
-    }
-  }
-
-  appendDirectory("", 1);
-  return visible;
-}
 
 function parentPath(path: string) {
   const separator = path.lastIndexOf("/");
@@ -54,43 +29,15 @@ function parentPath(path: string) {
 }
 
 function DisclosureIcon({ expanded }: { expanded: boolean }) {
-  return (
-    <svg
-      className={`folder-tree-disclosure${expanded ? " is-expanded" : ""}`}
-      viewBox="0 0 12 12"
-      aria-hidden="true"
-    >
-      <path d="m4 2.75 3.25 3.25L4 9.25" />
-    </svg>
-  );
+  return <AssetIcon src={disclosureIcon} className={`folder-tree-disclosure${expanded ? " is-expanded" : ""}`} />;
 }
 
 function EntryIcon({ kind }: Pick<FolderEntry, "kind">) {
-  if (kind === "directory") {
-    return (
-      <svg viewBox="0 0 16 16" aria-hidden="true">
-        <path d="M1.75 4.25h4l1.3 1.5h7.2v7.5H1.75z" />
-      </svg>
-    );
-  }
-  if (kind === "image") {
-    return (
-      <svg viewBox="0 0 16 16" aria-hidden="true">
-        <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
-        <circle cx="5.25" cy="5.75" r="1" />
-        <path d="m3.5 11 3-3 2 2 1.5-1.5 2.5 2.5" />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path d="M3 1.75h6l4 4v8.5H3z" />
-      <path d="M9 1.75v4h4M5.25 9h5.5M5.25 11.5h4" />
-    </svg>
-  );
+  return <AssetIcon src={kind === "directory" ? folderIcon : kind === "image" ? imageIcon : documentIcon} />;
 }
 
 type FolderTreeProps = {
+  revealRequest?: { path: string; rootToken: number; id: number } | null;
   state: FolderTreeState;
   currentDocumentPath: string | null;
   isDocumentBusy: boolean;
@@ -106,6 +53,7 @@ type FolderTreeProps = {
 
 export function FolderTree({
   state,
+  revealRequest,
   currentDocumentPath,
   isDocumentBusy,
   onSelect,
@@ -257,6 +205,14 @@ export function FolderTree({
     element?.focus();
     element?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
+
+  const handledRevealRef = useRef<typeof revealRequest>(null);
+  useLayoutEffect(() => {
+    if (!revealRequest || handledRevealRef.current === revealRequest || revealRequest.rootToken !== state.root?.token) return;
+    if (entryByPath.get(revealRequest.path)?.path !== currentDocumentPath) return;
+    handledRevealRef.current = revealRequest;
+    focusEntry(revealRequest.path);
+  });
 
   function showPage(page: number) {
     const nextPage = Math.min(pageCount - 1, Math.max(0, page));

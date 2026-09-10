@@ -1,3 +1,9 @@
+import { AssetIcon } from "../../components/icons/AssetIcon";
+import swapPaneIconAsset from "../../assets/icons/swap-panes.svg";
+import panelLayoutIconAsset from "../../assets/icons/panel-layout.svg";
+import resetSplitIconAsset from "../../assets/icons/reset-split.svg";
+import scrollSyncIconAsset from "../../assets/icons/scroll-sync.svg";
+import selectedOptionIconAsset from "../../assets/icons/selected-option.svg";
 import "../../components/menu/AppMenu.css";
 import {
   useEffect,
@@ -29,46 +35,23 @@ export type PaneDividerProps = {
 };
 
 function SwapPaneIcon() {
-  return (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M3 6h11m-3-3 3 3-3 3M15 12H4m3-3-3 3 3 3" />
-    </svg>
-  );
+  return <AssetIcon src={swapPaneIconAsset} />;
 }
 
 function PanelLayoutIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <rect x="3.25" y="4" width="13.5" height="12" rx="1.75" />
-      <path d="M10 4v12" />
-    </svg>
-  );
+  return <AssetIcon src={panelLayoutIconAsset} />;
 }
 
 function ResetSplitIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M4 5.25h12v9.5H4zM10 5.25v9.5" />
-      <path d="m6.25 3-2.5 2.25 2.5 2.25M13.75 17l2.5-2.25-2.5-2.25" />
-    </svg>
-  );
+  return <AssetIcon src={resetSplitIconAsset} />;
 }
 
 function ScrollSyncIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M3.5 4.25h4v11.5h-4zM12.5 4.25h4v11.5h-4z" />
-      <path d="M10 5.5v9m-2-2 2 2 2-2M8 7.5l2-2 2 2" />
-    </svg>
-  );
+  return <AssetIcon src={scrollSyncIconAsset} />;
 }
 
 function SelectedOptionIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path d="m3.5 8.25 2.75 2.75 6.25-6.25" />
-    </svg>
-  );
+  return <AssetIcon src={selectedOptionIconAsset} />;
 }
 
 function PanelLayoutMenu({

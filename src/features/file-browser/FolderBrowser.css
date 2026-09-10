@@ -2,7 +2,7 @@
   grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
-.folder-browser svg {
+.folder-browser :is(svg, .aster-asset-icon) {
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -188,7 +188,7 @@
   color: var(--accent-strong);
 }
 
-.folder-tree-icon svg {
+.folder-tree-icon :is(svg, .aster-asset-icon) {
   width: 15px;
   height: 15px;
 }
@@ -227,7 +227,7 @@
   text-align: center;
 }
 
-.folder-browser-message > svg {
+.folder-browser-message > :is(svg, .aster-asset-icon) {
   width: 28px;
   height: 28px;
   color: var(--accent-strong);
@@ -367,7 +367,7 @@
   opacity: 0.45;
 }
 
-.folder-browser-footer-actions svg {
+.folder-browser-footer-actions :is(svg, .aster-asset-icon) {
   width: 15px;
   height: 15px;
 }
@@ -383,3 +383,6 @@
 .folder-tree-scroll-frame > .folder-tree-viewport {
   height: 100%;
 }
+
+.document-sidebar-header > .folder-browser-header-actions { display: flex; align-items: center; gap: 2px; }
+.folder-browser-header-actions button:disabled { opacity: .4; cursor: default; }

@@ -1,3 +1,7 @@
+import { AssetIcon } from "../../components/icons/AssetIcon";
+import closeIconAsset from "../../assets/icons/close.svg";
+import fileIconAsset from "../../assets/icons/document.svg";
+import openFileIconAsset from "../../assets/icons/folder-open.svg";
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import { useTransientScrollbar } from "../../hooks/useTransientScrollbar";
 import type { RecentDocument } from "./recent-documents";
@@ -17,29 +21,15 @@ type DocumentSidebarProps = {
 };
 
 function CloseIcon() {
-  return (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <path d="m4.5 4.5 9 9m0-9-9 9" />
-    </svg>
-  );
+  return <AssetIcon src={closeIconAsset} />;
 }
 
 function FileIcon() {
-  return (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M4.5 2.75h5.25l3.75 3.75v8.75h-9z" />
-      <path d="M9.75 2.75V6.5h3.75" />
-    </svg>
-  );
+  return <AssetIcon src={fileIconAsset} />;
 }
 
 function OpenFileIcon() {
-  return (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M2.75 5.25h4l1.4 1.5h7.1l-1.5 7.5h-11z" />
-      <path d="M2.75 5.25V3.75h4.5l1.4 1.5h4.6v1.5" />
-    </svg>
-  );
+  return <AssetIcon src={openFileIconAsset} />;
 }
 
 function UnavailableIcon() {

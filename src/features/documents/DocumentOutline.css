@@ -68,8 +68,8 @@
   outline-offset: 2px;
 }
 
-.outline-close-button svg,
-.outline-search svg {
+.outline-close-button :is(svg, .aster-asset-icon),
+.outline-search :is(svg, .aster-asset-icon) {
   width: 17px;
   height: 17px;
   fill: none;
@@ -88,7 +88,7 @@
   color: var(--text-faint);
 }
 
-.outline-search > svg {
+.outline-search > :is(svg, .aster-asset-icon) {
   position: absolute;
   left: 11px;
   pointer-events: none;
