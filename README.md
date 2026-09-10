@@ -17,6 +17,41 @@
 
 macOS에서는 DMG를 열고 Aster를 Applications 폴더로 드래그하면 됩니다. Windows 설치 파일은 아직 코드 서명 인증서가 없어 Microsoft Defender SmartScreen 경고가 표시될 수 있습니다. 파일 무결성은 각 릴리스에 첨부된 `SHA256SUMS.txt`에서 확인할 수 있습니다.
 
+### Homebrew로 설치 (macOS)
+
+개발자가 관리하는 [개인 Tap](https://github.com/youseonghyeon/homebrew-aster)을 통해 정식 Aster를 설치할 수 있습니다. Apple Silicon과 Intel을 모두 지원하는 Universal 앱이며, Homebrew 공식 Cask 등록은 아직 진행하지 않았습니다.
+
+```sh
+brew install --cask youseonghyeon/aster/aster
+```
+
+Tap을 먼저 등록하면 짧은 이름으로 설치·검색할 수 있습니다.
+
+```sh
+brew tap youseonghyeon/aster
+brew install --cask aster
+brew search --cask aster
+```
+
+`untrusted tap` 오류가 나타나는 Homebrew에서는 아래 명령으로 Aster Cask를 신뢰 등록한 뒤 설치 명령을 다시 실행합니다.
+
+```sh
+brew trust --cask youseonghyeon/aster/aster
+```
+
+이미 수동 설치한 `Aster.app`이 있으면 기존 앱 때문에 설치가 중단될 수 있습니다. 기존 설치본에서도 앱 내 업데이트를 계속 사용할 수 있습니다.
+
+### Homebrew로 업데이트
+
+Homebrew로 설치한 뒤에도 앱 내 업데이트를 사용할 수 있습니다. 자체 업데이트를 지원하므로 일반적인 전체 `brew upgrade`에서는 기본적으로 제외됩니다. Homebrew로 업데이트하려면 작업을 저장하고 Aster를 종료한 뒤 실행합니다.
+
+```sh
+brew update
+brew upgrade --cask --greedy aster
+```
+
+앱 내 업데이트와 Homebrew 업데이트는 동시에 실행하지 않습니다. 자세한 설치·업데이트 안내는 [Tap README](https://github.com/youseonghyeon/homebrew-aster#readme)를 참고하세요.
+
 ## 읽기 환경
 
 | 구분 | 지원 항목 |
