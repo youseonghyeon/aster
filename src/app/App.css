@@ -2669,7 +2669,13 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
   word-break: keep-all;
 }
 
-.markdown-body :is(th, td) :is(a, code) {
+/* Table code uses the same wrapping rules as cell text, preserving its styling. */
+.markdown-body :is(th, td) code:not(pre code) {
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+.markdown-body :is(th, td) a {
   overflow-wrap: anywhere;
   word-break: normal;
 }
