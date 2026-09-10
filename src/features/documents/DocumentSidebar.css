@@ -78,10 +78,10 @@
   outline-offset: 2px;
 }
 
-.document-sidebar-close svg,
-.document-sidebar-open svg,
-.recent-document-icon svg,
-.recent-document-empty > svg {
+.document-sidebar-close :is(svg, .aster-asset-icon),
+.document-sidebar-open :is(svg, .aster-asset-icon),
+.recent-document-icon :is(svg, .aster-asset-icon),
+.recent-document-empty > :is(svg, .aster-asset-icon) {
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -89,8 +89,8 @@
   stroke-width: 1.5;
 }
 
-.document-sidebar-close svg,
-.document-sidebar-open svg {
+.document-sidebar-close :is(svg, .aster-asset-icon),
+.document-sidebar-open :is(svg, .aster-asset-icon) {
   width: 17px;
   height: 17px;
 }
@@ -148,7 +148,7 @@
   border-radius: 7px;
 }
 
-.recent-document-icon svg {
+.recent-document-icon :is(svg, .aster-asset-icon) {
   width: 15px;
   height: 15px;
 }
@@ -208,7 +208,7 @@
   background: color-mix(in srgb, var(--inline-code-text) 11%, transparent);
 }
 
-.recent-document-status svg {
+.recent-document-status :is(svg, .aster-asset-icon) {
   width: 12px;
   height: 12px;
   fill: none;
@@ -226,7 +226,7 @@
   text-align: center;
 }
 
-.recent-document-empty > svg {
+.recent-document-empty > :is(svg, .aster-asset-icon) {
   width: 24px;
   height: 24px;
   margin-bottom: 2px;

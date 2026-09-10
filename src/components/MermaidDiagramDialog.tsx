@@ -1,3 +1,5 @@
+import { AssetIcon } from "./icons/AssetIcon";
+import closeIconAsset from "../assets/icons/close.svg";
 import {
   useCallback,
   useEffect,
@@ -58,11 +60,7 @@ function readCanvasPadding(canvas: HTMLElement) {
 }
 
 function CloseIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M5 5l10 10M15 5L5 15" />
-    </svg>
-  );
+  return <AssetIcon src={closeIconAsset} />;
 }
 
 export function MermaidDiagramDialog({

@@ -39,6 +39,7 @@ export function AppWorkspace({
   });
   const folderBrowser = useFolderBrowser({
     isActive: workspace.state.stageSidebar === "files",
+    currentDocumentPath: documents.document.path,
   });
   const { state, search, elements, divider, actions } = workspace;
   const navigation = useLinkNavigationController({

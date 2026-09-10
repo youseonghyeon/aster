@@ -33,7 +33,7 @@
   border-color: var(--inline-code-text);
 }
 
-.pane-search-field svg {
+.pane-search-field :is(svg, .aster-asset-icon) {
   width: 15px;
   height: 15px;
   flex: 0 0 auto;
@@ -118,7 +118,7 @@
   letter-spacing: -0.08em;
 }
 
-.pane-search-action svg {
+.pane-search-action :is(svg, .aster-asset-icon) {
   width: 15px;
   height: 15px;
   fill: none;

@@ -1,74 +1,293 @@
 [
   {
-    "file": "proposals/outline-01/reload.svg",
+    "file": "reload.svg",
     "name": "reload",
     "label": "다시 로드",
-    "note": "순환 화살표"
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "menus"
+    ],
+    "status": "applied"
   },
   {
-    "file": "proposals/outline-01/copy.svg",
+    "file": "copy.svg",
     "name": "copy",
     "label": "복사",
-    "note": "겹친 문서"
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "menus"
+    ],
+    "status": "applied"
   },
   {
-    "file": "proposals/outline-01/copy-name.svg",
+    "file": "copy-name.svg",
     "name": "copy-name",
     "label": "이름 복사",
-    "note": "문서와 텍스트 · 요청할 때만 사용"
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "menus"
+    ],
+    "status": "proposal"
   },
   {
     "file": "trash.svg",
     "name": "trash",
     "label": "삭제",
-    "note": "뚜껑과 손잡이가 있는 단색 휴지통"
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "menus"
+    ],
+    "status": "applied"
   },
   {
-    "file": "proposals/outline-01/folder.svg",
+    "file": "folder.svg",
     "name": "folder",
     "label": "폴더",
-    "note": "닫힌 폴더"
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "files"
+    ],
+    "status": "applied"
   },
   {
-    "file": "proposals/outline-01/folder-open.svg",
+    "file": "folder-open.svg",
     "name": "folder-open",
     "label": "폴더 열기",
-    "note": "앞면이 열린 폴더"
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "header",
+      "files"
+    ],
+    "status": "applied"
   },
   {
-    "file": "proposals/outline-01/document.svg",
+    "file": "document.svg",
     "name": "document",
     "label": "문서",
-    "note": "접힌 모서리와 본문"
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "files"
+    ],
+    "status": "applied"
   },
   {
-    "file": "proposals/outline-01/image.svg",
+    "file": "image.svg",
     "name": "image",
     "label": "이미지",
-    "note": "사진 프레임"
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "files"
+    ],
+    "status": "applied"
   },
   {
-    "file": "proposals/outline-01/search.svg",
+    "file": "search.svg",
     "name": "search",
     "label": "검색",
-    "note": "돋보기"
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "search"
+    ],
+    "status": "applied"
   },
   {
-    "file": "proposals/outline-01/outline.svg",
+    "file": "outline.svg",
     "name": "outline",
     "label": "목차",
-    "note": "깊이가 구분되는 제목 목록"
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "header"
+    ],
+    "status": "applied"
   },
   {
-    "file": "proposals/outline-01/recent.svg",
+    "file": "recent.svg",
     "name": "recent",
     "label": "최근 문서",
-    "note": "되돌아보는 시계 · 기능 유지 시 후보"
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "files"
+    ],
+    "status": "proposal"
   },
   {
-    "file": "proposals/outline-01/close.svg",
+    "file": "close.svg",
     "name": "close",
     "label": "닫기",
-    "note": "닫기 기호"
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "menus"
+    ],
+    "status": "applied"
+  },
+  {
+    "file": "locate-current-file.svg",
+    "name": "locate-current-file",
+    "label": "현재 파일 찾기",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "files"
+    ],
+    "status": "applied"
+  },
+  {
+    "file": "document-browser.svg",
+    "name": "document-browser",
+    "label": "문서 탐색",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "header"
+    ],
+    "status": "applied"
+  },
+  {
+    "file": "history-back.svg",
+    "name": "history-back",
+    "label": "뒤로 이동",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "header"
+    ],
+    "status": "applied"
+  },
+  {
+    "file": "history-forward.svg",
+    "name": "history-forward",
+    "label": "앞으로 이동",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "header"
+    ],
+    "status": "applied"
+  },
+  {
+    "file": "reading-settings.svg",
+    "name": "reading-settings",
+    "label": "읽기 설정",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "header"
+    ],
+    "status": "applied"
+  },
+  {
+    "name": "copy-active",
+    "file": "copy.svg",
+    "label": "복사",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "menus"
+    ],
+    "status": "applied"
+  },
+  {
+    "name": "search-current",
+    "label": "검색",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "search"
+    ],
+    "status": "applied",
+    "file": "search.svg"
+  },
+  {
+    "name": "search-previous",
+    "label": "이전 검색 결과",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "search"
+    ],
+    "status": "applied",
+    "file": "search-previous.svg"
+  },
+  {
+    "name": "search-next",
+    "label": "다음 검색 결과",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "search"
+    ],
+    "status": "applied",
+    "file": "search-next.svg"
+  },
+  {
+    "name": "search-close",
+    "label": "검색 닫기",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "search"
+    ],
+    "status": "applied",
+    "file": "close.svg"
+  },
+  {
+    "name": "focus-enter",
+    "label": "미리보기 전체보기",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "preview"
+    ],
+    "status": "applied",
+    "file": "focus-enter.svg"
+  },
+  {
+    "name": "focus-exit",
+    "label": "전체보기 해제",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "preview"
+    ],
+    "status": "applied",
+    "file": "focus-exit.svg"
+  },
+  {
+    "name": "panel-layout",
+    "label": "패널 배치",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "preview"
+    ],
+    "status": "applied",
+    "file": "panel-layout.svg"
+  },
+  {
+    "name": "scroll-sync",
+    "label": "스크롤 동기화",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "preview"
+    ],
+    "status": "applied",
+    "file": "scroll-sync.svg"
+  },
+  {
+    "name": "swap-panes",
+    "label": "패널 위치 바꾸기",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "preview"
+    ],
+    "status": "applied",
+    "file": "swap-panes.svg"
+  },
+  {
+    "name": "reset-split",
+    "label": "너비 초기화",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "preview"
+    ],
+    "status": "applied",
+    "file": "reset-split.svg"
+  },
+  {
+    "name": "selected-option",
+    "label": "선택 표시",
+    "note": "승인 SVG 원본 · 동일 용도 공통 사용",
+    "groups": [
+      "preview"
+    ],
+    "status": "applied",
+    "file": "selected-option.svg"
   }
 ]

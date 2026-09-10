@@ -1,5 +1,5 @@
 import { showAppMenu, type AppMenuItem } from "../../components/menu/AppMenu";
-import reloadIconUrl from "../../assets/icons/proposals/outline-01/reload.svg";
+import reloadIconUrl from "../../assets/icons/reload.svg";
 import trashIconUrl from "../../assets/icons/trash.svg";
 import copyIconUrl from "../../assets/icons/copy.svg";
 import type { FolderEntry } from "./folder-gateway";

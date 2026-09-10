@@ -1,3 +1,8 @@
+import { AssetIcon } from "./icons/AssetIcon";
+import searchIconAsset from "../assets/icons/search.svg";
+import previousMatchIconAsset from "../assets/icons/search-previous.svg";
+import nextMatchIconAsset from "../assets/icons/search-next.svg";
+import closeIconAsset from "../assets/icons/close.svg";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { normalizeSearchIndex, type SearchSession } from "../lib/text-search";
 import "./PaneSearchBar.css";
@@ -5,36 +10,19 @@ import "./PaneSearchBar.css";
 const numberFormatter = new Intl.NumberFormat("ko-KR");
 
 export function SearchIcon() {
-  return (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <circle cx="7.5" cy="7.5" r="4.5" />
-      <path d="m11 11 3.5 3.5" />
-    </svg>
-  );
+  return <AssetIcon src={searchIconAsset} />;
 }
 
 function PreviousMatchIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path d="m4 9 4-4 4 4M8 5v7" />
-    </svg>
-  );
+  return <AssetIcon src={previousMatchIconAsset} />;
 }
 
 function NextMatchIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path d="m4 7 4 4 4-4M8 4v7" />
-    </svg>
-  );
+  return <AssetIcon src={nextMatchIconAsset} />;
 }
 
 function CloseIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path d="m4.5 4.5 7 7m0-7-7 7" />
-    </svg>
-  );
+  return <AssetIcon src={closeIconAsset} />;
 }
 
 export function PaneSearchBar({

@@ -89,6 +89,24 @@ describe("FolderTree", () => {
     vi.mocked(copyFolderEntry).mockReset().mockResolvedValue(undefined);
   });
 
+  it("reveals a current file across pages and can reveal it again without opening it", async () => {
+    const state = treeState();
+    state.expandedPaths = new Set();
+    state.directories[""].entries = Array.from({ length: 310 }, (_, i) => ({ name: `${i}.md`, path: `/docs/${i}.md`, relativePath: `${i}.md`, kind: "markdown" as const }));
+    state.selectedPath = "0.md";
+    const props = { state, currentDocumentPath: "/docs/305.md", isDocumentBusy: false, removingFilePath: null,
+      onSelect: vi.fn(), onToggleDirectory: vi.fn(), onRetryDirectory: vi.fn(), onRefresh: vi.fn(),
+      onOpenMarkdown: vi.fn(), onOpenImage: vi.fn(), onRemoveFile: vi.fn() };
+    const { rerender } = render(<FolderTree {...props} />);
+    expect(screen.queryByRole("treeitem", { name: "305.md, 현재 문서" })).not.toBeInTheDocument();
+    rerender(<FolderTree {...props} revealRequest={{ rootToken: 1, id: 1, path: "305.md" }} />);
+    await waitFor(() => expect(screen.getByRole("treeitem", { name: "305.md, 현재 문서" })).toHaveFocus());
+    fireEvent.click(screen.getByRole("treeitem", { name: "306.md" }));
+    rerender(<FolderTree {...props} revealRequest={{ rootToken: 1, id: 2, path: "305.md" }} />);
+    await waitFor(() => expect(screen.getByRole("treeitem", { name: "305.md, 현재 문서" })).toHaveFocus());
+    expect(props.onOpenMarkdown).not.toHaveBeenCalled();
+  });
+
   it("copies the clicked file and Shift copies its name without opening it", async () => {
     const props = renderTree();
     const row = screen.getByRole("treeitem", { name: "cover.png" });

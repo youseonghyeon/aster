@@ -1,3 +1,5 @@
+import { AssetIcon } from "../../components/icons/AssetIcon";
+import selectedOptionIconAsset from "../../assets/icons/selected-option.svg";
 import {
   useEffect,
   useRef,
@@ -156,11 +158,7 @@ function SelectChevronIcon() {
 }
 
 function SelectedOptionIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path d="m3.5 8.25 2.75 2.75 6.25-6.25" />
-    </svg>
-  );
+  return <AssetIcon src={selectedOptionIconAsset} />;
 }
 
 function ReadingFontSelect({
