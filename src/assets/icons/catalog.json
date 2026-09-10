@@ -289,5 +289,45 @@
     ],
     "status": "applied",
     "file": "selected-option.svg"
+  },
+  {
+    "name": "zoom-out",
+    "file": "zoom-out.svg",
+    "label": "다이어그램 축소",
+    "note": "Dev 적용 시안 · 사용자 확인 대기",
+    "groups": [
+      "preview"
+    ],
+    "status": "preview"
+  },
+  {
+    "name": "zoom-in",
+    "file": "zoom-in.svg",
+    "label": "다이어그램 확대",
+    "note": "Dev 적용 시안 · 사용자 확인 대기",
+    "groups": [
+      "preview"
+    ],
+    "status": "preview"
+  },
+  {
+    "name": "fit-width",
+    "file": "fit-width.svg",
+    "label": "다이어그램 너비 맞춤",
+    "note": "Dev 적용 시안 · 사용자 확인 대기",
+    "groups": [
+      "preview"
+    ],
+    "status": "preview"
+  },
+  {
+    "name": "diagram-open",
+    "file": "focus-enter.svg",
+    "label": "다이어그램 크게 보기",
+    "note": "전체보기 공통 SVG 재사용 · Dev 확인 대기",
+    "groups": [
+      "preview"
+    ],
+    "status": "preview"
   }
 ]

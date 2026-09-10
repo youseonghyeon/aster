@@ -167,7 +167,6 @@ export function MermaidDiagramDialog({
     () => commitZoom(getNextMermaidZoomPercent(zoomPercent, -1)),
     [commitZoom, zoomPercent],
   );
-  const handleReset = useCallback(() => commitZoom(100), [commitZoom]);
   const handleZoomIn = useCallback(
     () => commitZoom(getNextMermaidZoomPercent(zoomPercent, 1)),
     [commitZoom, zoomPercent],
@@ -290,7 +289,6 @@ export function MermaidDiagramDialog({
             zoomPercent={zoomPercent}
             disabled={false}
             onZoomOut={handleZoomOut}
-            onReset={handleReset}
             onZoomIn={handleZoomIn}
             onFitWidth={handleFitWidth}
           />

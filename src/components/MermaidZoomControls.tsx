@@ -1,21 +1,26 @@
 import { memo } from "react";
+import { AssetIcon } from "./icons/AssetIcon";
+import fitWidthIcon from "../assets/icons/fit-width.svg";
+import zoomOutIcon from "../assets/icons/zoom-out.svg";
+import openLargeIcon from "../assets/icons/focus-enter.svg";
+import zoomInIcon from "../assets/icons/zoom-in.svg";
 
 type MermaidZoomControlsProps = {
   zoomPercent: number;
   disabled: boolean;
   onZoomOut: () => void;
-  onReset: () => void;
   onZoomIn: () => void;
   onFitWidth: () => void;
+  onOpenLargeView?: (trigger: HTMLButtonElement) => void;
 };
 
 export const MermaidZoomControls = memo(function MermaidZoomControls({
   zoomPercent,
   disabled,
   onZoomOut,
-  onReset,
   onZoomIn,
   onFitWidth,
+  onOpenLargeView,
 }: MermaidZoomControlsProps) {
   return (
     <div
@@ -33,17 +38,7 @@ export const MermaidZoomControls = memo(function MermaidZoomControls({
         disabled={disabled || zoomPercent <= 25}
         onClick={onZoomOut}
       >
-        −
-      </button>
-      <button
-        type="button"
-        className="mermaid-diagram-control-button is-percent"
-        aria-label={`${zoomPercent}% — 100%로 재설정`}
-        title="100%로 재설정"
-        disabled={disabled || zoomPercent === 100}
-        onClick={onReset}
-      >
-        {zoomPercent}%
+        <AssetIcon src={zoomOutIcon} />
       </button>
       <button
         type="button"
@@ -53,18 +48,30 @@ export const MermaidZoomControls = memo(function MermaidZoomControls({
         disabled={disabled || zoomPercent >= 200}
         onClick={onZoomIn}
       >
-        +
+        <AssetIcon src={zoomInIcon} />
       </button>
       <button
         type="button"
-        className="mermaid-diagram-control-button is-fit"
-        aria-label="현재 폭에 한 번 맞춤"
-        title="현재 폭에 한 번 맞춤"
+        className="mermaid-diagram-control-button is-icon is-fit"
+        aria-label="너비 맞춤"
+        title="너비 맞춤"
         disabled={disabled}
         onClick={onFitWidth}
       >
-        너비 맞춤
+        <AssetIcon src={fitWidthIcon} />
       </button>
+      {onOpenLargeView ? (
+        <button
+          type="button"
+          className="mermaid-diagram-control-button is-icon"
+          aria-label="다이어그램 크게 보기"
+          title="다이어그램 크게 보기"
+          disabled={disabled}
+          onClick={(event) => onOpenLargeView(event.currentTarget)}
+        >
+          <AssetIcon src={openLargeIcon} />
+        </button>
+      ) : null}
     </div>
   );
 });

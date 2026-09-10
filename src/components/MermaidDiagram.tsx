@@ -1,3 +1,4 @@
+import { useDiagramPan } from "../hooks/useDiagramPan";
 import {
   memo,
   useCallback,
@@ -141,7 +142,9 @@ export const MermaidDiagram = memo(function MermaidDiagram({
     useRef<PreviewScrollAnchorSnapshot | null>(null);
   const zoomPercentRef = useRef(100);
   const [zoomPercent, setZoomPercent] = useState(100);
+  const [documentTitle, setDocumentTitle] = useState("다이어그램");
   const [isLargeViewOpen, setIsLargeViewOpen] = useState(false);
+  const pan = useDiagramPan(wrapperRef, `${source}:${appearanceKey}:${curve}:${isLargeViewOpen}`);
   zoomPercentRef.current = zoomPercent;
   const [state, setState] = useState<MermaidDiagramState>({
     svg: null,
@@ -263,7 +266,6 @@ export const MermaidDiagram = memo(function MermaidDiagram({
     commitZoom(getNextMermaidZoomPercent(zoomPercent, -1));
   }, [commitZoom, zoomPercent]);
 
-  const handleReset = useCallback(() => commitZoom(100), [commitZoom]);
 
   const handleZoomIn = useCallback(() => {
     commitZoom(getNextMermaidZoomPercent(zoomPercent, 1));
@@ -286,8 +288,18 @@ export const MermaidDiagram = memo(function MermaidDiagram({
     if (fitPercent !== null) commitZoom(fitPercent);
   }, [commitZoom]);
 
-  const handleOpenLargeView = useCallback(() => {
-    largeViewReturnFocusRef.current = canvasRef.current;
+  const handleOpenLargeView = useCallback((trigger?: HTMLElement) => {
+    const wrapper = wrapperRef.current;
+    const body = wrapper?.closest(".markdown-body");
+    let title = "다이어그램";
+    for (const heading of body?.querySelectorAll("h1,h2,h3,h4,h5,h6") ?? []) {
+      if (heading.closest(".mermaid-diagram")) continue;
+      if (wrapper && (heading.compareDocumentPosition(wrapper) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+        title = heading.textContent?.trim() || title;
+      }
+    }
+    setDocumentTitle(title);
+    largeViewReturnFocusRef.current = trigger ?? canvasRef.current;
     setIsLargeViewOpen(true);
   }, []);
 
@@ -341,9 +353,9 @@ export const MermaidDiagram = memo(function MermaidDiagram({
           zoomPercent={zoomPercent}
           disabled={isBusy}
           onZoomOut={handleZoomOut}
-          onReset={handleReset}
           onZoomIn={handleZoomIn}
           onFitWidth={handleFitWidth}
+          onOpenLargeView={handleOpenLargeView}
         />
       ) : null}
       <div
@@ -371,7 +383,10 @@ export const MermaidDiagram = memo(function MermaidDiagram({
             tabIndex={isBusy ? undefined : 0}
             aria-label={isBusy ? undefined : `${accessibleName} 크게 보기`}
             title={isBusy ? undefined : "다이어그램 크게 보기"}
-            onClick={isBusy ? undefined : handleOpenLargeView}
+            {...(!isBusy ? pan.handlers : {})}
+            onClick={isBusy ? undefined : () => {
+              if (!pan.consumeClick()) handleOpenLargeView();
+            }}
             onKeyDown={isBusy ? undefined : handleCanvasKeyDown}
             dangerouslySetInnerHTML={{ __html: zoomedSvg ?? "" }}
           />
@@ -386,7 +401,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({
       {isLargeViewOpen && hasVisibleSvg ? (
         <MermaidDiagramDialog
           svg={state.svg ?? ""}
-          accessibleTitle={state.accessibleTitle}
+          accessibleTitle={documentTitle}
           onClose={handleCloseLargeView}
         />
       ) : null}
