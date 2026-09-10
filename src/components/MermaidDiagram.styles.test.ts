@@ -28,7 +28,24 @@ describe("Mermaid large-view spacing", () => {
     expect(canvas).toMatch(/width:\s*max-content/);
     expect(canvas).toMatch(/min-width:\s*100%/);
     expect(canvas).toMatch(/min-height:\s*100%/);
-    expect(canvas).toMatch(/padding:\s*clamp\(40px, 6vw, 72px\)/);
+    expect(canvas).toMatch(/padding:\s*clamp\(20px, 3vw, 36px\)/);
     expect(canvas).toMatch(/place-items:\s*center/);
   });
+});
+
+
+it("removes the diagram and close-button focus outlines without removing zoom button feedback", () => {
+  for (const selector of [
+    ".markdown-body .mermaid-diagram-scroll:focus",
+    ".markdown-body .mermaid-diagram-canvas.is-openable:focus",
+    ".markdown-body .mermaid-diagram-dialog-close:focus",
+  ]) expect(cssRule(selector)).toMatch(/outline:\s*none/);
+  expect(cssRule(".markdown-body .mermaid-diagram-control-button:focus-visible")).toMatch(/outline:\s*2px/);
+});
+
+
+it("restores the original content-driven height limit", () => {
+  const viewport = cssRule(".markdown-body .mermaid-diagram-scroll");
+  expect(viewport).not.toMatch(/min-height:/);
+  expect(viewport).toMatch(/max-height:\s*min\(70vh, 760px\)/);
 });

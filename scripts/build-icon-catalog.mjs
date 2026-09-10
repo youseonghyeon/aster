@@ -13,7 +13,7 @@ const groups = [
   ["preview", "미리보기 · 패널", "전체보기, 패널 배치와 스크롤 동기화"],
   ["menus", "우클릭 메뉴", "다시 로드, 복사, 이름 복사와 삭제"],
 ];
-const status = { applied: "SVG 적용", inline: "현재 코드 SVG", proposal: "승인 에셋 · 미연결" };
+const status = { preview: "Dev 적용 · 확인 대기", applied: "SVG 적용", inline: "현재 코드 SVG", proposal: "승인 에셋 · 미연결" };
 const seen = new Set();
 for (const entry of entries) {
   if (seen.has(entry.name)) throw new Error(`Duplicate icon: ${entry.name}`);
@@ -41,7 +41,7 @@ function page(group) {
   const nav = `<a href="${home}" class="${!sub ? "active" : ""}">전체 목록 · ${entries.length}</a>` + groups.map(g => `<a href="${link(g[0])}" class="${g === group ? "active" : ""}">${g[1]}</a>`).join("");
   const categories = !sub ? `<div class="categories">${groups.map(g => `<a class="category" href="${link(g[0])}"><b>${g[1]}</b><span>${g[2]}<br>${entries.filter(e => e.groups.includes(g[0])).length}개</span></a>`).join("")}</div>` : "";
   const button = name => `<button title="${escape(entries.find(e => e.name === name)?.label ?? name)}" type="button">${icons.get(name)}</button>`;
-  const demo = group?.[0] === "header" ? `<div class="preview"><div class="toolbar">${button("history-back")}${button("history-forward")}${button("document-browser")}${button("outline")}<span class="document">감사로그 요구사항.md</span>${button("folder-open")}${button("reading-settings")}</div><small>현재 적용한 상단 구성</small></div>` : group?.[0] === "preview" ? `<div class="preview"><div class="toolbar">${["search-current", "focus-enter", "focus-exit", "panel-layout", "scroll-sync", "swap-panes", "reset-split"].map(button).join("")}</div><small>현재 코드의 모양을 비교합니다. 버튼은 모양 확인용입니다.</small></div>` : "";
+  const demo = group?.[0] === "header" ? `<div class="preview"><div class="toolbar">${button("history-back")}${button("history-forward")}${button("document-browser")}${button("outline")}<span class="document">감사로그 요구사항.md</span>${button("folder-open")}${button("reading-settings")}</div><small>현재 적용한 상단 구성</small></div>` : group?.[0] === "preview" ? `<div class="preview"><div class="toolbar">${["search-current", "focus-enter", "focus-exit", "panel-layout", "scroll-sync", "swap-panes", "reset-split", "zoom-out", "zoom-in", "fit-width", "diagram-open"].map(button).join("")}</div><small>현재 코드의 모양을 비교합니다. 버튼은 모양 확인용입니다.</small></div>` : "";
 
   const family = `<div class="family">${list.map(e => `<div class="family-item">${e.svg}<span>${escape(e.label)}</span></div>`).join("")}</div>`;
   const cards = list.map(e => `<article class="card" data-search="${escape(e.label + " " + e.name + " " + e.note)}"><div class="specimen after"><span class="tiny">${e.svg}<small>16px</small></span><span>${e.svg}<small>18px</small></span><span class="large">${e.svg}<small>48px</small></span></div><div class="meta"><b>${escape(e.label)}</b><span class="state">${status[e.status]}</span><p>${escape(e.note)}</p><div class="origin">${escape(e.origin)}</div><a class="download" href="data:image/svg+xml;charset=utf-8,${encodeURIComponent(e.svg)}" download="${escape(e.name)}.svg">SVG 보기 / 저장</a></div></article>`).join("");

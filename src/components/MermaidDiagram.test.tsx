@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import {
   act,
   createEvent,
@@ -53,6 +54,87 @@ function setScrollableDiagramMetrics(
 describe("MermaidDiagram", () => {
   beforeEach(() => {
     renderMermaidDiagram.mockReset();
+  });
+
+  it("opens through the explicit control and returns focus to that control", async () => {
+    renderMermaidDiagram.mockResolvedValue('<svg viewBox="0 0 400 200"><text>명시적 열기</text></svg>');
+    render(<MermaidDiagram source="A" appearanceKey="paper" curve="curved" />);
+    await screen.findByText("명시적 열기");
+    const controls = screen.getByRole("group");
+    expect(within(controls).getAllByRole("button").map(button => button.getAttribute("aria-label")))
+      .toEqual(["다이어그램 축소", "다이어그램 확대", "너비 맞춤", "다이어그램 크게 보기"]);
+    const open = within(controls).getByRole("button", { name: "다이어그램 크게 보기" });
+    fireEvent.click(open);
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "다이어그램 큰 보기 닫기" })).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() => expect(open).toHaveFocus());
+  });
+
+  it("keeps the original scale until the user requests width fitting", async () => {
+    const pending = deferred<string>();
+    renderMermaidDiagram.mockReturnValue(pending.promise);
+    render(<MermaidDiagram source="A" appearanceKey="paper" curve="curved" />);
+    const region = screen.getByRole("region");
+    Object.defineProperty(region, "clientWidth", { configurable: true, value: 500 });
+    await act(async () => { pending.resolve('<svg viewBox="0 0 1000 2400"><text>최초 맞춤</text></svg>'); });
+    await screen.findByText("최초 맞춤");
+    expect(region.querySelector("svg")).toHaveStyle({ width: "1000px", height: "2400px" });
+    expect(region.scrollTop).toBe(0);
+  });
+
+  it.each(["h1", "h2", "h3", "h4", "h5", "h6"])("uses the nearest preceding %s document heading", async (tag) => {
+    renderMermaidDiagram.mockResolvedValue('<svg viewBox="0 0 400 200"><title>SVG 내부 제목</title><text>그림</text></svg>');
+    const { container } = render(<div className="markdown-body">
+      <h1>이전 장</h1>
+      {createElement(tag, null, "현재 ", <strong>문서 제목</strong>)}
+      <MermaidDiagram source="A" appearanceKey="paper" curve="curved" />
+      <h2>다음 제목</h2>
+    </div>);
+    await screen.findByText("그림");
+    fireEvent.click(container.querySelector(".mermaid-diagram-canvas")!);
+    expect(screen.getByRole("dialog", { name: "현재 문서 제목" })).toBeInTheDocument();
+  });
+
+  it("pans inline without replacing SVG or opening on drag, then permits a click", async () => {
+    renderMermaidDiagram.mockResolvedValue('<svg viewBox="0 0 1000 600"><text>본문 드래그</text></svg>');
+    render(<MermaidDiagram source="A" appearanceKey="paper" curve="curved" />);
+    await screen.findByText("본문 드래그");
+    const region = screen.getByRole("region");
+    setScrollableDiagramMetrics(region, 0);
+    const canvas = region.querySelector<HTMLElement>(".mermaid-diagram-canvas")!;
+    const svg = canvas.querySelector("svg");
+    region.scrollLeft = 120; region.scrollTop = 80;
+    fireEvent.pointerDown(canvas, { isPrimary: true, pointerId: 1, button: 0, clientX: 200, clientY: 160 });
+    fireEvent.pointerMove(canvas, { isPrimary: true, pointerId: 1, clientX: 150, clientY: 100 });
+    expect(region.scrollLeft).toBe(170); expect(region.scrollTop).toBe(140);
+    expect(canvas.querySelector("svg")).toBe(svg);
+    fireEvent.pointerUp(canvas, { pointerId: 1 });
+    fireEvent.click(canvas);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(canvas).not.toHaveClass("is-dragging");
+    fireEvent.pointerDown(canvas, { isPrimary: true, pointerId: 2, button: 0, clientX: 200, clientY: 160 });
+    fireEvent.pointerMove(canvas, { isPrimary: true, pointerId: 2, clientX: 202, clientY: 160 });
+    fireEvent.pointerUp(canvas, { pointerId: 2 });
+    fireEvent.click(canvas);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it.each(["pointerCancel", "lostPointerCapture"] as const)("cleans inline pan after %s and clamps content bounds", async (finish) => {
+    renderMermaidDiagram.mockResolvedValue('<svg viewBox="0 0 1000 600"><text>취소</text></svg>');
+    render(<MermaidDiagram source="A" appearanceKey="paper" curve="curved" />);
+    await screen.findByText("취소");
+    const region = screen.getByRole("region");
+    setScrollableDiagramMetrics(region, 0);
+    const canvas = region.querySelector<HTMLElement>(".mermaid-diagram-canvas")!;
+    fireEvent.pointerDown(canvas, { isPrimary: true, pointerId: 1, button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(canvas, { isPrimary: true, pointerId: 1, clientX: -5000, clientY: -5000 });
+    expect(region.scrollLeft).toBe(700); expect(region.scrollTop).toBe(400);
+    fireEvent[finish](canvas, { pointerId: 1 });
+    fireEvent.pointerMove(canvas, { isPrimary: true, pointerId: 1, clientX: 5000, clientY: 5000 });
+    expect(region.scrollLeft).toBe(700);
+    fireEvent.click(canvas);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("reads the current Aster theme tokens", () => {
@@ -113,12 +195,10 @@ describe("MermaidDiagram", () => {
     expect(controls).toHaveAttribute("data-preview-search-ignore", "true");
     expect(controls).toHaveAttribute("aria-busy", "false");
     expect(screen.getByRole("button", { name: "다이어그램 축소" })).toBeEnabled();
-    expect(
-      screen.getByRole("button", { name: "100% — 100%로 재설정" }),
-    ).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /100%로 재설정/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "다이어그램 확대" })).toBeEnabled();
     expect(
-      screen.getByRole("button", { name: "현재 폭에 한 번 맞춤" }),
+      screen.getByRole("button", { name: "너비 맞춤" }),
     ).toBeEnabled();
     expect(
       screen.getByRole("button", {
@@ -159,12 +239,12 @@ describe("MermaidDiagram", () => {
     });
     fireEvent.keyDown(openCanvas, { key: "Enter" });
 
-    const dialog = screen.getByRole("dialog", { name: "큰 읽기 흐름" });
+    const dialog = screen.getByRole("dialog", { name: "다이어그램" });
     expect(dialog).toHaveAttribute("open");
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(dialog).toHaveAttribute("data-preview-search-ignore", "true");
     const largeRegion = within(dialog).getByRole("region", {
-      name: "큰 보기: 큰 읽기 흐름",
+      name: "큰 보기: 다이어그램",
     });
     expect(largeRegion.querySelector("svg")).toHaveStyle({
       width: "1000px",
@@ -234,7 +314,7 @@ describe("MermaidDiagram", () => {
     );
     const dialog = screen.getByRole("dialog");
     const largeRegion = within(dialog).getByRole<HTMLElement>("region", {
-      name: "큰 보기: Mermaid 다이어그램",
+      name: "큰 보기: 다이어그램",
     });
     const largeCanvas = largeRegion.querySelector<HTMLElement>(
       ".mermaid-diagram-dialog-canvas",
@@ -272,11 +352,7 @@ describe("MermaidDiagram", () => {
     });
     expect(largeRegion.scrollLeft).toBe(120);
     expect(largeRegion.scrollTop).toBe(80);
-    expect(
-      within(dialog).getByRole("button", {
-        name: "110% — 100%로 재설정",
-      }),
-    ).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /100%로 재설정/ })).not.toBeInTheDocument();
 
     fireEvent.pointerMove(largeCanvas as HTMLElement, {
       pointerId: 7,
@@ -325,11 +401,7 @@ describe("MermaidDiagram", () => {
     });
     fireEvent(largeRegion, zoomInWheel);
     expect(zoomInWheel.defaultPrevented).toBe(true);
-    expect(
-      within(dialog).getByRole("button", {
-        name: "110% — 100%로 재설정",
-      }),
-    ).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /100%로 재설정/ })).not.toBeInTheDocument();
     expect(largeRegion.querySelector("svg")).toHaveStyle({
       width: "1100px",
       height: "660px",
@@ -342,11 +414,7 @@ describe("MermaidDiagram", () => {
     });
     fireEvent(largeRegion, plainWheel);
     expect(plainWheel.defaultPrevented).toBe(false);
-    expect(
-      within(dialog).getByRole("button", {
-        name: "110% — 100%로 재설정",
-      }),
-    ).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /100%로 재설정/ })).not.toBeInTheDocument();
 
     const zoomOutWheel = createEvent.wheel(largeRegion, {
       bubbles: true,
@@ -356,14 +424,10 @@ describe("MermaidDiagram", () => {
     });
     fireEvent(largeRegion, zoomOutWheel);
     expect(zoomOutWheel.defaultPrevented).toBe(true);
-    expect(
-      within(dialog).getByRole("button", {
-        name: "100% — 100%로 재설정",
-      }),
-    ).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /100%로 재설정/ })).not.toBeInTheDocument();
   });
 
-  it("zooms, resets, and fits an individual diagram", async () => {
+  it("zooms and fits an individual diagram", async () => {
     renderMermaidDiagram.mockResolvedValueOnce(
       '<svg viewBox="0 0 1000 400"><text>배율 테스트</text></svg>',
     );
@@ -393,12 +457,10 @@ describe("MermaidDiagram", () => {
       width: "1100px",
       height: "440px",
     });
-    expect(
-      screen.getByRole("button", { name: "110% — 100%로 재설정" }),
-    ).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /100%로 재설정/ })).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "110% — 100%로 재설정" }),
+      screen.getByRole("button", { name: "다이어그램 축소" }),
     );
     expect(region.querySelector("svg")).toHaveStyle({
       width: "1000px",
@@ -406,18 +468,16 @@ describe("MermaidDiagram", () => {
     });
 
     fireEvent.click(
-      screen.getByRole("button", { name: "현재 폭에 한 번 맞춤" }),
+      screen.getByRole("button", { name: "너비 맞춤" }),
     );
     expect(region.querySelector("svg")).toHaveStyle({
       width: "480px",
       height: "192px",
     });
-    expect(
-      screen.getByRole("button", { name: "48% — 100%로 재설정" }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /100%로 재설정/ })).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "현재 폭에 한 번 맞춤" }),
+      screen.getByRole("button", { name: "너비 맞춤" }),
     );
     expect(region.querySelector("svg")).toHaveStyle({
       width: "480px",
@@ -460,11 +520,7 @@ describe("MermaidDiagram", () => {
 
     expect(firstRegion.querySelector("svg")).toHaveStyle({ width: "550px" });
     expect(secondRegion.querySelector("svg")).toHaveStyle({ width: "600px" });
-    expect(
-      within(secondRegion.parentElement as HTMLElement).getByRole("button", {
-        name: "100% — 100%로 재설정",
-      }),
-    ).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /100%로 재설정/ })).not.toBeInTheDocument();
   });
 
   it("preserves the visible center when zoom changes", async () => {
@@ -529,9 +585,7 @@ describe("MermaidDiagram", () => {
       screen.getByRole("group", { name: "다이어그램 확대 및 축소" }),
     ).toHaveAttribute("aria-busy", "true");
     expect(screen.getByRole("button", { name: "다이어그램 확대" })).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: "110% — 100%로 재설정" }),
-    ).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /100%로 재설정/ })).not.toBeInTheDocument();
 
     await act(async () => {
       second.resolve('<svg viewBox="0 0 1000 500"><text>새 테마</text></svg>');
