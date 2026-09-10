@@ -19,7 +19,7 @@ macOS에서는 DMG를 열고 Aster를 Applications 폴더로 드래그하면 됩
 
 ### Homebrew로 설치 (macOS)
 
-개발자가 관리하는 [개인 Tap](https://github.com/youseonghyeon/homebrew-aster)을 통해 정식 Aster를 설치할 수 있습니다. Apple Silicon과 Intel을 모두 지원하는 Universal 앱이며, Homebrew 공식 Cask 등록은 아직 진행하지 않았습니다.
+개발자가 관리하는 [개인 Tap](https://github.com/youseonghyeon/homebrew-aster)을 통해 정식 Aster를 설치할 수 있습니다. Apple Silicon과 Intel을 모두 지원하는 Universal 앱입니다.
 
 ```sh
 brew install --cask youseonghyeon/aster/aster
