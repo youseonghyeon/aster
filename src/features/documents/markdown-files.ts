@@ -121,11 +121,11 @@ export function resolveCloseRequest(request: {
 
 export function confirmReloadDiscard(): Promise<boolean> {
   return confirm(
-    "다시 불러오면 Aster에서 수정한 Markdown 내용이 사라집니다. 원본 파일을 다시 불러올까요?",
+    "Aster에서 저장하지 않은 편집 내용을 버리고, 파일에 저장된 내용을 불러옵니다.",
     {
-      title: "Markdown 변경 내용 버리기",
+      title: "파일 내용 다시 불러오기",
       kind: "warning",
-      okLabel: "다시 불러오기",
+      okLabel: "편집 내용 버리고 불러오기",
       cancelLabel: "취소",
     },
   );
@@ -156,20 +156,20 @@ export async function chooseExternalConflictDecision(
   documentName: string,
 ): Promise<ExternalConflictDecision> {
   const result = await message(
-    `“${documentName}”이 다른 앱에서도 변경되었습니다. 사용할 내용을 선택해 주세요.`,
+    `다른 앱에서도 “${documentName}” 파일을 수정했습니다. 파일 내용을 불러오면 Aster의 미저장 편집 내용이 사라집니다. Aster 내용을 저장하면 파일의 내용을 덮어씁니다.`,
     {
-      title: "Markdown 변경 충돌",
+      title: "어느 내용을 사용할까요?",
       kind: "warning",
       buttons: {
-        yes: "외부 변경 적용",
-        no: "현재 내용으로 덮어쓰기",
+        yes: "파일 내용 불러오기",
+        no: "Aster 내용으로 덮어쓰기",
         cancel: "취소",
       },
     },
   );
-  return result === "외부 변경 적용"
+  return result === "파일 내용 불러오기"
     ? "external"
-    : result === "현재 내용으로 덮어쓰기"
+    : result === "Aster 내용으로 덮어쓰기"
       ? "overwrite"
       : "cancel";
 }
@@ -179,16 +179,14 @@ export async function chooseRecoveryDecision(
   diskChanged: boolean,
 ): Promise<"restore" | "discard"> {
   const result = await message(
-    diskChanged
-      ? `“${documentName}”의 복구 초안이 있지만 원본도 변경되었습니다. 초안을 복구하면 저장 전 충돌 확인이 필요합니다.`
-      : `“${documentName}”에서 저장하지 못한 변경 내용을 발견했습니다. 복구할까요?`,
+    `“${documentName}”에서 이전에 저장하지 않은 편집 내용이 남아 있습니다. 복구하면 이어서 편집할 수 있습니다. 복구본을 삭제해도 원본 파일은 삭제되지 않습니다.${diskChanged ? "\n\n파일 상태가 달라졌거나 확인되지 않아, 복구 후 저장 시 추가 확인이 필요할 수 있습니다." : ""}`,
     {
-      title: "변경 내용 복구",
+      title: "저장하지 않은 편집 내용 발견",
       kind: "warning",
-      buttons: { ok: "복구", cancel: "폐기" },
+      buttons: { ok: "편집 내용 복구", cancel: "복구본 삭제" },
     },
   );
-  return result === "복구" ? "restore" : "discard";
+  return result === "편집 내용 복구" ? "restore" : "discard";
 }
 
 export async function showMarkdownMessage(

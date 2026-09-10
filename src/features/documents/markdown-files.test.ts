@@ -86,8 +86,8 @@ describe("markdown file gateway", () => {
     await confirmReloadDiscard();
 
     expect(confirm).toHaveBeenCalledWith(
-      expect.stringContaining("다시 불러오면"),
-      expect.objectContaining({ okLabel: "다시 불러오기", kind: "warning" }),
+      expect.stringContaining("저장하지 않은 편집 내용을 버리고"),
+      expect.objectContaining({ okLabel: "편집 내용 버리고 불러오기", kind: "warning" }),
     );
   });
 
@@ -96,11 +96,11 @@ describe("markdown file gateway", () => {
       .mockResolvedValueOnce("저장")
       .mockResolvedValueOnce("저장 안 함")
       .mockResolvedValueOnce("취소")
-      .mockResolvedValueOnce("외부 변경 적용")
-      .mockResolvedValueOnce("현재 내용으로 덮어쓰기")
+      .mockResolvedValueOnce("파일 내용 불러오기")
+      .mockResolvedValueOnce("Aster 내용으로 덮어쓰기")
       .mockResolvedValueOnce("취소")
-      .mockResolvedValueOnce("복구")
-      .mockResolvedValueOnce("폐기");
+      .mockResolvedValueOnce("편집 내용 복구")
+      .mockResolvedValueOnce("복구본 삭제");
 
     await expect(chooseLeaveDocumentDecision("one.md", "switch")).resolves.toBe(
       "save",
