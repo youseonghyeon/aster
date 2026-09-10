@@ -13,6 +13,7 @@ import {
   restoreReadingScrollRegions,
 } from "../../lib/reading-scroll-regions";
 import { previewLayoutChangeEvent } from "../../lib/preview-layout-events";
+import { previewViewChangeEvent, type PreviewViewChangeDetail } from "../../lib/preview-view-change";
 import type { AppEventChannel } from "../../shared/app-events";
 
 type UseReadingLayoutPreservationOptions = {
@@ -66,6 +67,12 @@ export function useReadingLayoutPreservation({
     let signature = layoutSignature(preview);
     let expectedTop: number | null = null;
     let captureOnFrame = false;
+    let viewChange: {
+      token: object;
+      topDelta: number;
+      markdown: string;
+      path: string | null;
+    } | null = null;
 
     function isCurrentPreview() {
       const current = inputsRef.current;
@@ -87,7 +94,7 @@ export function useReadingLayoutPreservation({
     }
 
     function restore() {
-      if (!isCurrentPreview()) return;
+      if (!isCurrentPreview() || viewChange) return;
       const snapshot = snapshotRef.current;
       const current = inputsRef.current;
       if (!snapshot || snapshot.path !== current.documentPath || snapshot.markdown !== current.markdown) {
@@ -122,6 +129,7 @@ export function useReadingLayoutPreservation({
     }
 
     function cancelForNavigation() {
+      viewChange = null;
       cancelFrame();
       snapshotRef.current = null;
       expectedTop = null;
@@ -132,6 +140,10 @@ export function useReadingLayoutPreservation({
     }
 
     function beforeLayoutChange() {
+      if (viewChange) {
+        viewChange = null;
+        capture();
+      }
       const hasUnrestoredLayout = frame !== null || layoutSignature(preview) !== signature;
       cancelFrame();
       if (externalTokenRef.current === null && !hasUnrestoredLayout) capture();
@@ -140,7 +152,7 @@ export function useReadingLayoutPreservation({
     }
 
     function commit() {
-      if (!isCurrentPreview()) return;
+      if (!isCurrentPreview() || viewChange) return;
       const current = inputsRef.current;
       const snapshot = snapshotRef.current;
       if (snapshot && snapshot.path !== current.documentPath) {
@@ -164,6 +176,7 @@ export function useReadingLayoutPreservation({
 
     const unsubscribeLayout = events.subscribe("reading-layout-will-change", beforeLayoutChange);
     const unsubscribeExternal = events.subscribe("external-content-will-apply", ({ commitToken }) => {
+      viewChange = null;
       cancelFrame();
       if (externalTokenRef.current === null) capture();
       externalTokenRef.current = commitToken;
@@ -179,10 +192,47 @@ export function useReadingLayoutPreservation({
 
     function afterLayoutChange() {
       // Don't replace a pending user-intent capture with an old anchor.
-      if (snapshotRef.current) schedule();
+      if (snapshotRef.current && !viewChange) schedule();
+    }
+    function onViewChange(event: Event) {
+      const { token, target, phase } = (event as CustomEvent<PreviewViewChangeDetail>).detail;
+      if (phase === "start") {
+        if (!isCurrentPreview() || !preview.contains(target)) return;
+        cancelFrame();
+        // A new gesture supersedes any restoration captured before that gesture.
+        snapshotRef.current = null;
+        externalTokenRef.current = null;
+        appliedTokenRef.current = null;
+        expectedTop = null;
+        viewChange = {
+          token,
+          topDelta: target.getBoundingClientRect().top - preview.getBoundingClientRect().top,
+          markdown: inputsRef.current.markdown,
+          path: inputsRef.current.documentPath,
+        };
+        suppressScrollSyncRestore();
+        return;
+      }
+      if (viewChange?.token !== token) return;
+      const completed = viewChange;
+      viewChange = null;
+      if (!isCurrentPreview()) return;
+      if (phase === "complete" && preview.contains(target) &&
+          completed.path === inputsRef.current.documentPath &&
+          completed.markdown === inputsRef.current.markdown) {
+        suppressScrollSyncRestore();
+        const topDelta = target.getBoundingClientRect().top - preview.getBoundingClientRect().top;
+        // Preserve the frame's top, not a percentage of the resized diagram.
+        // Native scrolling clamps naturally at the document boundaries.
+        const adjustment = topDelta - completed.topDelta;
+        if (Math.abs(adjustment) > 0.5) preview.scrollTop += adjustment;
+      }
+      cancelFrame();
+      capture();
+      expectedTop = preview.scrollTop;
     }
     function onScroll(event: Event) {
-      if (!isCurrentPreview()) return;
+      if (!isCurrentPreview() || viewChange) return;
       if (layoutSignature(preview) !== signature && snapshotRef.current) {
         afterLayoutChange();
         return;
@@ -202,6 +252,7 @@ export function useReadingLayoutPreservation({
       attributeFilter: ["class", "style", "src", "open"],
     });
     preview.addEventListener(previewLayoutChangeEvent, afterLayoutChange);
+    preview.addEventListener(previewViewChangeEvent, onViewChange);
     preview.addEventListener("load", afterLayoutChange, true);
     preview.addEventListener("error", afterLayoutChange, true);
     preview.addEventListener("scroll", onScroll, true);
@@ -233,6 +284,7 @@ export function useReadingLayoutPreservation({
       resizeObserver.disconnect();
       mutationObserver.disconnect();
       preview.removeEventListener(previewLayoutChangeEvent, afterLayoutChange);
+      preview.removeEventListener(previewViewChangeEvent, onViewChange);
       preview.removeEventListener("load", afterLayoutChange, true);
       preview.removeEventListener("error", afterLayoutChange, true);
       preview.removeEventListener("scroll", onScroll, true);
