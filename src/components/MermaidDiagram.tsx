@@ -374,7 +374,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({
         role="region"
         aria-label={accessibleName}
         aria-busy={isBusy}
-        tabIndex={0}
+        tabIndex={-1}
       >
         <p
           className={statusClassName}
@@ -390,7 +390,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({
             ref={canvasRef}
             className={`mermaid-diagram-canvas${isBusy ? "" : " is-openable"}`}
             role={isBusy ? undefined : "button"}
-            tabIndex={isBusy ? undefined : 0}
+            tabIndex={isBusy ? undefined : -1}
             aria-label={isBusy ? undefined : `${accessibleName} 크게 보기`}
             title={isBusy ? undefined : "다이어그램 크게 보기"}
             {...(!isBusy ? pan.handlers : {})}
