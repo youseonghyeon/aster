@@ -135,7 +135,10 @@
   font-weight: 680;
 }
 
-.folder-tree-item:focus-visible,
+.folder-tree-item:focus-visible {
+  outline: none;
+}
+
 .folder-browser-message button:focus-visible,
 .folder-browser-footer button:focus-visible,
 .folder-browser-root button:focus-visible {
