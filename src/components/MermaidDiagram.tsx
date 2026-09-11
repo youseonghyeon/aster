@@ -21,6 +21,7 @@ import {
   type ScrollViewportCenter,
 } from "../lib/mermaid-zoom";
 import { notifyPreviewLayoutChange } from "../lib/preview-layout-events";
+import { beginPreviewViewChange, type PreviewViewChange } from "../lib/preview-view-change";
 import {
   capturePreviewScrollAnchor,
   restorePreviewScrollAnchor,
@@ -138,6 +139,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const largeViewReturnFocusRef = useRef<HTMLElement | null>(null);
   const pendingCenterRef = useRef<ScrollViewportCenter | null>(null);
+  const pendingViewChangeRef = useRef<PreviewViewChange | null>(null);
   const pendingOuterAnchorRef =
     useRef<PreviewScrollAnchorSnapshot | null>(null);
   const zoomPercentRef = useRef(100);
@@ -243,18 +245,27 @@ export const MermaidDiagram = memo(function MermaidDiagram({
     }
 
     const pendingOuterAnchor = pendingOuterAnchorRef.current;
-    if (pendingOuterAnchor) {
+    if (pendingOuterAnchor && !pendingViewChangeRef.current) {
       restorePreviewScrollAnchor(pendingOuterAnchor);
-      pendingOuterAnchorRef.current = null;
     }
+    pendingOuterAnchorRef.current = null;
+
+    pendingViewChangeRef.current?.complete();
+    pendingViewChangeRef.current = null;
 
     if (wrapper && canvas) notifyPreviewLayoutChange(wrapper);
   }, [state.revision, zoomPercent]);
+
+  useLayoutEffect(() => () => {
+    pendingViewChangeRef.current?.cancel();
+    pendingViewChangeRef.current = null;
+  }, []);
 
   const commitZoom = useCallback((nextZoomPercent: number) => {
     const wrapper = wrapperRef.current;
     if (!wrapper || zoomPercentRef.current === nextZoomPercent) return;
 
+    pendingViewChangeRef.current ??= beginPreviewViewChange(wrapper.parentElement ?? wrapper);
     pendingCenterRef.current = captureScrollViewportCenter(
       readViewportMetrics(wrapper),
     );
@@ -265,7 +276,6 @@ export const MermaidDiagram = memo(function MermaidDiagram({
   const handleZoomOut = useCallback(() => {
     commitZoom(getNextMermaidZoomPercent(zoomPercent, -1));
   }, [commitZoom, zoomPercent]);
-
 
   const handleZoomIn = useCallback(() => {
     commitZoom(getNextMermaidZoomPercent(zoomPercent, 1));

@@ -2021,6 +2021,10 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
   color: var(--text-muted);
 }
 
+.markdown-body :is(h1, h2, h3, h4, h5, h6):focus {
+  outline: none;
+}
+
 .markdown-body p,
 .markdown-body ul,
 .markdown-body ol,
@@ -2286,6 +2290,10 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
   position: relative;
   max-width: 100%;
   margin: 0 0 1em;
+  color: var(--text-body);
+  background: var(--preview-background);
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 
 .markdown-body .mermaid-diagram-controls {
@@ -2300,11 +2308,12 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
 }
 
 .markdown-body .mermaid-diagram > .mermaid-diagram-controls {
-  position: absolute;
-  right: 12px;
-  top: 12px;
-  z-index: 2;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
+  width: max-content;
+  max-width: calc(100% - 24px);
+  margin: 12px 12px 8px auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 6%);
 }
 
 .markdown-body .mermaid-diagram-control-button {
@@ -2345,8 +2354,12 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
   overscroll-behavior-block: auto;
   color: var(--text-body);
   background: var(--preview-background);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: inherit;
+}
+
+.markdown-body .mermaid-diagram.is-ready > .mermaid-diagram-scroll {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 /* Keep diagram panning available without native scrollbar indicators. */
@@ -2371,6 +2384,10 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
   user-select: none;
   touch-action: none;
   box-sizing: border-box;
+}
+
+.markdown-body .mermaid-diagram.is-ready .mermaid-diagram-canvas {
+  padding-top: 0;
 }
 
 .markdown-body .mermaid-diagram-canvas svg {

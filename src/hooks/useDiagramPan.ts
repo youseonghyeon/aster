@@ -1,9 +1,11 @@
 import { useEffect, useRef, type PointerEvent, type RefObject } from "react";
+import { beginPreviewViewChange, type PreviewViewChange } from "../lib/preview-view-change";
 
 /** Pan without React renders: keep SVG identity and native scroll offsets intact. */
 export function useDiagramPan(scrollRef: RefObject<HTMLDivElement | null>, resetKey: string) {
   const origin = useRef<{
     id: number; x: number; y: number; left: number; top: number; moved: boolean; target: HTMLDivElement;
+    viewChange?: PreviewViewChange;
   } | null>(null);
   const suppressClick = useRef(false);
   useEffect(() => {
@@ -14,6 +16,7 @@ export function useDiagramPan(scrollRef: RefObject<HTMLDivElement | null>, reset
       suppressClick.current = true;
       drag.target.classList.remove("is-dragging");
       if (drag.target.hasPointerCapture?.(drag.id)) drag.target.releasePointerCapture(drag.id);
+      drag.viewChange?.cancel();
     }
     window.addEventListener("blur", cancel);
     return () => { window.removeEventListener("blur", cancel); cancel(); };
@@ -27,6 +30,8 @@ export function useDiagramPan(scrollRef: RefObject<HTMLDivElement | null>, reset
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    if (event.type === "pointerup") drag.viewChange?.complete();
+    else drag.viewChange?.cancel();
   }
   return {
     consumeClick() {
@@ -51,6 +56,7 @@ export function useDiagramPan(scrollRef: RefObject<HTMLDivElement | null>, reset
         const dy = event.clientY - drag.y;
         if (!drag.moved && Math.hypot(dx, dy) < 5) return;
         if (!drag.moved) {
+          drag.viewChange = beginPreviewViewChange(scroll.parentElement ?? scroll);
           drag.moved = true;
           suppressClick.current = true;
           event.currentTarget.setPointerCapture?.(event.pointerId);
