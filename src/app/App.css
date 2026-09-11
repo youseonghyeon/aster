@@ -1961,6 +1961,11 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
   background: var(--selection);
 }
 
+/* 미리보기 안 요소는 Tab 순회 대상이 아니므로 포커스 링을 그리지 않는다. */
+.markdown-body :focus {
+  outline: none;
+}
+
 .markdown-body > :first-child {
   margin-top: 0;
 }
@@ -2256,11 +2261,6 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
   line-height: 1.65;
 }
 
-.markdown-body pre:focus-visible {
-  outline: 2px solid var(--accent-soft);
-  outline-offset: 3px;
-}
-
 .markdown-body pre code {
   padding: 0;
   color: inherit;
@@ -2330,11 +2330,6 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
 .markdown-body .mermaid-diagram-control-button:hover:not(:disabled) {
   color: var(--text-heading);
   background: var(--inline-code-background);
-}
-
-.markdown-body .mermaid-diagram-control-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
 
 .markdown-body .mermaid-diagram-control-button:disabled {
@@ -2599,11 +2594,6 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
   border-top: 2px solid var(--accent);
   border-radius: 7px;
   background: var(--preview-background);
-}
-
-.markdown-body .table-scroll:focus-visible {
-  outline: 2px solid var(--accent-soft);
-  outline-offset: 3px;
 }
 
 .markdown-body table {

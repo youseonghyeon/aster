@@ -34,13 +34,14 @@ describe("Mermaid large-view spacing", () => {
 });
 
 
-it("removes the diagram and close-button focus outlines without removing zoom button feedback", () => {
+it("draws no focus outline inside the preview, including zoom buttons", () => {
   for (const selector of [
+    ".markdown-body :focus",
     ".markdown-body .mermaid-diagram-scroll:focus",
     ".markdown-body .mermaid-diagram-canvas.is-openable:focus",
     ".markdown-body .mermaid-diagram-dialog-close:focus",
   ]) expect(cssRule(selector)).toMatch(/outline:\s*none/);
-  expect(cssRule(".markdown-body .mermaid-diagram-control-button:focus-visible")).toMatch(/outline:\s*2px/);
+  expect(appStyles).not.toContain(".markdown-body .mermaid-diagram-control-button:focus-visible {");
 });
 
 

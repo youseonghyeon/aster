@@ -109,16 +109,12 @@ const markdownComponents = {
   h6: MarkdownHeading6,
   a: function MarkdownLink({ node, href, onClick, ...linkProps }: MarkdownLinkProps) {
     const activateLink = useContext(MarkdownLinkContext);
-    const isExplicitAnchor = Boolean(
-      linkProps[markdownHtmlIdAttribute] ||
-        linkProps[markdownHtmlNameAttribute],
-    );
     void node;
     return (
       <a
         {...linkProps}
         href={href}
-        tabIndex={isExplicitAnchor && !href ? -1 : linkProps.tabIndex}
+        tabIndex={-1}
         onClick={(event) => {
           onClick?.(event);
           if (event.defaultPrevented || !href || event.button !== 0) return;
@@ -180,7 +176,7 @@ const markdownComponents = {
     }
 
     return (
-      <pre {...preProps} tabIndex={0} translate="no">
+      <pre {...preProps} tabIndex={-1} translate="no">
         {children}
       </pre>
     );
@@ -198,7 +194,7 @@ const markdownComponents = {
         className="table-scroll"
         role="region"
         aria-label="표"
-        tabIndex={0}
+        tabIndex={-1}
         data-source-offset={sourceOffset}
       >
         <table {...tableProps} />

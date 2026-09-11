@@ -32,6 +32,7 @@ export const MermaidZoomControls = memo(function MermaidZoomControls({
     >
       <button
         type="button"
+        tabIndex={-1}
         className="mermaid-diagram-control-button is-icon"
         aria-label="다이어그램 축소"
         title="다이어그램 축소"
@@ -42,6 +43,7 @@ export const MermaidZoomControls = memo(function MermaidZoomControls({
       </button>
       <button
         type="button"
+        tabIndex={-1}
         className="mermaid-diagram-control-button is-icon"
         aria-label="다이어그램 확대"
         title="다이어그램 확대"
@@ -52,6 +54,7 @@ export const MermaidZoomControls = memo(function MermaidZoomControls({
       </button>
       <button
         type="button"
+        tabIndex={-1}
         className="mermaid-diagram-control-button is-icon is-fit"
         aria-label="너비 맞춤"
         title="너비 맞춤"
@@ -63,6 +66,7 @@ export const MermaidZoomControls = memo(function MermaidZoomControls({
       {onOpenLargeView ? (
         <button
           type="button"
+          tabIndex={-1}
           className="mermaid-diagram-control-button is-icon"
           aria-label="다이어그램 크게 보기"
           title="다이어그램 크게 보기"
