@@ -4,9 +4,9 @@ import {
 } from "../../lib/mermaid-curve";
 
 export const themes = [
+  { value: "mono", label: "흑백" },
   { value: "snow", label: "밝게" },
   { value: "paper", label: "종이" },
-  { value: "solarized", label: "Solarized" },
   { value: "sepia", label: "세피아" },
   { value: "nord", label: "Nord" },
   { value: "dracula", label: "Dracula" },
