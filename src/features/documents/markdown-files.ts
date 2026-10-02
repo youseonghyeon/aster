@@ -119,6 +119,10 @@ export function resolveCloseRequest(request: {
   return invoke<void>("resolve_close_request", { request });
 }
 
+export function takeSystemOpenRequest(): Promise<string | null> {
+  return invoke<string | null>("take_system_open_request");
+}
+
 export function confirmReloadDiscard(): Promise<boolean> {
   return confirm(
     "Aster에서 저장하지 않은 편집 내용을 버리고, 파일에 저장된 내용을 불러옵니다.",

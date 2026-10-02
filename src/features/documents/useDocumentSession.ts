@@ -15,15 +15,11 @@ import {
   type DocumentOperationKind,
   type DocumentSessionAction,
 } from "./document-session-state";
-import {
-  isDocumentDirty,
-  isSameDocumentContext,
-} from "./document-transactions";
+import { isDocumentDirty } from "./document-transactions";
 import { initialMarkdown } from "./initial-document";
 import {
   chooseExternalConflictDecision,
   chooseLeaveDocumentDecision,
-  chooseRecoveryDecision,
   getMarkdownFileStatus,
   isDesktopRuntime,
   readMarkdownFile,
@@ -37,6 +33,7 @@ import { useDocumentPersistence } from "./useDocumentPersistence";
 import { useDocumentRecovery } from "./useDocumentRecovery";
 import { useExternalFileStatus } from "./useExternalFileStatus";
 import { useDocumentNativeCommands } from "./useDocumentNativeCommands";
+import { useInitialDraftRecovery } from "./useInitialDraftRecovery";
 
 type UseDocumentSessionOptions = {
   events: AppEventChannel;
@@ -62,7 +59,6 @@ export function useDocumentSession({
   const noteSaveTimerRef = useRef<number | null>(null);
   const recentStatusBatchRef = useRef(0);
   const handledExternalObservationRef = useRef<string | null>(null);
-  const initialRecoveryCheckedRef = useRef(false);
   const saveDocumentRef = useRef<() => Promise<boolean>>(async () => false);
   const scopedDocumentReaderRef = useRef<
     (() => Promise<OpenedMarkdownFile>) | null
@@ -312,26 +308,16 @@ export function useDocumentSession({
     openDocument,
   });
 
-  useEffect(() => {
-    if (initialRecoveryCheckedRef.current || !isDesktopRuntime()) return;
-    initialRecoveryCheckedRef.current = true;
-    if (hasStoredDocument) return;
-    const initial = stateRef.current.document;
-    void loadDraft(initial.draftIdentity)
-      .then(async (draft) => {
-        if (!mountedRef.current || !draft || draft.content === initialMarkdown) return;
-        if (!isSameDocumentContext(stateRef.current.document, initial, true)) return;
-        const decision = await chooseRecoveryDecision(initial.name, false);
-        if (!mountedRef.current) return;
-        if (!isSameDocumentContext(stateRef.current.document, initial, true)) return;
-        if (decision === "restore") {
-          dispatch({ type: "restore-draft", markdown: draft.content, conflicted: false });
-        } else {
-          await discardDraft(initial.draftIdentity);
-        }
-      })
-      .catch((error) => console.error("새 문서 복구 초안을 확인하지 못했습니다:", error));
-  }, [discardDraft, dispatch, hasStoredDocument, loadDraft]);
+  useInitialDraftRecovery({
+    hasStoredDocument,
+    stateRef,
+    mountedRef,
+    dispatch,
+    beginOperation,
+    finishOperation,
+    loadDraft,
+    discardDraft,
+  });
 
   const editMarkdown = useCallback(
     (value: string) => dispatch({ type: "edit-markdown", value }),
@@ -380,6 +366,7 @@ export function useDocumentSession({
   useDocumentNativeCommands({
     isBlockingModalOpen,
     openFromPickerRef,
+    openSystemDocument: isRestoring || state.operation ? null : openDocument,
     saveDocumentRef,
   });
 

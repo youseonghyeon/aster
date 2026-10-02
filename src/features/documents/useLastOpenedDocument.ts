@@ -5,14 +5,14 @@ import {
   loadInitialDocumentPath,
   saveLastOpenedDocumentPath,
 } from "./last-opened-document";
-import { isDesktopRuntime } from "./markdown-files";
+import { isDesktopRuntime, takeSystemOpenRequest } from "./markdown-files";
 
 type UseLastOpenedDocumentOptions = {
   documentPath: string | null;
   fallbackDocumentPath: string | null;
   openDocument: (
     path: string,
-    source: "startup",
+    source: "startup" | "system",
   ) => Promise<DocumentOpenOutcome>;
 };
 
@@ -43,6 +43,16 @@ export function useLastOpenedDocument({
       restoreCheckedRef.current = true;
       void (async () => {
         try {
+          const systemPath = await takeSystemOpenRequest().catch((error) => {
+            console.error("Finder에서 연 문서를 가져오지 못했습니다:", error);
+            return null;
+          });
+          if (
+            systemPath &&
+            (await openDocumentRef.current(systemPath, "system")) !== "failed"
+          ) {
+            return;
+          }
           const outcome = await openDocumentRef.current(
             initialStoredDocumentPath,
             "startup",

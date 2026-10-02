@@ -14,6 +14,7 @@ import {
   readMarkdownFile,
   saveMarkdownFile,
   showMarkdownMessage,
+  takeSystemOpenRequest,
 } from "./markdown-files";
 import { useDocumentSession } from "./useDocumentSession";
 import {
@@ -52,6 +53,7 @@ vi.mock("./markdown-files", () => ({
   saveRecoveryDraft: vi.fn(async () => true),
   saveMarkdownFile: vi.fn(),
   showMarkdownMessage: vi.fn(),
+  takeSystemOpenRequest: vi.fn(),
 }));
 
 vi.mock("./useExternalFileStatus", () => ({
@@ -80,6 +82,21 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+async function getSystemOpenHandler() {
+  await waitFor(() =>
+    expect(
+      vi
+        .mocked(listen)
+        .mock.calls.some(([eventName]) => eventName === "system-open-requested"),
+    ).toBe(true),
+  );
+  await act(async () => undefined);
+  const calls = vi
+    .mocked(listen)
+    .mock.calls.filter(([eventName]) => eventName === "system-open-requested");
+  return calls[calls.length - 1]?.[1] as () => void;
+}
+
 describe("document session controller", () => {
   beforeEach(() => {
     vi.mocked(listen).mockClear();
@@ -94,6 +111,8 @@ describe("document session controller", () => {
     vi.mocked(loadRecoveryDraft).mockReset();
     vi.mocked(showMarkdownMessage).mockReset();
     vi.mocked(showMarkdownMessage).mockResolvedValue(undefined);
+    vi.mocked(takeSystemOpenRequest).mockReset();
+    vi.mocked(takeSystemOpenRequest).mockResolvedValue(null);
     localStorage.clear();
     mockedExternalStatus.desktop = false;
     mockedExternalStatus.state = null;
@@ -182,6 +201,231 @@ describe("document session controller", () => {
       title: "파일을 열 수 없습니다",
       kind: "error",
     });
+  });
+
+  it("opens a Finder request instead of the last document on startup", async () => {
+    mockedExternalStatus.desktop = true;
+    saveLastOpenedDocumentPath("/docs/stored.md");
+    vi.mocked(takeSystemOpenRequest).mockResolvedValueOnce(firstFile.path);
+    vi.mocked(readMarkdownFile).mockResolvedValue(firstFile);
+    vi.mocked(loadRecoveryDraft).mockResolvedValue(null);
+    const events = createAppEventChannel();
+    const settled = vi.fn();
+    events.subscribe("document-open-settled", settled);
+    const { result } = renderHook(() => useDocumentSession({ events }));
+
+    expect(result.current.isRestoringStartupDocument).toBe(true);
+    await waitFor(() => expect(result.current.document.path).toBe(firstFile.path));
+    expect(result.current.isRestoringStartupDocument).toBe(false);
+    expect(readMarkdownFile).toHaveBeenCalledOnce();
+    expect(readMarkdownFile).toHaveBeenCalledWith(firstFile.path);
+    expect(settled).toHaveBeenCalledWith({ source: "system", outcome: "opened" });
+    expect(localStorage.getItem(lastOpenedDocumentStorageKey)).toBe(
+      firstFile.path,
+    );
+  });
+
+  it("restores the last document when a startup Finder request fails", async () => {
+    mockedExternalStatus.desktop = true;
+    saveLastOpenedDocumentPath(firstFile.path);
+    vi.mocked(takeSystemOpenRequest).mockResolvedValueOnce("/docs/large.md");
+    vi.mocked(readMarkdownFile)
+      .mockRejectedValueOnce(new Error("파일이 너무 큽니다"))
+      .mockResolvedValueOnce(firstFile);
+    vi.mocked(loadRecoveryDraft).mockResolvedValue(null);
+    const { result } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+
+    await waitFor(() => expect(result.current.document.path).toBe(firstFile.path));
+    expect(result.current.isRestoringStartupDocument).toBe(false);
+    expect(readMarkdownFile).toHaveBeenNthCalledWith(1, "/docs/large.md");
+    expect(readMarkdownFile).toHaveBeenNthCalledWith(2, firstFile.path);
+    expect(showMarkdownMessage).toHaveBeenCalledWith("파일이 너무 큽니다", {
+      title: "파일을 열 수 없습니다",
+      kind: "error",
+    });
+    expect(localStorage.getItem(lastOpenedDocumentStorageKey)).toBe(
+      firstFile.path,
+    );
+  });
+
+  it("opens a Finder request that arrives while the app is running", async () => {
+    mockedExternalStatus.desktop = true;
+    vi.mocked(readMarkdownFile).mockResolvedValue(firstFile);
+    vi.mocked(loadRecoveryDraft).mockResolvedValue(null);
+    const events = createAppEventChannel();
+    const settled = vi.fn();
+    events.subscribe("document-open-settled", settled);
+    const { result } = renderHook(() => useDocumentSession({ events }));
+    const requestSystemOpen = await getSystemOpenHandler();
+    expect(readMarkdownFile).not.toHaveBeenCalled();
+
+    vi.mocked(takeSystemOpenRequest).mockResolvedValueOnce(firstFile.path);
+    act(() => requestSystemOpen());
+
+    await waitFor(() => expect(result.current.document.path).toBe(firstFile.path));
+    expect(readMarkdownFile).toHaveBeenCalledWith(firstFile.path);
+    expect(settled).toHaveBeenCalledWith({ source: "system", outcome: "opened" });
+  });
+
+  it("opens a Finder request after the current open operation settles", async () => {
+    mockedExternalStatus.desktop = true;
+    vi.mocked(readMarkdownFile).mockResolvedValue(firstFile);
+    vi.mocked(loadRecoveryDraft).mockResolvedValue(null);
+    const picker = deferred<string | null>();
+    vi.mocked(chooseMarkdownFilePath).mockReturnValue(picker.promise);
+    const { result } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+    const requestSystemOpen = await getSystemOpenHandler();
+
+    let pickerOpen: Promise<string> | undefined;
+    act(() => {
+      pickerOpen = result.current.openFromPicker("picker");
+    });
+    vi.mocked(takeSystemOpenRequest).mockResolvedValueOnce(firstFile.path);
+    await act(async () => requestSystemOpen());
+    expect(readMarkdownFile).not.toHaveBeenCalled();
+
+    picker.resolve(null);
+    await act(async () => {
+      expect(await pickerOpen).toBe("cancelled");
+    });
+    await waitFor(() => expect(result.current.document.path).toBe(firstFile.path));
+    expect(readMarkdownFile).toHaveBeenCalledOnce();
+  });
+
+  it("restores the last document when the startup Finder request cannot be read", async () => {
+    mockedExternalStatus.desktop = true;
+    saveLastOpenedDocumentPath(firstFile.path);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(takeSystemOpenRequest).mockRejectedValueOnce(new Error("IPC 실패"));
+    vi.mocked(readMarkdownFile).mockResolvedValue(firstFile);
+    vi.mocked(loadRecoveryDraft).mockResolvedValue(null);
+    const { result } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+
+    await waitFor(() => expect(result.current.document.path).toBe(firstFile.path));
+    expect(readMarkdownFile).toHaveBeenCalledOnce();
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("opens a Finder request only after the initial draft recovery settles", async () => {
+    mockedExternalStatus.desktop = true;
+    const recoveryDecision = deferred<"restore" | "discard">();
+    vi.mocked(loadRecoveryDraft).mockResolvedValue({
+      version: 1,
+      identity: "untitled:test",
+      path: null,
+      content: "# 복구 초안",
+      baseRevision: null,
+      updatedAt: 1,
+      sequence: 1,
+    });
+    vi.mocked(chooseRecoveryDecision).mockReturnValue(recoveryDecision.promise);
+    vi.mocked(chooseLeaveDocumentDecision).mockResolvedValue("cancel");
+    vi.mocked(readMarkdownFile).mockResolvedValue(firstFile);
+    const { result } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+    const requestSystemOpen = await getSystemOpenHandler();
+    await waitFor(() => expect(chooseRecoveryDecision).toHaveBeenCalledOnce());
+
+    vi.mocked(takeSystemOpenRequest).mockResolvedValueOnce(firstFile.path);
+    await act(async () => requestSystemOpen());
+    expect(readMarkdownFile).not.toHaveBeenCalled();
+
+    await act(async () => recoveryDecision.resolve("restore"));
+    await waitFor(() =>
+      expect(chooseLeaveDocumentDecision).toHaveBeenCalledWith("새 문서.md", "switch"),
+    );
+    expect(result.current.document.path).toBeNull();
+    expect(result.current.document.markdown).toBe("# 복구 초안");
+    expect(result.current.document.recovered).toBe(true);
+  });
+
+  it("keeps a Finder request taken just before another open starts", async () => {
+    mockedExternalStatus.desktop = true;
+    vi.mocked(readMarkdownFile).mockResolvedValue(firstFile);
+    vi.mocked(loadRecoveryDraft).mockResolvedValue(null);
+    const picker = deferred<string | null>();
+    vi.mocked(chooseMarkdownFilePath).mockReturnValue(picker.promise);
+    const { result } = renderHook(() =>
+      useDocumentSession({ events: createAppEventChannel() }),
+    );
+    const requestSystemOpen = await getSystemOpenHandler();
+    await waitFor(() => expect(result.current.isBusy).toBe(false));
+
+    const takenRequest = deferred<string | null>();
+    vi.mocked(takeSystemOpenRequest).mockReturnValueOnce(takenRequest.promise);
+    act(() => requestSystemOpen());
+    let pickerOpen: Promise<string> | undefined;
+    act(() => {
+      pickerOpen = result.current.openFromPicker("picker");
+    });
+    await act(async () => takenRequest.resolve(firstFile.path));
+    expect(readMarkdownFile).not.toHaveBeenCalled();
+
+    picker.resolve(null);
+    await act(async () => {
+      expect(await pickerOpen).toBe("cancelled");
+    });
+    await waitFor(() => expect(result.current.document.path).toBe(firstFile.path));
+  });
+
+  it("retries a Finder request that loses the race to another open", async () => {
+    mockedExternalStatus.desktop = true;
+    vi.mocked(readMarkdownFile).mockResolvedValue(firstFile);
+    vi.mocked(loadRecoveryDraft).mockResolvedValue(null);
+    const picker = deferred<string | null>();
+    vi.mocked(chooseMarkdownFilePath).mockReturnValue(picker.promise);
+    const events = createAppEventChannel();
+    const settled: unknown[] = [];
+    events.subscribe("document-open-settled", (payload) => settled.push(payload));
+    const { result } = renderHook(() => useDocumentSession({ events }));
+    const requestSystemOpen = await getSystemOpenHandler();
+    await waitFor(() => expect(result.current.isBusy).toBe(false));
+
+    const takenRequest = deferred<string | null>();
+    vi.mocked(takeSystemOpenRequest).mockReturnValueOnce(takenRequest.promise);
+    act(() => requestSystemOpen());
+    let pickerOpen: Promise<string> | undefined;
+    await act(async () => {
+      pickerOpen = result.current.openFromPicker("picker");
+      takenRequest.resolve(firstFile.path);
+      for (let index = 0; index < 5; index += 1) await Promise.resolve();
+    });
+    expect(settled).toContainEqual({ source: "system", outcome: "busy" });
+    expect(readMarkdownFile).not.toHaveBeenCalled();
+
+    picker.resolve(null);
+    await act(async () => {
+      expect(await pickerOpen).toBe("cancelled");
+    });
+    await waitFor(() => expect(result.current.document.path).toBe(firstFile.path));
+  });
+
+  it("ignores a Finder request while a blocking modal is open", async () => {
+    mockedExternalStatus.desktop = true;
+    vi.mocked(loadRecoveryDraft).mockResolvedValue(null);
+    const { result } = renderHook(() =>
+      useDocumentSession({
+        events: createAppEventChannel(),
+        isBlockingModalOpen: () => true,
+      }),
+    );
+    const requestSystemOpen = await getSystemOpenHandler();
+
+    const takesBeforeRequest = vi.mocked(takeSystemOpenRequest).mock.calls.length;
+    vi.mocked(takeSystemOpenRequest).mockResolvedValueOnce(firstFile.path);
+    await act(async () => requestSystemOpen());
+
+    expect(takeSystemOpenRequest).toHaveBeenCalledTimes(takesBeforeRequest + 1);
+    expect(readMarkdownFile).not.toHaveBeenCalled();
+    expect(result.current.document.path).toBeNull();
   });
 
   it("emits exactly one settled event for cancelled and busy picker outcomes", async () => {

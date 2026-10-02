@@ -7,6 +7,7 @@ mod file_watch;
 mod folder_tree;
 mod linked_resources;
 mod recovery;
+mod system_open;
 mod update_check;
 mod window_geometry;
 
@@ -17,6 +18,7 @@ use folder_tree::{FolderListing, FolderRoot, FolderTreeState, ListFolderChildren
 use recovery::{
     DeleteRecoveryDraftRequest, RecoveryDraft, RecoveryState, SaveRecoveryDraftRequest,
 };
+use system_open::SystemOpenState;
 #[cfg(target_os = "macos")]
 use tauri::menu::AboutMetadata;
 use tauri::{
@@ -261,6 +263,7 @@ pub fn run() {
         .manage(RecoveryState::default())
         .manage(CloseGuardState::default())
         .manage(app_update::UpdateState::default())
+        .manage(SystemOpenState::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -381,7 +384,9 @@ pub fn run() {
             app_update::can_install_update,
             app_update::download_app_update,
             app_update::install_app_update,
+            system_open::take_system_open_request,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(system_open::handle_run_event);
 }
