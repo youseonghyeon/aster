@@ -5,6 +5,21 @@ Aster의 주요 변경 사항을 기록합니다. 이 프로젝트는
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-10-02
+
+### Added
+
+- macOS Finder의 "다음으로 열기"에서 Aster를 골라 Markdown 문서를 바로 여는 기능
+- macOS에서 `⇧⌘↩`로 전체 화면을 켜고 끄는 단축키(View 메뉴 "Toggle Full Screen")
+
+### Changed
+
+- Solarized 테마를 흑백 테마로 교체. 기존 Solarized 설정은 종이 테마로 바뀝니다.
+
+### Notes
+
+- macOS Universal 및 Windows x64 설치 파일을 제공합니다. Windows 실제 동작은 이번 릴리스에서 검증하지 않았습니다.
+
 ## [1.9.2] - 2026-09-11
 
 ### Fixed
