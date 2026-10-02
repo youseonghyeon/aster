@@ -3,6 +3,7 @@ export type DocumentOpenSource =
   | "picker"
   | "native"
   | "startup"
+  | "system"
   | "recent"
   | "link"
   | "history";

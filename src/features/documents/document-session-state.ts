@@ -17,7 +17,12 @@ export type MarkdownSaveStatus =
   | "saving"
   | "conflict"
   | "error";
-export type DocumentOperationKind = "open" | "reload" | "save" | "external";
+export type DocumentOperationKind =
+  | "open"
+  | "reload"
+  | "save"
+  | "external"
+  | "recovery";
 
 export type DocumentSnapshot = {
   name: string;

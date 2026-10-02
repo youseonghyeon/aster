@@ -1016,7 +1016,7 @@ describe("workspace regression contracts", () => {
       </StrictMode>,
     );
 
-    await waitFor(() => expect(listen).toHaveBeenCalledTimes(6));
+    await waitFor(() => expect(listen).toHaveBeenCalledTimes(8));
     unmount();
     await waitFor(() =>
       expect(unlisteners.every((unlisten) => unlisten.mock.calls.length === 1)).toBe(true),
