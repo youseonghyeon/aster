@@ -292,6 +292,10 @@ pub fn run() {
                 .accelerator("CmdOrCtrl+0")
                 .build(app)?;
             let view_separator = PredefinedMenuItem::separator(app)?;
+            let toggle_fullscreen_item =
+                MenuItemBuilder::with_id("toggle_fullscreen", "Toggle Full Screen")
+                    .accelerator("CmdOrCtrl+Shift+Enter")
+                    .build(app)?;
             #[cfg(target_os = "macos")]
             let check_for_updates_item =
                 MenuItemBuilder::with_id("check_for_updates", "업데이트 확인…").build(app)?;
@@ -327,6 +331,7 @@ pub fn run() {
                             &zoom_out_item,
                             &actual_size_item,
                             &view_separator,
+                            &toggle_fullscreen_item,
                         ])?,
                         _ => {}
                     }
@@ -349,6 +354,12 @@ pub fn run() {
             }
             "actual_size" => {
                 let _ = app.emit("reading-zoom-requested", "reset");
+            }
+            "toggle_fullscreen" => {
+                if let Some(window) = app.get_webview_window("main") {
+                    let is_fullscreen = window.is_fullscreen().unwrap_or(false);
+                    let _ = window.set_fullscreen(!is_fullscreen);
+                }
             }
             "check_for_updates" => {
                 let _ = app.emit("update-check-requested", ());
