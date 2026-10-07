@@ -107,6 +107,27 @@ describe("MarkdownPreview", () => {
     expect(onLinkActivate).toHaveBeenCalledWith("./next.md#%EC%86%8C%EA%B0%9C");
   });
 
+  it("keeps bullet lists exposed as lists after the native marker is removed", () => {
+    render(
+      <MarkdownPreview
+        content={`- 상황
+- 선택지
+  - (a) 기안
+
+<ul><li>HTML 목록</li></ul>
+
+1. 번호 목록`}
+        appearanceKey="paper"
+        mermaidCurve="curved"
+      />,
+    );
+
+    const bulletLists = document.querySelectorAll(".markdown-body ul");
+    expect(bulletLists).toHaveLength(3);
+    bulletLists.forEach((list) => expect(list).toHaveAttribute("role", "list"));
+    expect(document.querySelector(".markdown-body ol")).not.toHaveAttribute("role");
+  });
+
   it("renders sanitized HTML and keeps explicit anchors addressable", () => {
     render(
       <MarkdownPreview

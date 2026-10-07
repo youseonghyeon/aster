@@ -129,6 +129,11 @@ const markdownComponents = {
     void node;
     return <RelativeMarkdownImage {...imageProps} data-copy-src={imageProps.src} resolveImage={resolveImage} />;
   },
+  // App.css drops the native bullet marker, which makes WebKit stop exposing the list.
+  ul: ({ node, ...listProps }) => {
+    void node;
+    return <ul {...listProps} role="list" />;
+  },
   pre: function MarkdownCodeBlock({ node, children, ...preProps }) {
     const appearanceKey = useContext(MarkdownAppearanceContext);
     const mermaidCurve = useContext(MermaidCurveContext);

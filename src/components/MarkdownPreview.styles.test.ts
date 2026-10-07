@@ -16,6 +16,11 @@ describe("Markdown preview styles", () => {
     );
   });
 
+  it("removes the native bullet marker so it cannot paint a selection highlight", () => {
+    expect(appStyles).toMatch(/\.markdown-body ul\s*\{\s*list-style-type:\s*none;\s*\}/u);
+    expect(appStyles).not.toMatch(/\.markdown-body ul > li::marker/u);
+  });
+
   it("provides document styles for safe raw HTML elements", () => {
     expect(appStyles).toMatch(/\.markdown-body details\s*\{/u);
     expect(appStyles).toMatch(/\.markdown-body summary\s*\{/u);
