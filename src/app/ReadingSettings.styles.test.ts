@@ -71,4 +71,28 @@ describe("reading settings visual hierarchy", () => {
     );
     expect(appStyles).not.toMatch(/\.mermaid-curve-help:hover/);
   });
+
+  it("draws list bullets at whole-pixel sizes so every item keeps the same shape", () => {
+    const bullet = cssRule(".markdown-body ul > li::before");
+    const hollowBullet = cssRule(".markdown-body ul ul > li::before");
+    const squareBullet = cssRule(".markdown-body ul ul ul > li::before");
+    const triangle = cssRule('.app-shell[data-bullet-style="triangle"] .markdown-body ul > li::before');
+    const smallTriangle = cssRule(
+      '.app-shell[data-bullet-style="triangle"] .markdown-body ul ul ul > li::before',
+    );
+
+    expect(bullet).toMatch(/--bullet-size:\s*round\(0\.4em, 1px\)/);
+    expect(bullet).toMatch(/box-sizing:\s*border-box/);
+    expect(bullet).toMatch(/width:\s*var\(--bullet-size\)/);
+    expect(bullet).toMatch(/height:\s*var\(--bullet-size\)/);
+    expect(bullet).toMatch(/top:\s*calc\(0\.5lh - var\(--bullet-size\) \/ 2\)/);
+    expect(bullet).not.toMatch(/transform/);
+    expect(hollowBullet).toMatch(/--bullet-size:\s*round\(0\.54em, 1px\)/);
+    expect(squareBullet).toMatch(/--bullet-size:\s*round\(0\.4em, 1px\)/);
+    expect(triangle).toMatch(/--bullet-size:\s*round\(0\.6em, 1px\)/);
+    expect(smallTriangle).toMatch(/--bullet-size:\s*round\(0\.4em, 1px\)/);
+    for (const rule of [hollowBullet, squareBullet, triangle, smallTriangle]) {
+      expect(rule).not.toMatch(/(?:^|[\s;])(?:width|height):/);
+    }
+  });
 });

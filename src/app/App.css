@@ -2039,7 +2039,9 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
 }
 
 /* Keep native list semantics and marker metrics identical across shape choices.
-   Decorative shapes sit outside text flow, centered on the first text line. */
+   Decorative shapes sit outside text flow, centered on the first text line.
+   Whole-pixel sizes without a fractional transform keep WebKit's device-pixel
+   snapping from turning circles into uneven ovals. */
 .markdown-body ul > li {
   position: relative;
 }
@@ -2049,32 +2051,34 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
 }
 
 .markdown-body ul > li::before {
+  --bullet-size: round(0.4em, 1px);
   content: "";
+  box-sizing: border-box;
   position: absolute;
   inset-inline-end: calc(100% + 0.45em);
-  top: 0.5lh;
-  transform: translateY(-50%);
-  width: 0.4em;
-  height: 0.4em;
+  top: calc(0.5lh - var(--bullet-size) / 2);
+  width: var(--bullet-size);
+  height: var(--bullet-size);
   border-radius: 50%;
   background: currentColor;
   pointer-events: none;
 }
 
 .markdown-body ul ul > li::before {
+  --bullet-size: round(0.54em, 1px);
   border: 0.07em solid currentColor;
   background: transparent;
 }
 
 .markdown-body ul ul ul > li::before {
+  --bullet-size: round(0.4em, 1px);
   border: 0;
   border-radius: 0;
   background: currentColor;
 }
 
 .app-shell[data-bullet-style="triangle"] .markdown-body ul > li::before {
-  width: 0.6em;
-  height: 0.6em;
+  --bullet-size: round(0.6em, 1px);
   border: 0;
   border-radius: 0;
   background: currentColor;
@@ -2086,8 +2090,7 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
 }
 
 .app-shell[data-bullet-style="triangle"] .markdown-body ul ul ul > li::before {
-  width: 0.4em;
-  height: 0.4em;
+  --bullet-size: round(0.4em, 1px);
   mask: none;
 }
 
