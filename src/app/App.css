@@ -2038,16 +2038,18 @@ html[data-platform="macos"][data-window-fullscreen="true"] .header-leading {
   padding-left: 1.55em;
 }
 
-/* Keep native list semantics and marker metrics identical across shape choices.
+/* Keep marker metrics identical across shape choices. The native marker is
+   removed rather than made transparent because WebKit still paints and can
+   leave its selection highlight behind; MarkdownPreview restores the list role.
    Decorative shapes sit outside text flow, centered on the first text line.
    Whole-pixel sizes without a fractional transform keep WebKit's device-pixel
    snapping from turning circles into uneven ovals. */
-.markdown-body ul > li {
-  position: relative;
+.markdown-body ul {
+  list-style-type: none;
 }
 
-.markdown-body ul > li::marker {
-  color: transparent;
+.markdown-body ul > li {
+  position: relative;
 }
 
 .markdown-body ul > li::before {
